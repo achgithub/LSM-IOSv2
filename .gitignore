@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Xcode / SwiftPM
+xcuserdata/
+*.xcuserstate
+*.xcuserstatedata
+DerivedData/
+build/
+.build/
+.swiftpm/
+
+# Node / Wrangler (worker also has its own .gitignore)
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+*.log
+
+# Local tooling
+.claude/

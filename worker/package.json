@@ -1,0 +1,27 @@
+{
+  "name": "lms-worker",
+  "version": "1.1.0",
+  "private": true,
+  "description": "LMS (Last Man Standing) Cloudflare Worker — generic read-only sports-data API. One deployment (wrangler env) per league; the engine is league-agnostic and reads everything from per-env config.",
+  "type": "module",
+  "packageManager": "pnpm@11.2.2",
+  "volta": {
+    "node": "22.22.3",
+    "pnpm": "11.2.2"
+  },
+  "scripts": {
+    "dev": "wrangler dev --env pl",
+    "deploy:pl": "wrangler deploy --env pl",
+    "types": "wrangler types --env pl",
+    "typecheck": "tsc --noEmit",
+    "db:apply:pl": "wrangler d1 execute lms-pl-db --env pl --remote --file=./schema.sql",
+    "db:apply:pl:local": "wrangler d1 execute lms-pl-db --env pl --local --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "wrangler": "^4.100.0"
+  }
+}

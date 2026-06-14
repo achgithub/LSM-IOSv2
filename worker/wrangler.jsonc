@@ -1,0 +1,67 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ── Generic, league-agnostic top level ───────────────────────────────────
+  // The engine in src/ never hardcodes a league. Each league is a wrangler
+  // *environment* below, supplying its own config (vars), D1, KV and crons.
+  // Run/deploy a specific league with `--env <league>` (e.g. `--env pl`).
+  "name": "lms-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-14",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+
+  // ── Per-league deployments ───────────────────────────────────────────────
+  "env": {
+    // Premier League — the first/proof instance.
+    // Adding a new league = copy this block, change the config + resource IDs.
+    "pl": {
+      "name": "lms-pl-worker",
+
+      // League config (read at runtime via c.env). Mirrors configs/pl/league.config.json.
+      "vars": {
+        "LEAGUE_ID": "PL",
+        "LEAGUE_NAME": "Premier League",
+        "FOOTBALL_DATA_CODE": "PL",
+        "TEAMS_COUNT": "20",
+        "ROUNDS_PER_SEASON": "38",
+        "SCORE_TTL_SUB_SECONDS": "20",
+        "SCORE_TTL_FREE_SECONDS": "5400",
+        "TIMEZONE": "Europe/London",
+        "MAINTENANCE_WINDOW_UTC": "04:00"
+      },
+
+      // FOOTBALL_DATA_TOKEN is a SECRET — set with:
+      //   wrangler secret put FOOTBALL_DATA_TOKEN --env pl
+      // Never put it in vars / source.
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-pl-db",
+          "database_id": "22c5f7a2-aed6-4bc4-8769-eb2f6bcb66f8"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "229d93724a9840bba6d196d666a61545"
+        }
+      ],
+
+      // Maintenance window (UTC), winter offset = safe conservative choice (§10.3).
+      "triggers": {
+        "crons": [
+          "0 4 * * 1,4", // standings sync (Mon & Thu)
+          "1 4 * * *",   // fixtures sync (daily)
+          "2 4 * * *"    // score cache warm + counter reset (daily)
+        ]
+      }
+    }
+  }
+}

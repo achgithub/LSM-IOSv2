@@ -1,0 +1,3 @@
+# Copy to .dev.vars and fill in. Real values for deploy via: wrangler secret put <NAME> --env pl
+FOOTBALL_DATA_TOKEN=your-football-data-org-api-token
+ADMIN_TOKEN=a-long-random-string
