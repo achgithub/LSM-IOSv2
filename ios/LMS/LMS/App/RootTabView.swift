@@ -4,6 +4,10 @@ import SwiftUI
 /// (Picks are entered inside a game — Games → Enter Picks — so the second tab
 /// is the reusable player roster rather than a read-only picks view.)
 struct RootTabView: View {
+    /// True while the launch splash is still showing — modal presentations
+    /// (onboarding, downgrade gate) wait until it's gone so they don't pop over
+    /// the splash (a `.sheet`/`.fullScreenCover` presents at the window level).
+    var splashActive: Bool = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var entitlements = Entitlements.shared
     @Environment(EnabledLeagues.self) private var enabled
@@ -35,12 +39,12 @@ struct RootTabView: View {
             }
         }
         .environment(entitlements)
-        .sheet(isPresented: .constant(managerName.isEmpty)) {
+        .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {
             ManagerOnboardingView(managerName: $managerName)
         }
         // Subscription downgrade: block the whole app until the user trims their
         // enabled leagues back within the new allowance.
-        .fullScreenCover(isPresented: .constant(mustReduceLeagues)) {
+        .fullScreenCover(isPresented: .constant(!splashActive && mustReduceLeagues)) {
             LeagueDowngradeView()
                 .environment(entitlements)
         }

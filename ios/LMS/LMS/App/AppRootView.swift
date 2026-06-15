@@ -8,7 +8,7 @@ struct AppRootView: View {
 
     var body: some View {
         ZStack {
-            RootTabView()
+            RootTabView(splashActive: showSplash)
                 .environment(EnabledLeagues.shared)
 
             if showSplash {
