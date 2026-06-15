@@ -79,6 +79,7 @@ enum GameLogicService {
         fixtureIds: [Int],
         deadline: Date,
         roundType: RoundType = .normal,
+        leagueId: String = Leagues.home.id,
         context: ModelContext
     ) -> Round {
         let round = Round(
@@ -86,6 +87,7 @@ enum GameLogicService {
             deadline: deadline,
             fixtureIds: fixtureIds,
             roundType: roundType,
+            leagueId: leagueId,
             game: game
         )
         context.insert(round)

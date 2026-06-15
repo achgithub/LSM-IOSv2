@@ -10,6 +10,10 @@ final class Round {
     var fixtureIds: [Int]
     var deadline: Date
     var statusRaw: String
+    /// Which league these fixtures belong to (so resolution targets the right
+    /// Worker and team count). Empty on rounds created before multi-league —
+    /// `league` resolves that to the home league. See [[Leagues]].
+    var leagueIdRaw: String = ""
     var game: Game?
 
     @Relationship(deleteRule: .cascade, inverse: \Pick.round)
@@ -20,6 +24,7 @@ final class Round {
         deadline: Date,
         fixtureIds: [Int] = [],
         roundType: RoundType = .normal,
+        leagueId: String = Leagues.home.id,
         game: Game? = nil
     ) {
         self.id = UUID()
@@ -28,8 +33,12 @@ final class Round {
         self.fixtureIds = fixtureIds
         self.roundTypeRaw = roundType.rawValue
         self.statusRaw = RoundStatus.open.rawValue
+        self.leagueIdRaw = leagueId
         self.game = game
     }
+
+    /// The league this round's fixtures belong to (legacy empty → home).
+    var league: LeagueOption { Leagues.resolve(leagueIdRaw) }
 
     var status: RoundStatus {
         get { RoundStatus(rawValue: statusRaw) ?? .open }

@@ -6,10 +6,21 @@ struct LeagueData {
     let teamsById: [Int: TeamDTO]
     let standingsByTeam: [Int: StandingDTO]
 
+    /// Load from the home league's Worker (the app default).
     static func load() async throws -> LeagueData {
-        async let fixturesReq = APIClient.shared.fixtures()
-        async let teamsReq = APIClient.shared.teams()
-        async let standingsReq = APIClient.shared.standings()
+        try await load(from: APIClient.shared)
+    }
+
+    /// Load from a specific league's Worker — used by round-scoped screens so a
+    /// round always resolves against the league its fixtures came from.
+    static func load(for league: LeagueOption) async throws -> LeagueData {
+        try await load(from: league.client)
+    }
+
+    private static func load(from client: APIClient) async throws -> LeagueData {
+        async let fixturesReq = client.fixtures()
+        async let teamsReq = client.teams()
+        async let standingsReq = client.standings()
         let (fixtures, teams, standings) = try await (fixturesReq, teamsReq, standingsReq)
         return LeagueData(
             fixtures: fixtures,

@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// Open a new round: pick a matchday's fixtures (deselect any) and set the
-/// picks deadline (spec §6.3).
+/// Open a new round: choose a league, narrow fixtures (matchday / date range /
+/// unplayed-only) and select the ones the round runs on, then set the picks
+/// deadline (spec §6.3). Defaults to upcoming (unplayed) fixtures so managers
+/// see selectable games first.
 struct OpenRoundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -15,15 +17,40 @@ struct OpenRoundView: View {
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var matchday = 1
+
+    // Filters
+    @State private var selectedLeague: LeagueOption
+    @State private var matchdayFilter: Int?          // nil = all matchdays
+    @State private var unplayedOnly = true           // default: upcoming fixtures
+    @State private var dateFilterOn = false
+    @State private var dateFrom = Date()
+    @State private var dateTo = Date().addingTimeInterval(7 * 24 * 3600)
+
     @State private var selectedFixtureIds: Set<Int> = []
     @State private var deadline = Date()
 
-    private var matchdays: [Int] {
-        Array(Set((data?.fixtures ?? []).compactMap(\.matchday))).sorted()
+    init(game: Game, roundType: RoundType = .normal, onOpened: @escaping () -> Void = {}) {
+        self.game = game
+        self.roundType = roundType
+        self.onOpened = onOpened
+        // Stay in the game's current league for follow-up rounds; else home.
+        _selectedLeague = State(initialValue: game.currentRound?.league ?? Leagues.home)
     }
-    private var matchdayFixtures: [FixtureDTO] {
-        (data?.fixtures ?? []).filter { $0.matchday == matchday }.sorted { $0.kickoff < $1.kickoff }
+
+    private var allFixtures: [FixtureDTO] { data?.fixtures ?? [] }
+
+    private var matchdays: [Int] {
+        Array(Set(allFixtures.compactMap(\.matchday))).sorted()
+    }
+
+    /// Fixtures after every active filter, sorted by kickoff.
+    private var visibleFixtures: [FixtureDTO] {
+        allFixtures.filter { f in
+            (matchdayFilter == nil || f.matchday == matchdayFilter)
+                && (!unplayedOnly || Self.isUnplayed(f))
+                && (!dateFilterOn || dateInRange(f))
+        }
+        .sorted { $0.kickoff < $1.kickoff }
     }
 
     var body: some View {
@@ -45,56 +72,125 @@ struct OpenRoundView: View {
                     Button("Open") { create() }.disabled(selectedFixtureIds.isEmpty)
                 }
             }
-            .task { await load() }
+            .task(id: selectedLeague) { await load() }
         }
     }
 
     private var form: some View {
         Form {
+            Section("League") {
+                Picker("League", selection: $selectedLeague) {
+                    ForEach(Leagues.all) { Text($0.name).tag($0) }
+                }
+            }
+
+            Section("Filters") {
+                Picker("Matchday", selection: $matchdayFilter) {
+                    Text("All").tag(Int?.none)
+                    ForEach(matchdays, id: \.self) { Text("Matchday \($0)").tag(Int?.some($0)) }
+                }
+                Toggle("Unplayed only", isOn: $unplayedOnly)
+                Toggle("Filter by date", isOn: $dateFilterOn.animation())
+                if dateFilterOn {
+                    DatePicker("From", selection: $dateFrom, displayedComponents: .date)
+                    DatePicker("To", selection: $dateTo, in: dateFrom..., displayedComponents: .date)
+                }
+            }
+
             Section {
-                Picker("Matchday", selection: $matchday) {
-                    ForEach(matchdays, id: \.self) { Text("Matchday \($0)").tag($0) }
-                }
-                .onChange(of: matchday) { selectAllInMatchday() }
-            }
-            Section("Fixtures (\(selectedFixtureIds.count) selected)") {
-                ForEach(matchdayFixtures) { fixture in
-                    Button {
-                        toggle(fixture.id)
-                    } label: {
-                        HStack {
-                            Image(systemName: selectedFixtureIds.contains(fixture.id) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedFixtureIds.contains(fixture.id) ? .green : .secondary)
-                            FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
+                if visibleFixtures.isEmpty {
+                    Text("No fixtures match these filters.").foregroundStyle(.secondary)
+                } else {
+                    ForEach(visibleFixtures) { fixture in
+                        Button {
+                            toggle(fixture.id)
+                        } label: {
+                            HStack {
+                                Image(systemName: selectedFixtureIds.contains(fixture.id) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedFixtureIds.contains(fixture.id) ? .green : .secondary)
+                                FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                }
+            } header: {
+                HStack {
+                    Text("Fixtures (\(selectedFixtureIds.count) selected)")
+                    Spacer()
+                    if !visibleFixtures.isEmpty {
+                        Button(allVisibleSelected ? "Deselect all" : "Select all") {
+                            toggleSelectAllVisible()
+                        }
+                        .font(.caption.weight(.semibold))
+                        .textCase(nil)
+                    }
                 }
             }
+
             Section("Deadline") {
                 DatePicker("Picks due by", selection: $deadline)
             }
         }
     }
 
-    private func toggle(_ id: Int) {
-        if selectedFixtureIds.contains(id) { selectedFixtureIds.remove(id) } else { selectedFixtureIds.insert(id) }
+    // MARK: Selection
+
+    private var allVisibleSelected: Bool {
+        !visibleFixtures.isEmpty && visibleFixtures.allSatisfy { selectedFixtureIds.contains($0.id) }
     }
 
-    private func selectAllInMatchday() {
-        selectedFixtureIds = Set(matchdayFixtures.map(\.id))
-        if let first = matchdayFixtures.first, let date = FixtureFormat.kickoffDate(first.kickoff) {
-            deadline = date
-        }
+    private func toggle(_ id: Int) {
+        if selectedFixtureIds.contains(id) { selectedFixtureIds.remove(id) } else { selectedFixtureIds.insert(id) }
+        syncDeadlineToSelection()
     }
+
+    private func toggleSelectAllVisible() {
+        if allVisibleSelected {
+            visibleFixtures.forEach { selectedFixtureIds.remove($0.id) }
+        } else {
+            visibleFixtures.forEach { selectedFixtureIds.insert($0.id) }
+        }
+        syncDeadlineToSelection()
+    }
+
+    /// Default the deadline to the earliest selected kickoff.
+    private func syncDeadlineToSelection() {
+        let kickoffs = allFixtures
+            .filter { selectedFixtureIds.contains($0.id) }
+            .compactMap { FixtureFormat.kickoffDate($0.kickoff) }
+        if let earliest = kickoffs.min() { deadline = earliest }
+    }
+
+    // MARK: Filtering helpers
+
+    private static func isUnplayed(_ f: FixtureDTO) -> Bool {
+        f.status != "FINISHED" && f.status != "CANCELLED"
+    }
+
+    private func dateInRange(_ f: FixtureDTO) -> Bool {
+        guard let k = FixtureFormat.kickoffDate(f.kickoff) else { return false }
+        let cal = Calendar.current
+        return k >= cal.startOfDay(for: dateFrom) && k < cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: dateTo) ?? dateTo)
+    }
+
+    // MARK: Load
 
     private func load() async {
         isLoading = true
         errorMessage = nil
         do {
-            data = try await LeagueData.load()
-            matchday = matchdays.first ?? 1
-            selectAllInMatchday()
+            let fresh = try await LeagueData.load(for: selectedLeague)
+            data = fresh
+            // Default to the first matchday that still has unplayed fixtures —
+            // the current/next one — and preselect its fixtures.
+            let firstUnplayedMatchday = fresh.fixtures
+                .filter { Self.isUnplayed($0) }
+                .compactMap(\.matchday)
+                .min()
+            matchdayFilter = firstUnplayedMatchday ?? matchdays.first
+            selectedFixtureIds = Set(visibleFixtures.map(\.id))
+            syncDeadlineToSelection()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -107,6 +203,7 @@ struct OpenRoundView: View {
             fixtureIds: Array(selectedFixtureIds),
             deadline: deadline,
             roundType: roundType,
+            leagueId: selectedLeague.id,
             context: context
         )
         onOpened()

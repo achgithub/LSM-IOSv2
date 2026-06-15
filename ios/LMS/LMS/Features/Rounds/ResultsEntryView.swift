@@ -99,7 +99,7 @@ struct ResultsEntryView: View {
         isLoading = true
         errorMessage = nil
         do {
-            data = try await LeagueData.load()
+            data = try await LeagueData.load(for: round.league)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -137,7 +137,7 @@ struct ResultsEntryView: View {
             round,
             game: game,
             standingsByTeam: data.standingsByTeam,
-            teamsCount: LeagueConfig.shared.teamsCount,
+            teamsCount: round.league.teamsCount,
             context: context
         )
 
