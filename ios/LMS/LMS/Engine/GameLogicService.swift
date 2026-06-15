@@ -101,8 +101,13 @@ enum GameLogicService {
             existing.teamId = teamId
             existing.result = nil
         } else {
-            let newPick = Pick(teamId: teamId, player: player, round: round)
+            // Insert first, then wire relationships, so SwiftData updates the
+            // inverse arrays (round.picks / player.picks) synchronously — otherwise
+            // the row re-renders in two passes after a pick is chosen.
+            let newPick = Pick(teamId: teamId)
             context.insert(newPick)
+            newPick.player = player
+            newPick.round = round
         }
     }
 

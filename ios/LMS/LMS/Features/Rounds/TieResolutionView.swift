@@ -8,15 +8,22 @@ struct TieResolutionView: View {
     @Environment(\.dismiss) private var dismiss
     let game: Game
     let tiedPlayers: [Player]
-    /// True when the tied group has used every team in the league(s), so a
-    /// roll-the-week must reopen their pool. Computed by the caller (it has the
-    /// loaded team data).
-    let poolExhausted: Bool
     /// Reports the resolution: a follow-up round type (`.rollover`) to open next,
     /// or `nil` when the game is now complete.
     let onResolved: (RoundType?) -> Void
 
     private var tiedIds: [UUID] { tiedPlayers.map(\.id) }
+
+    /// The tied group has used every team in the league(s) — so a roll-the-week
+    /// must reopen their pool or they'd have nothing left to pick. Since everyone
+    /// picks every week, exhaustion hits the whole group together. Computed from
+    /// config (team counts), so it works without loaded match data.
+    private var poolExhausted: Bool {
+        GameEngine.poolExhausted(
+            usedTeamCounts: tiedPlayers.map { GameLogicService.usedTeamIds(for: $0).count },
+            totalTeams: game.totalTeamCount
+        )
+    }
 
     var body: some View {
         NavigationStack {

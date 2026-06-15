@@ -42,5 +42,14 @@ enum AdRootViewController {
             .first { $0.isKeyWindow }?
             .rootViewController
     }
+
+    /// The view controller actually on top — follows the presented chain so a
+    /// fullscreen ad presents over any sheet (e.g. the Results screen) rather than
+    /// failing against a root that's already presenting.
+    static var topmost: UIViewController? {
+        var top = current
+        while let presented = top?.presentedViewController { top = presented }
+        return top
+    }
 }
 #endif

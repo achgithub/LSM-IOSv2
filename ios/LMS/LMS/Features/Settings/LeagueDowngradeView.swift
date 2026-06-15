@@ -50,6 +50,14 @@ struct LeagueDowngradeView: View {
                 } footer: {
                     Text("Renewed by mistake? Restore your subscription to keep all your leagues.")
                 }
+
+                #if DEBUG
+                Section {
+                    Button("Simulate Pro (testing)") { entitlements.setDevTier(.pro) }
+                } footer: {
+                    Text("Dev only: unlock all leagues without a purchase (persists across rebuilds).")
+                }
+                #endif
             }
             .navigationTitle("Choose your league\(allowance == 1 ? "" : "s")")
             .navigationBarTitleDisplayMode(.inline)

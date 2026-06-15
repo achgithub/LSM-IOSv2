@@ -73,4 +73,9 @@ final class Game {
 
     /// Next sequential entry number for a player added to this game.
     var nextEntryNumber: Int { (players.map(\.entryNumber).max() ?? 0) + 1 }
+
+    /// Total distinct teams a player could ever pick = the sum of the game's
+    /// leagues' team counts (from config, so it's available without loading data).
+    /// Used to detect team-pool exhaustion when resolving a tie.
+    var totalTeamCount: Int { leagues.reduce(0) { $0 + $1.teamsCount } }
 }

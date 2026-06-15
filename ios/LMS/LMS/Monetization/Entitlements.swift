@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 /// Subscription tiers (mirrors the darts app's TierKey / entitlement ids).
@@ -44,7 +45,19 @@ final class Entitlements {
     static let entitlementNoAds = Tier.noAds.rawValue
     static let entitlementPro = Tier.pro.rawValue
 
-    private init() {}
+    private static let devTierKey = "devTierOverride"
+
+    private init() {
+        // Pre-release: restore a dev tier override so a rebuild/reinstall doesn't
+        // reset testing back to Free. Production resolves via RevenueCat instead.
+        #if DEBUG
+        if let raw = UserDefaults.standard.string(forKey: Self.devTierKey),
+           let saved = Tier(rawValue: raw) {
+            tier = saved
+            verified = true
+        }
+        #endif
+    }
 
     /// The single gate the UI uses to decide whether to render ad placements.
     var shouldShowAds: Bool { !tier.removesAds }
@@ -66,6 +79,9 @@ final class Entitlements {
     func setDevTier(_ tier: Tier) {
         self.tier = tier
         self.verified = true
+        #if DEBUG
+        UserDefaults.standard.set(tier.rawValue, forKey: Self.devTierKey)
+        #endif
     }
 
     /// Applied by `PurchaseService` once it resolves the live entitlements.

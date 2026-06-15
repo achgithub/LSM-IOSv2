@@ -47,13 +47,10 @@ struct SummaryShareView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                 if let rendered {
                     ToolbarItem(placement: .primaryAction) {
-                        // Free users watch a rewarded ad before the share sheet;
-                        // subscribers share instantly (see AdGate). Presented
-                        // programmatically so the ad can run first.
+                        // No ad here — the rewarded ad is gated on opening this card
+                        // (see GameDetailView), so the share itself is unblocked.
                         Button {
-                            AdGate.run {
-                                ImageSharePresenter.present(image: rendered, title: title)
-                            }
+                            ImageSharePresenter.present(image: rendered, title: title)
                         } label: {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }

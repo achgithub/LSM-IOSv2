@@ -9,23 +9,24 @@ struct ResultsEntryView: View {
     @Environment(\.modelContext) private var context
     let game: Game
     let round: Round
-    /// Set when a tie resolution reinstates players, so the parent can open the
-    /// follow-up round after this sheet dismisses.
-    @Binding var pendingAutoOpen: RoundType?
+    /// Set true when closing leaves everyone eliminated; the parent then presents
+    /// the tie resolution (at the top level, after this sheet dismisses).
+    @Binding var pendingResolve: Bool
 
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var outcomes: [Int: FixtureOutcome] = [:]
-    @State private var tiedPlayers: [Player] = []
-    @State private var poolExhausted = false
-    @State private var showTie = false
-    @State private var showDeclare = false
 
     private var roundFixtures: [FixtureDTO] {
         guard let data else { return [] }
         let ids = Set(round.fixtureIds)
         return data.fixtures.filter { ids.contains($0.id) }.sorted { $0.kickoff < $1.kickoff }
+    }
+
+    /// Every fixture in the round has a result entered — required before closing.
+    private var allResultsSet: Bool {
+        !roundFixtures.isEmpty && roundFixtures.allSatisfy { outcomes[$0.id] != nil }
     }
 
     var body: some View {
@@ -44,15 +45,12 @@ struct ResultsEntryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        // Free users watch a rewarded ad to pull fresh results;
-                        // subscribers pull instantly (see AdGate).
-                        Button("Pull results from server") {
-                            AdGate.run { Task { await pullFromServer() } }
-                        }
-                        Button("Declare winner(s)…") { showDeclare = true }
+                    // Free users watch a rewarded ad to pull fresh results;
+                    // subscribers pull instantly (see AdGate).
+                    Button {
+                        AdGate.run { Task { await pullFromServer() } }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Pull results from server", systemImage: "arrow.down.circle")
                     }
                 }
             }
@@ -62,19 +60,9 @@ struct ResultsEntryView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .padding()
-                .disabled(round.status == .closed)
+                .disabled(round.status == .closed || !allResultsSet)
             }
             .task { await load() }
-            .sheet(isPresented: $showTie) {
-                TieResolutionView(game: game, tiedPlayers: tiedPlayers,
-                                  poolExhausted: poolExhausted) { followUp in
-                    pendingAutoOpen = followUp
-                    dismiss()
-                }
-            }
-            .sheet(isPresented: $showDeclare) {
-                DeclareWinnersView(game: game) { dismiss() }
-            }
         }
     }
 
@@ -122,7 +110,7 @@ struct ResultsEntryView: View {
     }
 
     private func close() {
-        guard let data else { return }
+        guard data != nil else { return }
         // Apply each entered fixture result to the picks on both teams.
         for fixture in roundFixtures {
             if let outcome = outcomes[fixture.id] {
@@ -138,14 +126,10 @@ struct ResultsEntryView: View {
         let result = GameLogicService.closeRound(round, game: game, context: context)
 
         if result.allEliminated {
-            tiedPlayers = result.eliminated
-            // Pool is exhausted (roll-the-week must reset it) when every tied
-            // player has used every team in the league(s).
-            poolExhausted = GameEngine.poolExhausted(
-                usedTeamCounts: result.eliminated.map { GameLogicService.usedTeamIds(for: $0).count },
-                totalTeams: data.teamsById.count
-            )
-            showTie = true
+            // Hand off to the parent to present the resolution at the top level
+            // (avoids stacking a sheet on this one).
+            pendingResolve = true
+            dismiss()
         } else if result.remainingActive == 1,
                   let winner = game.players.first(where: { $0.status == .active }) {
             GameLogicService.apply(.winners([winner.id]), game: game)

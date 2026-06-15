@@ -40,20 +40,22 @@ final class RewardedAdManager: NSObject {
     }
 
     /// Presents the rewarded ad; `completion(true)` if the reward was earned.
-    /// Reports false immediately if not ready or another fullscreen ad is showing.
-    func show(completion: @escaping (Bool) -> Void) {
+    /// Returns `false` if it couldn't even present (not ready, no host VC, or
+    /// another fullscreen ad is showing) so the caller can proceed without it.
+    @discardableResult
+    func show(completion: @escaping (Bool) -> Void) -> Bool {
         #if canImport(GoogleMobileAds)
-        guard let ad, let root = AdRootViewController.current, AdLock.acquire() else {
-            completion(false)
-            return
+        guard let ad, let root = AdRootViewController.topmost, AdLock.acquire() else {
+            return false
         }
         self.completion = completion
         self.earned = false
         ad.present(from: root) { [weak self] in
             self?.earned = true
         }
+        return true
         #else
-        completion(false)
+        return false
         #endif
     }
 }

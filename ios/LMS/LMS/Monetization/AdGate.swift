@@ -18,8 +18,11 @@ enum AdGate {
     static func run(_ action: @escaping () -> Void) {
         guard Entitlements.shared.shouldShowAds else { action(); return }  // subscriber: no ad
         guard RewardedAdManager.shared.isReady else { action(); return }   // no ad to show: don't block
-        RewardedAdManager.shared.show { earned in
+        // If the ad can't actually be presented (e.g. no host VC), don't swallow
+        // the action — run it anyway. We never hard-block a real task on the ad.
+        let presented = RewardedAdManager.shared.show { earned in
             if earned { action() }
         }
+        if !presented { action() }
     }
 }

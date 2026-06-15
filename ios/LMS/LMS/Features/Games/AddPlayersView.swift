@@ -14,6 +14,7 @@ struct AddPlayersView: View {
 
     /// nil = no filter (all roster members).
     @State private var filterGroupId: UUID?
+    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
@@ -82,13 +83,29 @@ struct AddPlayersView: View {
                 Section("In this game (\(game.players.count))") {
                     if game.players.isEmpty {
                         Text("No players yet.").foregroundStyle(.secondary)
+                    } else if filteredInGame.isEmpty {
+                        Text("No players match.").font(.caption).foregroundStyle(.secondary)
                     } else {
-                        ForEach(sortedPlayers) { Text($0.name) }
+                        ForEach(filteredInGame) { player in
+                            Button {
+                                remove(player)
+                            } label: {
+                                HStack {
+                                    Text(player.name).foregroundStyle(.primary)
+                                    if player.isManager {
+                                        Text("you").font(.caption2).fontWeight(.semibold).foregroundStyle(.blue)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                                }
+                            }
+                        }
                     }
                 }
             }
             .navigationTitle("Add Players")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search players")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
@@ -116,9 +133,21 @@ struct AddPlayersView: View {
         return roster.filter { member in
             guard !inGame.contains(member.name.lowercased()) else { return false }
             guard member.name.localizedCaseInsensitiveCompare(managerTrimmed) != .orderedSame else { return false }
+            guard searchText.isEmpty || member.name.localizedCaseInsensitiveContains(searchText) else { return false }
             guard let filterGroupId else { return true }
             return member.groups.contains { $0.id == filterGroupId }
         }
+    }
+
+    /// Players already in the game, after the name search.
+    private var filteredInGame: [Player] {
+        sortedPlayers.filter { searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    /// Remove a player from this game (cascade deletes their picks).
+    private func remove(_ player: Player) {
+        game.players.removeAll { $0.id == player.id }
+        context.delete(player)
     }
 
     private func add(_ member: RosterMember) {
