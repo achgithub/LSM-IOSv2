@@ -26,13 +26,12 @@ struct NewGameView: View {
             Form {
                 Section("Game") {
                     TextField("Game name", text: $name)
-                    LabeledContent("Season", value: season)
                 }
 
-                Section {
-                    if enabled.leagues.count == 1 {
-                        LabeledContent("League", value: enabled.leagues[0].name)
-                    } else {
+                // Only shown when there's an actual choice — a single-league setup
+                // uses that league silently (season comes from config, not shown).
+                if enabled.leagues.count > 1 {
+                    Section {
                         ForEach(enabled.leagues) { league in
                             Button {
                                 toggleLeague(league.id)
@@ -46,11 +45,9 @@ struct NewGameView: View {
                                 }
                             }
                         }
-                    }
-                } header: {
-                    Text("League\(enabled.leagues.count > 1 ? "s" : "")")
-                } footer: {
-                    if enabled.leagues.count > 1 {
+                    } header: {
+                        Text("Leagues")
+                    } footer: {
                         Text("Pick one league, or blend several — players can then pick teams from any of them.")
                     }
                 }
