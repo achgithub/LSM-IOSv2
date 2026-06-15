@@ -204,15 +204,24 @@ struct ScoreItem: Identifiable {
 // MARK: - Row
 
 private struct ScoreRow: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let item: ScoreItem
     let teamsById: [Int: TeamDTO]
+    @State private var expanded = false
 
-    private func name(_ id: Int) -> String { teamsById[id]?.shortName ?? teamsById[id]?.name ?? "Team \(id)" }
+    private var isPad: Bool { sizeClass == .regular }
+    private var tileSize: TileSize { isPad ? .medium : .small }
+    private var nameFont: Font { isPad ? .title3 : .body }
+    private var scoreFont: Font { isPad ? .title2 : .headline }
+
+    private func shortName(_ id: Int) -> String { teamsById[id]?.shortName ?? teamsById[id]?.name ?? "Team \(id)" }
+    private func fullName(_ id: Int) -> String { teamsById[id]?.name ?? "Team \(id)" }
+    private func displayName(_ id: Int) -> String { expanded ? fullName(id) : shortName(id) }
     private func tla(_ id: Int) -> String? { teamsById[id]?.tla }
 
     private var scoreText: String {
         if let h = item.homeScore, let a = item.awayScore { return "\(h)–\(a)" }
-        return "vs"
+        return "v"
     }
 
     private var statusText: String {
@@ -230,14 +239,34 @@ private struct ScoreRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            TeamTile(tla: tla(item.homeTeamId), size: .small)
-            Text(name(item.homeTeamId)).lineLimit(1)
-            Spacer()
-            Text(scoreText).bold().monospacedDigit()
-            Text(statusText).font(.caption2).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
-            Spacer()
-            Text(name(item.awayTeamId)).lineLimit(1).multilineTextAlignment(.trailing)
-            TeamTile(tla: tla(item.awayTeamId), size: .small)
+            // Home — tile + name, takes equal flexible width, name truncates inward.
+            HStack(spacing: 8) {
+                TeamTile(tla: tla(item.homeTeamId), size: tileSize)
+                Text(displayName(item.homeTeamId))
+                    .font(nameFont)
+                    .lineLimit(expanded ? 2 : 1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Centre — fixed-width score so it never moves with name length.
+            VStack(spacing: 2) {
+                Text(scoreText).font(scoreFont).bold().monospacedDigit()
+                Text(statusText).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(width: isPad ? 104 : 78)
+
+            // Away — name + tile, mirror of home.
+            HStack(spacing: 8) {
+                Text(displayName(item.awayTeamId))
+                    .font(nameFont)
+                    .lineLimit(expanded ? 2 : 1)
+                    .multilineTextAlignment(.trailing)
+                TeamTile(tla: tla(item.awayTeamId), size: tileSize)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .padding(.vertical, isPad ? 6 : 0)
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() } }
     }
 }

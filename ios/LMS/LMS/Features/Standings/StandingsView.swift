@@ -74,27 +74,51 @@ struct StandingsView: View {
 }
 
 private struct StandingRow: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let row: StandingDTO
     let team: TeamDTO?
 
+    private var isPad: Bool { sizeClass == .regular }
+    private var nameFont: Font { isPad ? .title3 : .body }
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: isPad ? 16 : 12) {
             Text("\(row.position)")
-                .frame(width: 22, alignment: .leading)
+                .frame(width: isPad ? 32 : 22, alignment: .leading)
                 .foregroundStyle(.secondary)
+                .font(nameFont)
                 .monospacedDigit()
-            TeamTile(tla: team?.tla, size: .small)
+            TeamTile(tla: team?.tla, size: isPad ? .medium : .small)
             Text(team?.shortName ?? team?.name ?? "Team \(row.teamId)")
+                .font(nameFont)
                 .lineLimit(1)
             Spacer()
-            Text("\(row.played)·\(row.won)·\(row.drawn)·\(row.lost)")
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            // Played / Won / Drawn / Lost — labelled + larger on iPad.
+            HStack(spacing: isPad ? 18 : 10) {
+                stat("P", row.played)
+                stat("W", row.won)
+                stat("D", row.drawn)
+                stat("L", row.lost)
+            }
             Text("\(row.points)")
                 .bold()
-                .frame(width: 32, alignment: .trailing)
+                .frame(width: isPad ? 48 : 32, alignment: .trailing)
+                .font(nameFont)
                 .monospacedDigit()
         }
+        .padding(.vertical, isPad ? 6 : 0)
+    }
+
+    private func stat(_ label: String, _ value: Int) -> some View {
+        VStack(spacing: 1) {
+            Text(label)
+                .font(isPad ? .caption2 : .system(size: 8))
+                .foregroundStyle(.tertiary)
+            Text("\(value)")
+                .font(isPad ? .callout : .caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .frame(minWidth: isPad ? 24 : 14)
     }
 }
