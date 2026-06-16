@@ -21,14 +21,32 @@ private final class LanguageOverrideBundle: Bundle, @unchecked Sendable {
 }
 
 extension Bundle {
+    /// The bundle `AppString` resolves against: the selected language's `.lproj`
+    /// sub-bundle, or `Bundle.main` for the device default. `String(localized:)`
+    /// bypasses the swizzle (it resolves via CFBundle, not the ObjC
+    /// `localizedString` override), so passing this bundle explicitly is what
+    /// makes plain strings follow the in-app language. Written only on the main
+    /// thread (language changes); read anywhere.
+    nonisolated(unsafe) private(set) static var appLanguageBundle: Bundle = .main
+
     /// Point `Bundle.main` at the `.lproj` for `code` (e.g. "es"), or pass `nil`
     /// to fall back to the device language. Safe to call repeatedly.
     static func setAppLanguage(_ code: String?) {
-        // Swap the class once so string lookups route through the override.
+        // Swap the class once so SwiftUI `Text`/`NSLocalizedString` route through
+        // the override.
         if !(Bundle.main is LanguageOverrideBundle) {
             object_setClass(Bundle.main, LanguageOverrideBundle.self)
         }
         let path = code.flatMap { Bundle.main.path(forResource: $0, ofType: "lproj") }
         objc_setAssociatedObject(Bundle.main, &languageBundleKey, path, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        appLanguageBundle = path.flatMap(Bundle.init(path:)) ?? .main
     }
+}
+
+/// Localizes `key` honoring the in-app language override. Use this instead of
+/// `String(localized:)` for any non-`Text` string (enum labels, share-card copy,
+/// alerts): plain `String(localized:)` ignores the override and always uses the
+/// device language. SwiftUI `Text("…")` is fine as-is (it respects the swizzle).
+func AppString(_ key: String.LocalizationValue) -> String {
+    String(localized: key, bundle: Bundle.appLanguageBundle)
 }

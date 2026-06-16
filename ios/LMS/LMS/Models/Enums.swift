@@ -7,9 +7,9 @@ enum GameStatus: String, Codable, CaseIterable {
     /// Localized, user-facing label (replaces `rawValue.capitalized`).
     var label: String {
         switch self {
-        case .setup:    return String(localized: "Setup")
-        case .active:   return String(localized: "Active")
-        case .complete: return String(localized: "Complete")
+        case .setup:    return AppString("Setup")
+        case .active:   return AppString("Active")
+        case .complete: return AppString("Complete")
         }
     }
 }
@@ -18,9 +18,9 @@ enum PlayerStatus: String, Codable, CaseIterable {
     case active, eliminated, winner
     var label: String {
         switch self {
-        case .active:     return String(localized: "Active")
-        case .eliminated: return String(localized: "Eliminated")
-        case .winner:     return String(localized: "Winner")
+        case .active:     return AppString("Active")
+        case .eliminated: return AppString("Eliminated")
+        case .winner:     return AppString("Winner")
         }
     }
 }
@@ -29,10 +29,10 @@ enum RoundStatus: String, Codable, CaseIterable {
     case open, picks, results, closed
     var label: String {
         switch self {
-        case .open:    return String(localized: "Open")
-        case .picks:   return String(localized: "Picks")
-        case .results: return String(localized: "Results")
-        case .closed:  return String(localized: "Closed")
+        case .open:    return AppString("Open")
+        case .picks:   return AppString("Picks")
+        case .results: return AppString("Results")
+        case .closed:  return AppString("Closed")
         }
     }
 }
@@ -43,9 +43,9 @@ enum RoundType: String, Codable, CaseIterable, Identifiable {
     /// Label for the open-round screen when this round is a tie follow-up.
     var openTitle: String {
         switch self {
-        case .normal: return String(localized: "Round")
-        case .playoff: return String(localized: "Playoff Round")
-        case .rollover: return String(localized: "Rollover Round")
+        case .normal: return AppString("Round")
+        case .playoff: return AppString("Playoff Round")
+        case .rollover: return AppString("Rollover Round")
         }
     }
 }
@@ -58,8 +58,8 @@ enum AnonymityMode: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .anonymous: return String(localized: "Anonymous")
-        case .named: return String(localized: "Named")
+        case .anonymous: return AppString("Anonymous")
+        case .named: return AppString("Named")
         }
     }
 }

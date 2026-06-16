@@ -148,7 +148,7 @@ struct PlayersView: View {
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let error):
-            message = String(localized: "Import failed: \(error.localizedDescription)")
+            message = AppString("Import failed: \(error.localizedDescription)")
         case .success(let urls):
             guard let url = urls.first else { return }
             let scoped = url.startAccessingSecurityScopedResource()
@@ -157,7 +157,7 @@ struct PlayersView: View {
                 let text = try String(contentsOf: url, encoding: .utf8)
                 importRows(RosterCSV.parse(text))
             } catch {
-                message = String(localized: "Couldn't read file: \(error.localizedDescription)")
+                message = AppString("Couldn't read file: \(error.localizedDescription)")
             }
         }
     }
@@ -202,17 +202,17 @@ struct PlayersView: View {
         }
 
         var parts = [added == 1
-                     ? String(localized: "Imported 1 new player")
-                     : String(localized: "Imported \(added) new players")]
+                     ? AppString("Imported 1 new player")
+                     : AppString("Imported \(added) new players")]
         if skipped > 0 {
             parts.append(skipped == 1
-                         ? String(localized: "1 already existed")
-                         : String(localized: "\(skipped) already existed"))
+                         ? AppString("1 already existed")
+                         : AppString("\(skipped) already existed"))
         }
         if assigned > 0 {
             parts.append(assigned == 1
-                         ? String(localized: "1 group assignment")
-                         : String(localized: "\(assigned) group assignments"))
+                         ? AppString("1 group assignment")
+                         : AppString("\(assigned) group assignments"))
         }
         // List separator is locale-aware; the parts are full clauses per language.
         message = parts.joined(separator: ", ") + "."

@@ -9,27 +9,27 @@ enum OutcomeEnding: String, Codable, CaseIterable {
 
     var sectionLabel: String {
         switch self {
-        case .winner, .split: return String(localized: "RESULT")
-        case .rollWeek, .everyoneBackIn: return String(localized: "NO CLEAR WINNER")
+        case .winner, .split: return AppString("RESULT")
+        case .rollWeek, .everyoneBackIn: return AppString("NO CLEAR WINNER")
         }
     }
 
     var headline: String {
         switch self {
-        case .winner: return String(localized: "🏆 WINNER")
-        case .split: return String(localized: "🏆 JOINT WINNERS")
-        case .rollWeek: return String(localized: "⏭️ ROLL THE WEEK")
-        case .everyoneBackIn: return String(localized: "🔄 EVERYONE BACK IN")
+        case .winner: return AppString("🏆 WINNER")
+        case .split: return AppString("🏆 JOINT WINNERS")
+        case .rollWeek: return AppString("⏭️ ROLL THE WEEK")
+        case .everyoneBackIn: return AppString("🔄 EVERYONE BACK IN")
         }
     }
 
     /// Heading above the player list on the card.
     var listHeading: String {
         switch self {
-        case .winner: return String(localized: "Takes it all")
-        case .split: return String(localized: "Pot is split")
-        case .rollWeek: return String(localized: "Still in — pick again")
-        case .everyoneBackIn: return String(localized: "Back in, picks reset")
+        case .winner: return AppString("Takes it all")
+        case .split: return AppString("Pot is split")
+        case .rollWeek: return AppString("Still in — pick again")
+        case .everyoneBackIn: return AppString("Back in, picks reset")
         }
     }
 }
@@ -43,9 +43,9 @@ enum SummaryType: Equatable {
 
     var sectionLabel: String {
         switch self {
-        case .fixtures: return String(localized: "FIXTURES")
-        case .picks: return String(localized: "PICKS")
-        case .results: return String(localized: "RESULTS")
+        case .fixtures: return AppString("FIXTURES")
+        case .picks: return AppString("PICKS")
+        case .results: return AppString("RESULTS")
         case .outcome(let ending): return ending.sectionLabel
         }
     }
@@ -220,9 +220,9 @@ struct SummaryData {
         formatter.locale = .current
         formatter.setLocalizedDateFormatFromTemplate("EEE d MMM HH:mm")
         switch type {
-        case .fixtures: return String(localized: "Picks due · \(formatter.string(from: round.deadline))")
-        case .picks:    return String(localized: "Picks locked · \(formatter.string(from: round.deadline))")
-        case .results, .outcome: return String(localized: "Full time · \(formatter.string(from: Date()))")
+        case .fixtures: return AppString("Picks due · \(formatter.string(from: round.deadline))")
+        case .picks:    return AppString("Picks locked · \(formatter.string(from: round.deadline))")
+        case .results, .outcome: return AppString("Full time · \(formatter.string(from: Date()))")
         }
     }
 }

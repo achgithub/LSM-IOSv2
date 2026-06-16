@@ -106,8 +106,8 @@ struct PicksEntryView: View {
             }
             .confirmationDialog(
                 unpickedCount == 1
-                    ? String(localized: "Auto-assign 1 player?")
-                    : String(localized: "Auto-assign \(unpickedCount) players?"),
+                    ? AppString("Auto-assign 1 player?")
+                    : AppString("Auto-assign \(unpickedCount) players?"),
                 isPresented: $showAutoAssignConfirm,
                 titleVisibility: .visible
             ) {

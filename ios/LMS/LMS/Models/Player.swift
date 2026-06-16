@@ -39,6 +39,6 @@ final class Player {
 
     /// Name, or "Player N" when the card is anonymous (spec §13b.2).
     func displayName(anonymous: Bool) -> String {
-        anonymous ? String(localized: "Player \(entryNumber)") : name
+        anonymous ? AppString("Player \(entryNumber)") : name
     }
 }

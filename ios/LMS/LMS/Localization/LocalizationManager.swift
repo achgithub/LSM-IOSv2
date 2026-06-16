@@ -20,7 +20,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     /// translated. `.system` is the only entry that follows the UI language.
     var displayName: String {
         switch self {
-        case .system:  return String(localized: "System Default")
+        case .system:  return AppString("System Default")
         case .english: return "English"
         case .spanish: return "Español"
         case .german:  return "Deutsch"

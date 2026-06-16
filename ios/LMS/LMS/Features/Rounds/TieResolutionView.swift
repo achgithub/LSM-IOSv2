@@ -37,20 +37,20 @@ struct TieResolutionView: View {
                     Button {
                         resolve(.winners(tiedIds))
                     } label: {
-                        actionLabel(String(localized: "Split the win"),
-                                    String(localized: "Joint winners — the prize is divided."))
+                        actionLabel(AppString("Split the win"),
+                                    AppString("Joint winners — the prize is divided."))
                     }
 
                     Button {
                         resolve(.rollWeek(tiedIds: tiedIds, resetPool: poolExhausted))
                     } label: {
-                        actionLabel(String(localized: "Roll the week"), rollDetail)
+                        actionLabel(AppString("Roll the week"), rollDetail)
                     }
 
                     Button {
                         resolve(.everyoneBackIn(allIds: game.players.map(\.id)))
                     } label: {
-                        actionLabel(String(localized: "Everyone back in"), everyoneBackInDetail)
+                        actionLabel(AppString("Everyone back in"), everyoneBackInDetail)
                     }
                 }
             }
@@ -66,18 +66,18 @@ struct TieResolutionView: View {
     private var rollDetail: String {
         let n = tiedPlayers.count
         let base = n == 1
-            ? String(localized: "The 1 tied player carries forward and replays.")
-            : String(localized: "The \(n) tied players carry forward and replay.")
+            ? AppString("The 1 tied player carries forward and replays.")
+            : AppString("The \(n) tied players carry forward and replay.")
         return poolExhausted
-            ? base + " " + String(localized: "Their team pool resets — all teams open again.")
+            ? base + " " + AppString("Their team pool resets — all teams open again.")
             : base
     }
 
     private var everyoneBackInDetail: String {
         let n = game.players.count
         return n == 1
-            ? String(localized: "1 player reinstated, picks reset.")
-            : String(localized: "All \(n) players reinstated, picks reset.")
+            ? AppString("1 player reinstated, picks reset.")
+            : AppString("All \(n) players reinstated, picks reset.")
     }
 
     private func actionLabel(_ title: String, _ detail: String) -> some View {

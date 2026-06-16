@@ -15,10 +15,10 @@ struct SummaryShareView: View {
 
     private var title: String {
         switch type {
-        case .fixtures: return String(localized: "Fixtures · Round \(round.roundNumber)")
-        case .picks:    return String(localized: "Picks · Round \(round.roundNumber)")
-        case .results:  return String(localized: "Results · Round \(round.roundNumber)")
-        case .outcome:  return String(localized: "Outcome · Round \(round.roundNumber)")
+        case .fixtures: return AppString("Fixtures · Round \(round.roundNumber)")
+        case .picks:    return AppString("Picks · Round \(round.roundNumber)")
+        case .results:  return AppString("Results · Round \(round.roundNumber)")
+        case .outcome:  return AppString("Outcome · Round \(round.roundNumber)")
         }
     }
 
@@ -85,7 +85,7 @@ struct SummaryShareView: View {
         if let image = renderer.uiImage {
             rendered = image
         } else {
-            errorMessage = String(localized: "The card image could not be generated.")
+            errorMessage = AppString("The card image could not be generated.")
         }
         isLoading = false
     }

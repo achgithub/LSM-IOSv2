@@ -135,8 +135,8 @@ struct SettingsView: View {
             } message: { league in
                 let n = gamesUsing(league).count
                 Text(verbatim: n == 1
-                     ? String(localized: "This permanently deletes 1 game and can't be undone.")
-                     : String(localized: "This permanently deletes \(n) games and can't be undone."))
+                     ? AppString("This permanently deletes 1 game and can't be undone.")
+                     : AppString("This permanently deletes \(n) games and can't be undone."))
             }
             .confirmationDialog(
                 "Switch to \(pendingSwap?.name ?? "")?",
@@ -170,12 +170,12 @@ struct SettingsView: View {
     private var leagueFooter: String {
         let canSubscribeForMore = allowance < Leagues.all.count
         if allowance == 1 {
-            var text = String(localized: "Your \(entitlements.tier.label) plan includes 1 league — tap another to switch.")
-            if canSubscribeForMore { text += " " + String(localized: "Subscribe to run more at once.") }
+            var text = AppString("Your \(entitlements.tier.label) plan includes 1 league — tap another to switch.")
+            if canSubscribeForMore { text += " " + AppString("Subscribe to run more at once.") }
             return text
         } else {
-            var text = String(localized: "You can enable \(allowance) leagues on the \(entitlements.tier.label) plan.")
-            if canSubscribeForMore { text += " " + String(localized: "Subscribe to enable more.") }
+            var text = AppString("You can enable \(allowance) leagues on the \(entitlements.tier.label) plan.")
+            if canSubscribeForMore { text += " " + AppString("Subscribe to enable more.") }
             return text
         }
     }
@@ -184,20 +184,20 @@ struct SettingsView: View {
     private func disableMessage(_ league: LeagueOption) -> String {
         let n = gamesUsing(league).count
         switch n {
-        case 0:  return String(localized: "Disabling \(league.name) removes its data from this device.")
-        case 1:  return String(localized: "Disabling \(league.name) removes its data from this device and deletes 1 game that uses it.")
-        default: return String(localized: "Disabling \(league.name) removes its data from this device and deletes \(n) games that use it.")
+        case 0:  return AppString("Disabling \(league.name) removes its data from this device.")
+        case 1:  return AppString("Disabling \(league.name) removes its data from this device and deletes 1 game that uses it.")
+        default: return AppString("Disabling \(league.name) removes its data from this device and deletes \(n) games that use it.")
         }
     }
 
     /// Single-league-plan swap-confirm message — singular / plural / no-games.
     private func switchMessage(to target: LeagueOption) -> String {
-        let current = enabled.leagues.first?.name ?? String(localized: "your league")
+        let current = enabled.leagues.first?.name ?? AppString("your league")
         let n = enabled.leagues.reduce(0) { $0 + gamesUsing($1).count }
         switch n {
-        case 0:  return String(localized: "Switches from \(current) to \(target.name).")
-        case 1:  return String(localized: "Switches from \(current) to \(target.name), deleting 1 game that uses the old league.")
-        default: return String(localized: "Switches from \(current) to \(target.name), deleting \(n) games that use the old league.")
+        case 0:  return AppString("Switches from \(current) to \(target.name).")
+        case 1:  return AppString("Switches from \(current) to \(target.name), deleting 1 game that uses the old league.")
+        default: return AppString("Switches from \(current) to \(target.name), deleting \(n) games that use the old league.")
         }
     }
 

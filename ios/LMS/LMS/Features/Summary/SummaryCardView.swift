@@ -180,14 +180,14 @@ struct SummaryCardView: View {
             VStack(alignment: .leading, spacing: 18) {
                 resultGroup(
                     icon: "✅",
-                    title: String(localized: "Through to Round \(data.nextRoundNumber) (\(data.survivors.count))"),
+                    title: AppString("Through to Round \(data.nextRoundNumber) (\(data.survivors.count))"),
                     names: data.survivors,
                     flagged: data.managerSurvived,
                     titleColor: survivedGreen
                 )
                 resultGroup(
                     icon: "❌",
-                    title: String(localized: "Eliminated (\(data.eliminated.count))"),
+                    title: AppString("Eliminated (\(data.eliminated.count))"),
                     names: data.eliminated,
                     flagged: data.managerEliminated,
                     titleColor: eliminatedRed
@@ -199,14 +199,14 @@ struct SummaryCardView: View {
     /// Anonymous-mode survivor/eliminated tallies — singular / plural variants.
     private var survivorsLine: String {
         data.survivors.count == 1
-            ? String(localized: "1 player through to Round \(data.nextRoundNumber)")
-            : String(localized: "\(data.survivors.count) players through to Round \(data.nextRoundNumber)")
+            ? AppString("1 player through to Round \(data.nextRoundNumber)")
+            : AppString("\(data.survivors.count) players through to Round \(data.nextRoundNumber)")
     }
 
     private var eliminatedLine: String {
         data.eliminated.count == 1
-            ? String(localized: "1 player eliminated")
-            : String(localized: "\(data.eliminated.count) players eliminated")
+            ? AppString("1 player eliminated")
+            : AppString("\(data.eliminated.count) players eliminated")
     }
 
     @ViewBuilder

@@ -25,17 +25,17 @@ struct LeagueDowngradeView: View {
     /// The "you're over your allowance" banner — singular / plural on the allowance.
     private var overLimitMessage: String {
         allowance == 1
-            ? String(localized: "Your plan now includes 1 league. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
-            : String(localized: "Your plan now includes \(allowance) leagues. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
+            ? AppString("Your plan now includes 1 league. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
+            : AppString("Your plan now includes \(allowance) leagues. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
     }
 
     /// Remove-confirm message — singular / plural / no-games variants.
     private func removeMessage(_ league: LeagueOption) -> String {
         let n = gamesUsing(league).count
         switch n {
-        case 0:  return String(localized: "Removes \(league.name) from this device.")
-        case 1:  return String(localized: "Removes \(league.name) from this device and permanently deletes 1 game that uses it.")
-        default: return String(localized: "Removes \(league.name) from this device and permanently deletes \(n) games that use it.")
+        case 0:  return AppString("Removes \(league.name) from this device.")
+        case 1:  return AppString("Removes \(league.name) from this device and permanently deletes 1 game that uses it.")
+        default: return AppString("Removes \(league.name) from this device and permanently deletes \(n) games that use it.")
         }
     }
 
@@ -83,8 +83,8 @@ struct LeagueDowngradeView: View {
                 #endif
             }
             .navigationTitle(allowance == 1
-                             ? String(localized: "Choose your league")
-                             : String(localized: "Choose your leagues"))
+                             ? AppString("Choose your league")
+                             : AppString("Choose your leagues"))
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(true)
             .alert(item: $purchaseAlert) { a in

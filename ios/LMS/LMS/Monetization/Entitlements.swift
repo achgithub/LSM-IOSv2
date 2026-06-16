@@ -12,17 +12,17 @@ enum Tier: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .free: return String(localized: "Free")
-        case .noAds: return String(localized: "No Ads")
-        case .pro: return String(localized: "Pro")
+        case .free: return AppString("Free")
+        case .noAds: return AppString("No Ads")
+        case .pro: return AppString("Pro")
         }
     }
 
     var detail: String {
         switch self {
-        case .free: return String(localized: "Ad-supported · 1 league")
-        case .noAds: return String(localized: "Ads removed · up to 3 leagues")
-        case .pro: return String(localized: "Ads removed · all leagues + premium")
+        case .free: return AppString("Ad-supported · 1 league")
+        case .noAds: return AppString("Ads removed · up to 3 leagues")
+        case .pro: return AppString("Ads removed · all leagues + premium")
         }
     }
 
