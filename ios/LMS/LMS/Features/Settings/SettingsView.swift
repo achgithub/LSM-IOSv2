@@ -95,7 +95,12 @@ struct SettingsView: View {
                 } header: {
                     Text("Language")
                 } footer: {
-                    Text("Choose the app's language. Team, player and league names always come from the league data.")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Choose the app's language. Team, player and league names always come from the league data.")
+                        // Deliberately English-only (verbatim) so the disclaimer
+                        // reads the same in every language.
+                        Text(verbatim: "Translations are AI-assisted — please report any errors.")
+                    }
                 }
 
                 Section("About") {

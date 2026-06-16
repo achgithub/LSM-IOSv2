@@ -6231,41 +6231,6 @@
         }
       }
     },
-    "The 1 tied player carries forward and replays.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der 1 punktgleiche Spieler kommt weiter und spielt erneut."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El jugador empatado continúa y vuelve a jugar."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le joueur à égalité poursuit et rejoue."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il giocatore a pari merito prosegue e rigioca."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "De gelijke speler gaat door en speelt opnieuw."
-          }
-        }
-      }
-    },
     "The %lld tied players carry forward and replay.": {
       "extractionState": "manual",
       "localizations": {
@@ -6367,41 +6332,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Iedereen terug"
-          }
-        }
-      }
-    },
-    "1 player reinstated, picks reset.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Spieler wieder dabei, Tipps zurückgesetzt."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 jugador readmitido, selecciones reiniciadas."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 joueur réintégré, choix réinitialisés."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 giocatore reintegrato, scelte azzerate."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 speler teruggeplaatst, keuzes gereset."
           }
         }
       }

@@ -63,21 +63,17 @@ struct TieResolutionView: View {
         .interactiveDismissDisabled()
     }
 
+    // A tie always involves at least 2 players (a round needs >= 2 active players
+    // to open), so these never need a singular form.
     private var rollDetail: String {
-        let n = tiedPlayers.count
-        let base = n == 1
-            ? AppString("The 1 tied player carries forward and replays.")
-            : AppString("The \(n) tied players carry forward and replay.")
+        let base = AppString("The \(tiedPlayers.count) tied players carry forward and replay.")
         return poolExhausted
             ? base + " " + AppString("Their team pool resets — all teams open again.")
             : base
     }
 
     private var everyoneBackInDetail: String {
-        let n = game.players.count
-        return n == 1
-            ? AppString("1 player reinstated, picks reset.")
-            : AppString("All \(n) players reinstated, picks reset.")
+        AppString("All \(game.players.count) players reinstated, picks reset.")
     }
 
     private func actionLabel(_ title: String, _ detail: String) -> some View {
