@@ -65,12 +65,23 @@ struct StandingsView: View {
             // the explicit refresh button is the gated fetch action).
             .task(id: league) { await load() }
             .safeAreaInset(edge: .bottom) {
-                if let lastRefreshed {
-                    Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                VStack(spacing: 4) {
+                    if let lastRefreshed {
+                        Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    // Independence / non-affiliation disclaimer (names + data are
+                    // factual, descriptive use only). Single localized key — can't wrap.
+                    // swiftlint:disable:next line_length
+                    Text("Not affiliated with, licensed by or endorsed by any football club, league or federation. An independent tool — team names and fixtures are factual data shown for reference only.")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 6)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
                 }
+                .padding(.bottom, 6)
+                .background(.bar)
             }
         }
     }

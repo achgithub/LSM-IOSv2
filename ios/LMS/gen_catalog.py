@@ -391,6 +391,12 @@ add("Choose the app's language. Team, player and league names always come from t
     "Kies de taal van de app. Team-, speler- en competitienamen komen altijd uit de competitiegegevens.",
     "Scegli la lingua dell’app. I nomi di squadre, giocatori e leghe provengono sempre dai dati della lega.")
 add("About", "Acerca de", "Über", "À propos", "Over", "Informazioni")
+add("Not affiliated with, licensed by or endorsed by any football club, league or federation. An independent tool — team names and fixtures are factual data shown for reference only.",
+    "No está afiliado, licenciado ni respaldado por ningún club, liga o federación de fútbol. Es una herramienta independiente: los nombres de equipos y los partidos son datos factuales mostrados solo como referencia.",
+    "Nicht verbunden mit, lizenziert von oder unterstützt durch einen Fußballverein, eine Liga oder einen Verband. Ein unabhängiges Tool – Mannschaftsnamen und Spiele sind sachliche Daten, die nur zur Information angezeigt werden.",
+    "Sans affiliation, licence ni approbation d’un club, d’une ligue ou d’une fédération de football. Outil indépendant — les noms d’équipes et les matchs sont des données factuelles affichées à titre d’information uniquement.",
+    "Niet verbonden aan, gelicentieerd door of onderschreven door een voetbalclub, competitie of federatie. Een onafhankelijke tool — teamnamen en wedstrijden zijn feitelijke gegevens die alleen ter informatie worden getoond.",
+    "Non affiliato, concesso in licenza o approvato da alcun club, lega o federazione calcistica. Strumento indipendente: i nomi delle squadre e le partite sono dati fattuali mostrati solo a scopo informativo.")
 add("Disable %@?", "¿Desactivar %@?", "%@ deaktivieren?", "Désactiver %@ ?", "%@ uitschakelen?", "Disattivare %@?")
 add("Delete games in %@?", "¿Eliminar partidas de %@?", "Spiele in %@ löschen?", "Supprimer les parties de %@ ?", "Spellen in %@ verwijderen?", "Eliminare le partite in %@?")
 add("Switch to %@?", "¿Cambiar a %@?", "Zu %@ wechseln?", "Passer à %@ ?", "Wisselen naar %@?", "Passare a %@?")

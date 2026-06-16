@@ -103,9 +103,15 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("About") {
+                Section {
                     LabeledContent("App", value: config.appName)
                     LabeledContent("Version", value: version)
+                } header: {
+                    Text("About")
+                } footer: {
+                    // Single localized string key — can't wrap without changing the key.
+                    // swiftlint:disable:next line_length
+                    Text("Not affiliated with, licensed by or endorsed by any football club, league or federation. An independent tool — team names and fixtures are factual data shown for reference only.")
                 }
             }
             .navigationTitle("Settings")
