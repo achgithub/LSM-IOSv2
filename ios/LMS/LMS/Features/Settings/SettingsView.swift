@@ -27,9 +27,11 @@ struct SettingsView: View {
         games.filter { $0.leagues.contains(league) }
     }
 
+    #if DEBUG
     private var tierBinding: Binding<Tier> {
         Binding(get: { entitlements.tier }, set: { entitlements.setDevTier($0) })
     }
+    #endif
 
     private var version: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -55,6 +57,7 @@ struct SettingsView: View {
                     }
                 }
 
+                #if DEBUG
                 Section("Developer (testing)") {
                     Picker("Simulate tier", selection: tierBinding) {
                         ForEach(Tier.allCases) { Text($0.label).tag($0) }
@@ -62,6 +65,7 @@ struct SettingsView: View {
                     Text("Flips ad-on / ad-off + league allowance without a purchase. Free = 1 league; paid = all.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                #endif
 
                 leagueSection
 

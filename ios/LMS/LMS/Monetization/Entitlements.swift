@@ -74,12 +74,13 @@ final class Entitlements {
     /// checklist and in-game league chooser are worth showing as multi-select).
     var canHaveMultipleLeagues: Bool { leagueAllowance > 1 }
 
-    /// Local testing override — flips the tier with no purchase. Pre-release only;
-    /// gate behind a dev flag before shipping (production reads RevenueCat).
+    /// Local testing override — flips the tier with no purchase. DEBUG-only: a
+    /// no-op in release builds so it can never bypass the RevenueCat entitlement
+    /// (production always resolves the tier via PurchaseService).
     func setDevTier(_ tier: Tier) {
+        #if DEBUG
         self.tier = tier
         self.verified = true
-        #if DEBUG
         UserDefaults.standard.set(tier.rawValue, forKey: Self.devTierKey)
         #endif
     }
