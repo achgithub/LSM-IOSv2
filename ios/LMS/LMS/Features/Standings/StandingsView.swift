@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// League table from the Worker, with §15 team tiles. Live read; subscriber
-/// auto-refresh and the free-tier ad gate come in later phases.
+/// League table from the Worker, with §15 team tiles. Browsing is a free live
+/// read; the explicit refresh button is the free-tier rewarded-ad gate (matches
+/// Scores), and shows when the data was last refreshed.
 struct StandingsView: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var selectedLeague: LeagueOption?
@@ -9,6 +10,7 @@ struct StandingsView: View {
     @State private var teamsById: [Int: TeamDTO] = [:]
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var lastRefreshed: Date?
 
     private var league: LeagueOption { selectedLeague ?? enabled.leagues.first ?? Leagues.home }
     private var leagueBinding: Binding<LeagueOption> {
@@ -34,6 +36,15 @@ struct StandingsView: View {
             }
             .navigationTitle("Standings")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    // Same gate as Scores: a fresh pull is a server fetch, so free
+                    // users watch a rewarded ad first (see AdGate); subscribers
+                    // refresh instantly.
+                    Button { AdGate.run { Task { await load() } } } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(isLoading)
+                }
                 if enabled.leagues.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -50,9 +61,17 @@ struct StandingsView: View {
                     }
                 }
             }
-            // Reloads when the chosen league changes.
+            // Reloads when the chosen league changes (browsing, so not ad-gated —
+            // the explicit refresh button is the gated fetch action).
             .task(id: league) { await load() }
-            .refreshable { await load() }
+            .safeAreaInset(edge: .bottom) {
+                if let lastRefreshed {
+                    Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 6)
+                }
+            }
         }
     }
 
@@ -66,6 +85,7 @@ struct StandingsView: View {
             let (standings, teams) = try await (standingsReq, teamsReq)
             self.standings = standings
             self.teamsById = Dictionary(teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            lastRefreshed = Date()
         } catch {
             errorMessage = error.localizedDescription
         }

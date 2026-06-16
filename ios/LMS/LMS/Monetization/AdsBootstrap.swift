@@ -1,14 +1,13 @@
 import Foundation
-#if canImport(GoogleMobileAds)
-import GoogleMobileAds
-#endif
 
-/// Starts the Google Mobile Ads SDK once at launch (no-op until the package is
-/// linked). Requires `GADApplicationIdentifier` (the AdMob App ID) in Info.plist.
+/// Bootstraps ads at launch: gathers GDPR/UMP consent and App Tracking
+/// Transparency authorization *before* starting the Google Mobile Ads SDK (see
+/// `AdConsent`). No-op until the package is linked. Requires
+/// `GADApplicationIdentifier` (the AdMob App ID) and, for ATT, an
+/// `NSUserTrackingUsageDescription` in Info.plist.
+@MainActor
 enum AdsBootstrap {
     static func start() {
-        #if canImport(GoogleMobileAds)
-        MobileAds.shared.start(completionHandler: nil)
-        #endif
+        AdConsent.gatherThenStart()
     }
 }

@@ -113,7 +113,7 @@ struct FirstRunWizardView: View {
                 Spacer()
 
                 Button {
-                    activeSheet = step.sheet
+                    open(step.sheet)
                 } label: {
                     Text(step.action).frame(maxWidth: .infinity)
                 }
@@ -173,6 +173,17 @@ struct FirstRunWizardView: View {
         }
     }
 
+    /// Opens a step's screen. Share-card steps cost a rewarded ad for free users —
+    /// the same gate the real screens use (GameDetailView / PicksEntryView) — so
+    /// the wizard isn't an ad-free side door to the shareable cards.
+    private func open(_ which: WizardSheet) {
+        if which.isShare {
+            AdGate.run { activeSheet = which }
+        } else {
+            activeSheet = which
+        }
+    }
+
     /// After a step's screen closes, advance if that step is now satisfied.
     private func autoAdvance() {
         if isComplete(stepIndex) && !isLastStep { stepIndex += 1 }
@@ -201,4 +212,12 @@ enum WizardSheet: String, Identifiable {
     case players, newGame, addPlayers, openRound, picks, results
     case shareFixtures, sharePicks, shareResults
     var id: String { rawValue }
+
+    /// The steps that open a shareable summary card (rewarded-ad gated for free).
+    var isShare: Bool {
+        switch self {
+        case .shareFixtures, .sharePicks, .shareResults: return true
+        default: return false
+        }
+    }
 }

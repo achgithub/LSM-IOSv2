@@ -20,9 +20,9 @@ enum Tier: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .free: return "Ad-supported"
-        case .noAds: return "Ads removed"
-        case .pro: return "Ads removed + premium features"
+        case .free: return "Ad-supported · 1 league"
+        case .noAds: return "Ads removed · up to 3 leagues"
+        case .pro: return "Ads removed · all leagues + premium"
         }
     }
 
@@ -63,11 +63,15 @@ final class Entitlements {
     var shouldShowAds: Bool { !tier.removesAds }
 
     /// How many leagues the user may have enabled at once (ticked in Settings).
-    /// Free = 1; any paid tier = the whole catalogue. NOTE: when the Tier enum
-    /// collapses to free/manager/club/pro this becomes 1 / 1 / 3 / all — change
-    /// it here only.
+    /// Free = 1, No Ads (middle) = up to 3, Pro = the whole catalogue. Capped at
+    /// the number of leagues that actually exist so a small catalogue never claims
+    /// more than it has. Change tier→count here only.
     var leagueAllowance: Int {
-        tier.removesAds ? Leagues.all.count : 1
+        switch tier {
+        case .free:  return 1
+        case .noAds: return min(3, Leagues.all.count)
+        case .pro:   return Leagues.all.count
+        }
     }
 
     /// True when the user may enable more than one league (so the Settings

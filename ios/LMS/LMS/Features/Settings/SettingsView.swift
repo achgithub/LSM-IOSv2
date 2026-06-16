@@ -18,6 +18,9 @@ struct SettingsView: View {
     @State private var confirmDisable: LeagueOption?   // second (final) warning
     // Single-league plans swap their one league instead of disable/enable.
     @State private var pendingSwap: LeagueOption?
+    // Upgrade / restore.
+    @State private var showPaywall = false
+    @State private var purchaseAlert: PurchaseAlertItem?
 
     private var allowance: Int { entitlements.leagueAllowance }
 
@@ -52,8 +55,16 @@ struct SettingsView: View {
                     LabeledContent("Plan", value: entitlements.tier.label)
                     Text(entitlements.tier.detail)
                         .font(.caption).foregroundStyle(.secondary)
+                    if entitlements.tier != .pro {
+                        Button("Upgrade") { showPaywall = true }
+                    }
                     Button("Restore Purchases") {
-                        Task { await PurchaseService.shared.restore() }
+                        Task {
+                            let outcome = await PurchaseService.shared.restore()
+                            if let a = outcome.alert(restoring: true) {
+                                purchaseAlert = PurchaseAlertItem(title: a.title, message: a.message)
+                            }
+                        }
                     }
                 }
 
@@ -75,6 +86,12 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $showPaywall) {
+                PaywallView().environment(entitlements)
+            }
+            .alert(item: $purchaseAlert) { a in
+                Alert(title: Text(a.title), message: Text(a.message), dismissButton: .default(Text("OK")))
+            }
             .confirmationDialog(
                 "Disable \(pendingDisable?.name ?? "league")?",
                 isPresented: Binding(get: { pendingDisable != nil }, set: { if !$0 { pendingDisable = nil } }),

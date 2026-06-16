@@ -8,5 +8,9 @@
 	     manifest, orientations) are merged in by GENERATE_INFOPLIST_FILE=YES. -->
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<!-- App Tracking Transparency: shown by AdConsent before ads start. Without
+	     this key the ATT prompt cannot appear and ads stay non-personalized. -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This lets us show you more relevant ads. You can keep using the app whichever you choose.</string>
 </dict>
 </plist>

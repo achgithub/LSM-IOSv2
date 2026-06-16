@@ -13,6 +13,7 @@ struct LeagueDowngradeView: View {
     @Query private var games: [Game]
 
     @State private var pendingRemove: LeagueOption?
+    @State private var purchaseAlert: PurchaseAlertItem?
 
     private var allowance: Int { entitlements.leagueAllowance }
     private var overBy: Int { max(0, enabled.ids.count - allowance) }
@@ -45,7 +46,12 @@ struct LeagueDowngradeView: View {
 
                 Section {
                     Button("Restore Purchases") {
-                        Task { await PurchaseService.shared.restore() }
+                        Task {
+                            let outcome = await PurchaseService.shared.restore()
+                            if let a = outcome.alert(restoring: true) {
+                                purchaseAlert = PurchaseAlertItem(title: a.title, message: a.message)
+                            }
+                        }
                     }
                 } footer: {
                     Text("Renewed by mistake? Restore your subscription to keep all your leagues.")
@@ -62,6 +68,9 @@ struct LeagueDowngradeView: View {
             .navigationTitle("Choose your league\(allowance == 1 ? "" : "s")")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(true)
+            .alert(item: $purchaseAlert) { a in
+                Alert(title: Text(a.title), message: Text(a.message), dismissButton: .default(Text("OK")))
+            }
             .confirmationDialog(
                 "Remove \(pendingRemove?.name ?? "")?",
                 isPresented: Binding(get: { pendingRemove != nil }, set: { if !$0 { pendingRemove = nil } }),
