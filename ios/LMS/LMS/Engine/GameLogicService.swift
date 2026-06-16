@@ -7,10 +7,10 @@ enum FixtureOutcome: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .homeWin: return "Home Win"
-        case .draw: return "Draw"
-        case .awayWin: return "Away Win"
-        case .postponed: return "Postponed"
+        case .homeWin: return String(localized: "Home Win")
+        case .draw: return String(localized: "Draw")
+        case .awayWin: return String(localized: "Away Win")
+        case .postponed: return String(localized: "Postponed")
         }
     }
 }

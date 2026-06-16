@@ -22,12 +22,29 @@ struct LeagueDowngradeView: View {
         games.filter { $0.leagues.contains(league) }
     }
 
+    /// The "you're over your allowance" banner — singular / plural on the allowance.
+    private var overLimitMessage: String {
+        allowance == 1
+            ? String(localized: "Your plan now includes 1 league. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
+            : String(localized: "Your plan now includes \(allowance) leagues. You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
+    }
+
+    /// Remove-confirm message — singular / plural / no-games variants.
+    private func removeMessage(_ league: LeagueOption) -> String {
+        let n = gamesUsing(league).count
+        switch n {
+        case 0:  return String(localized: "Removes \(league.name) from this device.")
+        case 1:  return String(localized: "Removes \(league.name) from this device and permanently deletes 1 game that uses it.")
+        default: return String(localized: "Removes \(league.name) from this device and permanently deletes \(n) games that use it.")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     Label {
-                        Text("Your plan now includes \(allowance) league\(allowance == 1 ? "" : "s"). You have \(enabled.ids.count) enabled — remove \(overBy) to continue.")
+                        Text(verbatim: overLimitMessage)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     }
@@ -65,7 +82,9 @@ struct LeagueDowngradeView: View {
                 }
                 #endif
             }
-            .navigationTitle("Choose your league\(allowance == 1 ? "" : "s")")
+            .navigationTitle(allowance == 1
+                             ? String(localized: "Choose your league")
+                             : String(localized: "Choose your leagues"))
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(true)
             .alert(item: $purchaseAlert) { a in
@@ -80,8 +99,7 @@ struct LeagueDowngradeView: View {
                 Button("Remove & delete games", role: .destructive) { remove(league) }
                 Button("Cancel", role: .cancel) {}
             } message: { league in
-                let n = gamesUsing(league).count
-                Text("Removes \(league.name) from this device\(n > 0 ? " and permanently deletes \(n) game\(n == 1 ? "" : "s") that use it" : "").")
+                Text(verbatim: removeMessage(league))
             }
         }
     }

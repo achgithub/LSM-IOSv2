@@ -75,7 +75,7 @@ private struct GameCard: View {
 private struct StatusBadge: View {
     let status: GameStatus
     var body: some View {
-        Text(status.rawValue.capitalized)
+        Text(status.label)
             .font(.caption2.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

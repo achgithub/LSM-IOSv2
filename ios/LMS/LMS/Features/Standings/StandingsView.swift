@@ -130,7 +130,7 @@ private struct StandingRow: View {
         .padding(.vertical, isPad ? 6 : 0)
     }
 
-    private func stat(_ label: String, _ value: Int) -> some View {
+    private func stat(_ label: LocalizedStringKey, _ value: Int) -> some View {
         VStack(spacing: 1) {
             Text(label)
                 .font(isPad ? .caption2 : .system(size: 8))

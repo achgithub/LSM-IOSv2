@@ -105,7 +105,9 @@ struct PicksEntryView: View {
                 SummaryShareView(game: game, round: round, type: .picks)
             }
             .confirmationDialog(
-                "Auto-assign \(unpickedCount) player\(unpickedCount == 1 ? "" : "s")?",
+                unpickedCount == 1
+                    ? String(localized: "Auto-assign 1 player?")
+                    : String(localized: "Auto-assign \(unpickedCount) players?"),
                 isPresented: $showAutoAssignConfirm,
                 titleVisibility: .visible
             ) {

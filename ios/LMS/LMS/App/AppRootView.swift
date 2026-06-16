@@ -5,6 +5,10 @@ import SwiftUI
 /// splash so its startup work (ads, purchases) is already running on handoff.
 struct AppRootView: View {
     @State private var showSplash = true
+    /// Drives in-app language: changing it re-keys the tree (so every view
+    /// re-reads its localized strings) and updates `\.locale` for date/number
+    /// and plural formatting.
+    @State private var localization = LocalizationManager.shared
 
     var body: some View {
         ZStack {
@@ -19,5 +23,8 @@ struct AppRootView: View {
                 .zIndex(1)
             }
         }
+        .environment(localization)
+        .environment(\.locale, localization.locale)
+        .id(localization.language)
     }
 }

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
+    @Environment(LocalizationManager.self) private var localization
     @Environment(\.modelContext) private var context
     @Query private var games: [Game]
 
@@ -23,6 +24,10 @@ struct SettingsView: View {
     @State private var purchaseAlert: PurchaseAlertItem?
 
     private var allowance: Int { entitlements.leagueAllowance }
+
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(get: { localization.language }, set: { localization.select($0) })
+    }
 
     /// Games that reference a league (whole game is deleted, even if it blends
     /// other leagues too).
@@ -80,6 +85,19 @@ struct SettingsView: View {
 
                 leagueSection
 
+                Section {
+                    Picker("Language", selection: languageBinding) {
+                        ForEach(AppLanguage.allCases) { language in
+                            // Endonym (e.g. "Deutsch") — fixed, never translated.
+                            Text(language.displayName).tag(language)
+                        }
+                    }
+                } header: {
+                    Text("Language")
+                } footer: {
+                    Text("Choose the app's language. Team, player and league names always come from the league data.")
+                }
+
                 Section("About") {
                     LabeledContent("App", value: config.appName)
                     LabeledContent("Version", value: version)
@@ -104,8 +122,7 @@ struct SettingsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { league in
-                let n = gamesUsing(league).count
-                Text("Disabling \(league.name) removes its data from this device\(n > 0 ? " and deletes \(n) game\(n == 1 ? "" : "s") that use it" : "").")
+                Text(verbatim: disableMessage(league))
             }
             .confirmationDialog(
                 "Delete games in \(confirmDisable?.name ?? "")?",
@@ -117,7 +134,9 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { league in
                 let n = gamesUsing(league).count
-                Text("This permanently deletes \(n) game\(n == 1 ? "" : "s") and can't be undone.")
+                Text(verbatim: n == 1
+                     ? String(localized: "This permanently deletes 1 game and can't be undone.")
+                     : String(localized: "This permanently deletes \(n) games and can't be undone."))
             }
             .confirmationDialog(
                 "Switch to \(pendingSwap?.name ?? "")?",
@@ -128,9 +147,7 @@ struct SettingsView: View {
                 Button("Switch", role: .destructive) { swap(to: target) }
                 Button("Cancel", role: .cancel) {}
             } message: { target in
-                let current = enabled.leagues.first
-                let n = enabled.leagues.reduce(0) { $0 + gamesUsing($1).count }
-                Text("Switches from \(current?.name ?? "your league") to \(target.name)\(n > 0 ? ", deleting \(n) game\(n == 1 ? "" : "s") that use the old league" : "").")
+                Text(verbatim: switchMessage(to: target))
             }
         }
     }
@@ -143,11 +160,44 @@ struct SettingsView: View {
         } header: {
             Text("Leagues")
         } footer: {
-            if allowance == 1 {
-                Text("Your \(entitlements.tier.label) plan includes 1 league — tap another to switch.\(allowance < Leagues.all.count ? " Subscribe to run more at once." : "")")
-            } else {
-                Text("You can enable \(allowance) leagues on the \(entitlements.tier.label) plan.\(allowance < Leagues.all.count ? " Subscribe to enable more." : "")")
-            }
+            Text(verbatim: leagueFooter)
+        }
+    }
+
+    /// League-section footer: a base sentence plus an optional "subscribe" nudge
+    /// when the catalogue has more leagues than the plan allows. Built in Swift so
+    /// each clause is a clean, fully-translatable sentence (no inline plurals).
+    private var leagueFooter: String {
+        let canSubscribeForMore = allowance < Leagues.all.count
+        if allowance == 1 {
+            var text = String(localized: "Your \(entitlements.tier.label) plan includes 1 league — tap another to switch.")
+            if canSubscribeForMore { text += " " + String(localized: "Subscribe to run more at once.") }
+            return text
+        } else {
+            var text = String(localized: "You can enable \(allowance) leagues on the \(entitlements.tier.label) plan.")
+            if canSubscribeForMore { text += " " + String(localized: "Subscribe to enable more.") }
+            return text
+        }
+    }
+
+    /// First disable-confirm message — singular / plural / no-games variants.
+    private func disableMessage(_ league: LeagueOption) -> String {
+        let n = gamesUsing(league).count
+        switch n {
+        case 0:  return String(localized: "Disabling \(league.name) removes its data from this device.")
+        case 1:  return String(localized: "Disabling \(league.name) removes its data from this device and deletes 1 game that uses it.")
+        default: return String(localized: "Disabling \(league.name) removes its data from this device and deletes \(n) games that use it.")
+        }
+    }
+
+    /// Single-league-plan swap-confirm message — singular / plural / no-games.
+    private func switchMessage(to target: LeagueOption) -> String {
+        let current = enabled.leagues.first?.name ?? String(localized: "your league")
+        let n = enabled.leagues.reduce(0) { $0 + gamesUsing($1).count }
+        switch n {
+        case 0:  return String(localized: "Switches from \(current) to \(target.name).")
+        case 1:  return String(localized: "Switches from \(current) to \(target.name), deleting 1 game that uses the old league.")
+        default: return String(localized: "Switches from \(current) to \(target.name), deleting \(n) games that use the old league.")
         }
     }
 

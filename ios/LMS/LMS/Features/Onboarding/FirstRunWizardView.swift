@@ -98,9 +98,9 @@ struct FirstRunWizardView: View {
                         .foregroundStyle(.tint)
                     Text("Step \(stepIndex + 1) of \(steps.count)")
                         .font(.subheadline).foregroundStyle(.secondary)
-                    Text(step.title)
+                    Text(LocalizedStringKey(step.title))
                         .font(.title2.bold()).multilineTextAlignment(.center)
-                    Text(step.detail)
+                    Text(LocalizedStringKey(step.detail))
                         .font(.body).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -115,7 +115,7 @@ struct FirstRunWizardView: View {
                 Button {
                     open(step.sheet)
                 } label: {
-                    Text(step.action).frame(maxWidth: .infinity)
+                    Text(LocalizedStringKey(step.action)).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

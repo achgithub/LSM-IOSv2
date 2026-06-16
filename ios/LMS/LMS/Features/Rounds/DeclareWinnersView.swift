@@ -25,7 +25,7 @@ struct DeclareWinnersView: View {
                             HStack {
                                 Text(player.name).foregroundStyle(.primary)
                                 if player.status != .active {
-                                    Text(player.status.rawValue.capitalized)
+                                    Text(player.status.label)
                                         .font(.caption2).foregroundStyle(.secondary)
                                 }
                                 Spacer()

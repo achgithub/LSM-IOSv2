@@ -115,17 +115,18 @@ extension PurchaseService.PurchaseOutcome {
         switch self {
         case .success(let tier):
             if restoring && tier == .free {
-                return ("Nothing to restore", "We couldn't find an active subscription on your Apple ID.")
+                return (String(localized: "Nothing to restore"),
+                        String(localized: "We couldn't find an active subscription on your Apple ID."))
             }
-            return (restoring ? "Purchases restored" : "You're subscribed",
-                    "Your \(tier.label) plan is now active.")
+            return (restoring ? String(localized: "Purchases restored") : String(localized: "You're subscribed"),
+                    String(localized: "Your \(tier.label) plan is now active."))
         case .cancelled:
             return nil
         case .failed(let message):
-            return (restoring ? "Restore failed" : "Purchase failed", message)
+            return (restoring ? String(localized: "Restore failed") : String(localized: "Purchase failed"), message)
         case .unavailable:
-            return ("Not available yet",
-                    "Subscriptions aren't available in this build yet. Please check back after the next update.")
+            return (String(localized: "Not available yet"),
+                    String(localized: "Subscriptions aren't available in this build yet. Please check back after the next update."))
         }
     }
 }

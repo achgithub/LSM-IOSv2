@@ -151,14 +151,14 @@ struct GameDetailView: View {
 
     private var infoSection: some View {
         Section {
-            LabeledContent("Status", value: game.status.rawValue.capitalized)
+            LabeledContent("Status", value: game.status.label)
             LabeledContent("Round", value: "\(currentRound?.roundNumber ?? 0)")
         }
     }
 
     /// One ad-gated "share card" row — the card can't be screenshot ad-free
     /// because the ad gates *opening* it.
-    private func shareCardButton(_ title: String, _ which: RoundSheet, enabled: Bool) -> some View {
+    private func shareCardButton(_ title: LocalizedStringKey, _ which: RoundSheet, enabled: Bool) -> some View {
         Button { AdGate.run { sheet = which } } label: {
             Label(title, systemImage: "square.and.arrow.up")
         }
@@ -180,7 +180,7 @@ struct GameDetailView: View {
                 }
 
             } else if let round = openRound {
-                LabeledContent("Round \(round.roundNumber)", value: round.status.rawValue.capitalized)
+                LabeledContent("Round \(round.roundNumber)", value: round.status.label)
                 // A rollover/playoff round follows a resolution — surface its card.
                 if round.roundType != .normal, let ending = game.lastOutcome {
                     shareCardButton("Share \(ending.headline) Card", .summaryOutcome, enabled: true)
@@ -239,7 +239,7 @@ struct GameDetailView: View {
                         }
                         Spacer()
                         if player.status != .active {
-                            Text(player.status.rawValue.capitalized)
+                            Text(player.status.label)
                                 .font(.caption)
                                 .foregroundStyle(player.status == .winner ? .green : .red)
                         }
