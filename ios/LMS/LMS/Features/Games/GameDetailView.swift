@@ -206,7 +206,7 @@ struct GameDetailView: View {
                     shareCardButton("Share Results Card", .summaryResults, enabled: true)
                 }
                 Button { sheet = .open } label: { Label("Open Round", systemImage: "calendar.badge.plus") }
-                    .disabled(game.activePlayers.isEmpty)
+                    .disabled(game.activePlayers.count < 2)
             }
         }
     }

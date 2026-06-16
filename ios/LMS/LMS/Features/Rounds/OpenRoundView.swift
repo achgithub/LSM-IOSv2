@@ -64,15 +64,27 @@ struct OpenRoundView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Open") { create() }.disabled(selectedFixtureIds.isEmpty)
+                    Button("Open") { create() }.disabled(selectedFixtureIds.isEmpty || !enoughPlayers)
                 }
             }
             .task { await load() }
         }
     }
 
+    /// A round needs at least two active players — otherwise there's no contest
+    /// and a single player could be "eliminated" into a nonsensical one-way tie.
+    private var enoughPlayers: Bool { game.activePlayers.count >= 2 }
+
     private var form: some View {
         Form {
+            if !enoughPlayers {
+                Section {
+                    Label("A game needs at least 2 players to start a round.",
+                          systemImage: "person.2.slash")
+                        .foregroundStyle(.orange)
+                }
+            }
+
             Section("Filters") {
                 // Only show the league control when there's an actual choice — a
                 // single-league game uses that league silently (matches New Game).

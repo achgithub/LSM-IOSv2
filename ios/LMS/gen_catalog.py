@@ -307,7 +307,8 @@ add("Name it, choose whether you're playing, and set anonymity for shared cards.
     "Geef het een naam, kies of je meespeelt en stel anonimiteit in voor gedeelde kaarten.",
     "Dagli un nome, scegli se giochi e imposta l’anonimato per le schede condivise.")
 add("Add players to the game", "Añade jugadores a la partida", "Spieler zum Spiel hinzufügen", "Ajoute des joueurs à la partie", "Voeg spelers toe aan het spel", "Aggiungi giocatori alla partita")
-add("Pull people from your roster into this game.", "Trae personas de tu lista a esta partida.", "Hol Personen aus deiner Liste in dieses Spiel.", "Ajoute des personnes de ta liste à cette partie.", "Haal mensen uit je lijst naar dit spel.", "Porta persone dal tuo elenco in questa partita.")
+add("Pull people from your roster into this game — you need at least two to play.", "Trae personas de tu lista a esta partida: necesitas al menos dos para jugar.", "Hol Personen aus deiner Liste in dieses Spiel – du brauchst mindestens zwei zum Spielen.", "Ajoute des personnes de ta liste à cette partie — il en faut au moins deux pour jouer.", "Haal mensen uit je lijst naar dit spel — je hebt er minstens twee nodig om te spelen.", "Porta persone dal tuo elenco in questa partita: ne servono almeno due per giocare.")
+add("A game needs at least 2 players to start a round.", "Una partida necesita al menos 2 jugadores para empezar una ronda.", "Ein Spiel braucht mindestens 2 Spieler, um eine Runde zu starten.", "Une partie nécessite au moins 2 joueurs pour lancer une manche.", "Een spel heeft minstens 2 spelers nodig om een ronde te starten.", "Una partita richiede almeno 2 giocatori per iniziare un turno.")
 add("Open round 1", "Abre la ronda 1", "Runde 1 öffnen", "Ouvre la manche 1", "Open ronde 1", "Apri il turno 1")
 add("Pick the fixtures this round runs on and set the picks deadline.",
     "Elige los partidos de esta ronda y fija la fecha límite de selecciones.",

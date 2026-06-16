@@ -41,7 +41,7 @@ struct FirstRunWizardView: View {
                   action: "New Game", gated: true),
             .init(sheet: .addPlayers, icon: "person.badge.plus",
                   title: "Add players to the game",
-                  detail: "Pull people from your roster into this game.",
+                  detail: "Pull people from your roster into this game — you need at least two to play.",
                   action: "Add Players", gated: true),
             .init(sheet: .openRound, icon: "calendar.badge.plus",
                   title: "Open round 1",
@@ -74,7 +74,7 @@ struct FirstRunWizardView: View {
         switch steps[index].sheet {
         case .players:       return !roster.isEmpty || (game?.players.isEmpty == false)
         case .newGame:       return game != nil
-        case .addPlayers:    return (game?.activePlayers.count ?? 0) >= 1
+        case .addPlayers:    return (game?.activePlayers.count ?? 0) >= 2
         case .openRound:     return openRound != nil || latestClosedRound != nil
         case .picks:         return picksComplete || latestClosedRound != nil
         case .results:       return latestClosedRound != nil

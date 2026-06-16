@@ -6756,37 +6756,72 @@
         }
       }
     },
-    "Pull people from your roster into this game.": {
+    "Pull people from your roster into this game — you need at least two to play.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hol Personen aus deiner Liste in dieses Spiel."
+            "value": "Hol Personen aus deiner Liste in dieses Spiel – du brauchst mindestens zwei zum Spielen."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trae personas de tu lista a esta partida."
+            "value": "Trae personas de tu lista a esta partida: necesitas al menos dos para jugar."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajoute des personnes de ta liste à cette partie."
+            "value": "Ajoute des personnes de ta liste à cette partie — il en faut au moins deux pour jouer."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Porta persone dal tuo elenco in questa partita."
+            "value": "Porta persone dal tuo elenco in questa partita: ne servono almeno due per giocare."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Haal mensen uit je lijst naar dit spel."
+            "value": "Haal mensen uit je lijst naar dit spel — je hebt er minstens twee nodig om te spelen."
+          }
+        }
+      }
+    },
+    "A game needs at least 2 players to start a round.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Spiel braucht mindestens 2 Spieler, um eine Runde zu starten."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una partida necesita al menos 2 jugadores para empezar una ronda."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une partie nécessite au moins 2 joueurs pour lancer une manche."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una partita richiede almeno 2 giocatori per iniziare un turno."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Een spel heeft minstens 2 spelers nodig om een ronde te starten."
           }
         }
       }
