@@ -447,7 +447,10 @@ add("Your %@ plan includes 1 league — tap another to switch.",
     "Je %@-abonnement bevat 1 competitie — tik op een andere om te wisselen.",
     "Il tuo piano %@ include 1 lega: tocca un’altra per cambiare.")
 add("Subscribe to run more at once.", "Suscríbete para usar más a la vez.", "Abonniere, um mehrere gleichzeitig zu nutzen.", "Abonne-toi pour en gérer plusieurs à la fois.", "Abonneer om er meer tegelijk te gebruiken.", "Abbonati per gestirne di più contemporaneamente.")
-add("You can enable %lld leagues on the %@ plan.", "Puedes activar %lld ligas con el plan %@.", "Mit dem %@-Tarif kannst du %lld Ligen aktivieren.", "Tu peux activer %lld ligues avec le forfait %@.", "Je kunt %lld competities inschakelen met het %@-abonnement.", "Con il piano %@ puoi attivare %lld leghe.")
+# DE/IT reorder the args vs the source (%lld=count, %@=plan), so they MUST use
+# positional specifiers (%1$ = count, %2$ = plan) — otherwise the Int and String
+# args get swapped into the wrong specifier at runtime (garbage/crash).
+add("You can enable %lld leagues on the %@ plan.", "Puedes activar %lld ligas con el plan %@.", "Mit dem %2$@-Tarif kannst du %1$lld Ligen aktivieren.", "Tu peux activer %lld ligues avec le forfait %@.", "Je kunt %lld competities inschakelen met het %@-abonnement.", "Con il piano %2$@ puoi attivare %1$lld leghe.")
 add("Subscribe to enable more.", "Suscríbete para activar más.", "Abonniere, um mehr zu aktivieren.", "Abonne-toi pour en activer plus.", "Abonneer om er meer in te schakelen.", "Abbonati per attivarne di più.")
 
 # ---- Paywall ----

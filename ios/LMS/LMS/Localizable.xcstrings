@@ -8267,7 +8267,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mit dem %@-Tarif kannst du %lld Ligen aktivieren."
+            "value": "Mit dem %2$@-Tarif kannst du %1$lld Ligen aktivieren."
           }
         },
         "es": {
@@ -8285,7 +8285,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Con il piano %@ puoi attivare %lld leghe."
+            "value": "Con il piano %2$@ puoi attivare %1$lld leghe."
           }
         },
         "nl": {
