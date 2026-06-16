@@ -18,11 +18,19 @@
 			remoteGlobalIDString = 92346B552FDED71700998C1D;
 			remoteInfo = LMS;
 		};
+		5DA0000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 92346B4E2FDED71700998C1D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92346B552FDED71700998C1D;
+			remoteInfo = LMS;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		92346B562FDED71700998C1D /* LMS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LMS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		92346B652FDED71900998C1D /* LMSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LMSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DA0000000000000000003 /* LMSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LMSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +42,11 @@
 		92346B682FDED71900998C1D /* LMSTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LMSTests;
+			sourceTree = "<group>";
+		};
+		5DA0000000000000000004 /* LMSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LMSUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -54,6 +67,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5DA0000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,6 +82,7 @@
 			children = (
 				92346B582FDED71700998C1D /* LMS */,
 				92346B682FDED71900998C1D /* LMSTests */,
+				5DA0000000000000000004 /* LMSUITests */,
 				92346B572FDED71700998C1D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,6 +92,7 @@
 			children = (
 				92346B562FDED71700998C1D /* LMS.app */,
 				92346B652FDED71900998C1D /* LMSTests.xctest */,
+				5DA0000000000000000003 /* LMSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -125,6 +147,29 @@
 			productReference = 92346B652FDED71900998C1D /* LMSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5DA0000000000000000008 /* LMSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DA000000000000000000B /* Build configuration list for PBXNativeTarget "LMSUITests" */;
+			buildPhases = (
+				5DA0000000000000000007 /* Sources */,
+				5DA0000000000000000005 /* Frameworks */,
+				5DA0000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DA0000000000000000002 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5DA0000000000000000004 /* LMSUITests */,
+			);
+			name = LMSUITests;
+			packageProductDependencies = (
+			);
+			productName = LMSUITests;
+			productReference = 5DA0000000000000000003 /* LMSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -139,6 +184,10 @@
 						CreatedOnToolsVersion = 26.5;
 					};
 					92346B642FDED71900998C1D = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 92346B552FDED71700998C1D;
+					};
+					5DA0000000000000000008 = {
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = 92346B552FDED71700998C1D;
 					};
@@ -168,6 +217,7 @@
 			targets = (
 				92346B552FDED71700998C1D /* LMS */,
 				92346B642FDED71900998C1D /* LMSTests */,
+				5DA0000000000000000008 /* LMSUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -181,6 +231,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		92346B632FDED71900998C1D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DA0000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -226,6 +283,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5DA0000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -233,6 +297,11 @@
 			isa = PBXTargetDependency;
 			target = 92346B552FDED71700998C1D /* LMS */;
 			targetProxy = 92346B662FDED71900998C1D /* PBXContainerItemProxy */;
+		};
+		5DA0000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92346B552FDED71700998C1D /* LMS */;
+			targetProxy = 5DA0000000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -466,6 +535,48 @@
 			};
 			name = Release;
 		};
+		5DA0000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UD928WR9RR;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sportsmanager.LMSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = LMS;
+			};
+			name = Debug;
+		};
+		5DA000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UD928WR9RR;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sportsmanager.LMSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = LMS;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -492,6 +603,15 @@
 			buildConfigurations = (
 				92346B7D2FDED71900998C1D /* Debug */,
 				92346B7E2FDED71900998C1D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5DA000000000000000000B /* Build configuration list for PBXNativeTarget "LMSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DA0000000000000000009 /* Debug */,
+				5DA000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

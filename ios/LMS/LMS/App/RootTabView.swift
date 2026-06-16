@@ -50,12 +50,16 @@ struct RootTabView: View {
         }
         .task {
             PurchaseService.shared.configure()
-            AdsBootstrap.start()
-            // Interstitial dropped (low value for this workflow app, 2026-06-15).
-            // Code kept in InterstitialAdManager; re-enable by uncommenting here
-            // and the scenePhase trigger below.
-            // InterstitialAdManager.shared.preload()
-            RewardedAdManager.shared.preload()
+            // Skip ad bootstrap under UI tests so the ATT / UMP consent dialogs
+            // never appear and make the launch flow flaky.
+            if !ProcessInfo.processInfo.arguments.contains("-uitests") {
+                AdsBootstrap.start()
+                // Interstitial dropped (low value for this workflow app, 2026-06-15).
+                // Code kept in InterstitialAdManager; re-enable by uncommenting here
+                // and the scenePhase trigger below.
+                // InterstitialAdManager.shared.preload()
+                RewardedAdManager.shared.preload()
+            }
             await entitlements.refresh()
             // Drop any leagues that no longer exist. Going over the subscription
             // allowance is handled by the blocking downgrade gate, not silently.
