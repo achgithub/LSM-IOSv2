@@ -84,11 +84,12 @@ private struct StandingRow: View {
     var body: some View {
         HStack(spacing: isPad ? 16 : 12) {
             Text("\(row.position)")
-                .frame(width: isPad ? 32 : 22, alignment: .leading)
-                .foregroundStyle(.secondary)
                 .font(nameFont)
                 .monospacedDigit()
-            TeamTile(tla: team?.tla, size: isPad ? .medium : .small)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: isPad ? 40 : 28, alignment: .leading)
+                .foregroundStyle(.secondary)
             Text(team?.shortName ?? team?.name ?? "Team \(row.teamId)")
                 .font(nameFont)
                 .lineLimit(1)
