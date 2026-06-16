@@ -164,13 +164,21 @@ struct SummaryCardView: View {
 
     @ViewBuilder
     private var resultsContent: some View {
+        // A single survivor means the game is won (last man standing) — show the
+        // winner, not a non-existent next round. Zero survivors = all eliminated,
+        // so there's no "through" line at all.
+        let survived = data.survivors.count
+        let won = survived == 1
         if data.mode == .anonymous {
             VStack(alignment: .leading, spacing: 16) {
-                Label {
-                    Text(verbatim: survivorsLine)
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(textPrimary)
-                } icon: { Text(verbatim: "✅") }
-                Divider().overlay(textSecondary.opacity(0.3))
+                if survived > 0 {
+                    Label {
+                        Text(verbatim: won ? AppString("Winner")
+                                           : AppString("\(survived) players through to Round \(data.nextRoundNumber)"))
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(textPrimary)
+                    } icon: { Text(verbatim: won ? "🏆" : "✅") }
+                    Divider().overlay(textSecondary.opacity(0.3))
+                }
                 Label {
                     Text(verbatim: eliminatedLine)
                         .font(.system(size: 17, weight: .semibold)).foregroundStyle(textPrimary)
@@ -178,13 +186,16 @@ struct SummaryCardView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 18) {
-                resultGroup(
-                    icon: "✅",
-                    title: AppString("Through to Round \(data.nextRoundNumber) (\(data.survivors.count))"),
-                    names: data.survivors,
-                    flagged: data.managerSurvived,
-                    titleColor: survivedGreen
-                )
+                if survived > 0 {
+                    resultGroup(
+                        icon: won ? "🏆" : "✅",
+                        title: won ? AppString("Winner")
+                                   : AppString("Through to Round \(data.nextRoundNumber) (\(survived))"),
+                        names: data.survivors,
+                        flagged: data.managerSurvived,
+                        titleColor: won ? accent : survivedGreen
+                    )
+                }
                 resultGroup(
                     icon: "❌",
                     title: AppString("Eliminated (\(data.eliminated.count))"),
@@ -194,13 +205,6 @@ struct SummaryCardView: View {
                 )
             }
         }
-    }
-
-    /// Anonymous-mode survivor/eliminated tallies — singular / plural variants.
-    private var survivorsLine: String {
-        data.survivors.count == 1
-            ? AppString("1 player through to Round \(data.nextRoundNumber)")
-            : AppString("\(data.survivors.count) players through to Round \(data.nextRoundNumber)")
     }
 
     private var eliminatedLine: String {

@@ -9941,41 +9941,6 @@
         }
       }
     },
-    "1 player through to Round %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Spieler weiter in Runde %lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 jugador pasa a la ronda %lld"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 joueur qualifié pour la manche %lld"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 giocatore avanti al turno %lld"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 speler door naar ronde %lld"
-          }
-        }
-      }
-    },
     "%lld players through to Round %lld": {
       "extractionState": "manual",
       "localizations": {

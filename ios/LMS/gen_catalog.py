@@ -554,7 +554,6 @@ add("Still in — pick again", "Sigue en juego: vuelve a elegir", "Noch dabei �
 add("Back in, picks reset", "De vuelta, selecciones reiniciadas", "Wieder dabei, Tipps zurückgesetzt", "De retour, choix réinitialisés", "Terug, keuzes gereset", "Di nuovo in gioco, scelte azzerate")
 add("Through to Round %lld (%lld)", "Pasan a la ronda %lld (%lld)", "Weiter in Runde %lld (%lld)", "Qualifiés pour la manche %lld (%lld)", "Door naar ronde %lld (%lld)", "Avanti al turno %lld (%lld)")
 add("Eliminated (%lld)", "Eliminados (%lld)", "Ausgeschieden (%lld)", "Éliminés (%lld)", "Afgevallen (%lld)", "Eliminati (%lld)")
-add("1 player through to Round %lld", "1 jugador pasa a la ronda %lld", "1 Spieler weiter in Runde %lld", "1 joueur qualifié pour la manche %lld", "1 speler door naar ronde %lld", "1 giocatore avanti al turno %lld")
 add("%lld players through to Round %lld", "%lld jugadores pasan a la ronda %lld", "%lld Spieler weiter in Runde %lld", "%lld joueurs qualifiés pour la manche %lld", "%lld spelers door naar ronde %lld", "%lld giocatori avanti al turno %lld")
 add("1 player eliminated", "1 jugador eliminado", "1 Spieler ausgeschieden", "1 joueur éliminé", "1 speler afgevallen", "1 giocatore eliminato")
 add("%lld players eliminated", "%lld jugadores eliminados", "%lld Spieler ausgeschieden", "%lld joueurs éliminés", "%lld spelers afgevallen", "%lld giocatori eliminati")
