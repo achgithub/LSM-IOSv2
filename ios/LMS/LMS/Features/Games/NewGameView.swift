@@ -11,7 +11,7 @@ struct NewGameView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     @State private var name = ""
-    @State private var season = LeagueConfig.shared.season
+    @State private var season = Leagues.app.season
     @State private var anonymity: AnonymityMode = .anonymous
     @State private var selectedLeagueIds: Set<String> = []
     @State private var managerPlaying = true   // manager opts in/out per game
@@ -109,7 +109,7 @@ struct NewGameView: View {
         let game = Game(
             name: trimmedName,
             season: season,
-            allowRepeats: LeagueConfig.shared.allowRepeatDefault,
+            allowRepeats: Leagues.app.allowRepeatDefault,
             anonymityMode: anonymity,
             leagueIds: Array(selectedLeagueIds)
         )

@@ -24,13 +24,24 @@ struct LeagueOption: Identifiable, Hashable, Sendable, Decodable {
 /// The registry of every league with a live Worker. Single source of truth —
 /// the engine, networking and UI all resolve leagues through here, never via a
 /// hardcoded id or count, so the set scales by editing `leagues.json` alone.
+/// App-wide settings (not league-specific), bundled in `leagues.json`.
+struct AppSettings: Decodable, Sendable {
+    let name: String                 // product name shown on cards / Settings
+    let season: String               // default season for a new game
+    let allowRepeatDefault: Bool     // default "allow repeat picks" rule
+}
+
 enum Leagues {
     private struct Manifest: Decodable {
+        let app: AppSettings
         let homeLeagueId: String
         let leagues: [LeagueOption]
     }
 
     private static let manifest: Manifest = load()
+
+    /// App-wide settings (product name, default season + gameplay rules).
+    static var app: AppSettings { manifest.app }
 
     /// Every registered league, in manifest order.
     static var all: [LeagueOption] { manifest.leagues }

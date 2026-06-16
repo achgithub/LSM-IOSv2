@@ -197,7 +197,7 @@ struct SummaryData {
             type: type,
             mode: game.anonymityMode,
             leagueName: game.leagueLabel,
-            appName: LeagueConfig.shared.appName,
+            appName: Leagues.app.name,
             gameName: game.name,
             roundNumber: round.roundNumber,
             timestampLabel: timestampLabel(for: type, round: round),

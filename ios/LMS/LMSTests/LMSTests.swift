@@ -57,10 +57,11 @@ struct ModelTests {
 
 struct LeagueConfigTests {
 
-    @Test func bundledConfigLoadsForPremierLeague() {
-        let config = LeagueConfig.shared
-        #expect(config.leagueId == "PL")
-        #expect(config.teamsCount == 20)
-        #expect(config.workerURL.scheme == "https")
+    @Test func bundledManifestLoadsHomeLeagueAndAppSettings() {
+        #expect(Leagues.home.id == "PL")
+        #expect(Leagues.home.teamsCount == 20)
+        #expect(Leagues.home.workerURL.scheme == "https")
+        #expect(!Leagues.app.name.isEmpty)
+        #expect(!Leagues.app.season.isEmpty)
     }
 }

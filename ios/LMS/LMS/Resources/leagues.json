@@ -1,23 +1,28 @@
 {
+  "app": {
+    "name": "Last Man Standing",
+    "season": "2025/26",
+    "allowRepeatDefault": false
+  },
   "homeLeagueId": "PL",
   "leagues": [
     {
       "id": "PL",
-      "name": "Premier League",
+      "name": "England — Premier League",
       "shortName": "PL",
       "workerBaseURL": "https://lms-pl-worker.sportsmanager.workers.dev",
       "teamsCount": 20
     },
     {
       "id": "ELC",
-      "name": "Championship",
+      "name": "England — Championship",
       "shortName": "ELC",
       "workerBaseURL": "https://lms-elc-worker.sportsmanager.workers.dev",
       "teamsCount": 24
     },
     {
       "id": "PD",
-      "name": "La Liga",
+      "name": "España — La Liga",
       "shortName": "PD",
       "workerBaseURL": "https://lms-pd-worker.sportsmanager.workers.dev",
       "teamsCount": 20

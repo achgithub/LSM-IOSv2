@@ -6,7 +6,6 @@ import SwiftData
 /// its on-device data and deletes any game that uses it — guarded by a two-step
 /// confirmation.
 struct SettingsView: View {
-    private let config = LeagueConfig.shared
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
@@ -104,7 +103,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    LabeledContent("App", value: config.appName)
+                    LabeledContent("App", value: Leagues.app.name)
                     LabeledContent("Version", value: version)
                 } header: {
                     Text("About")

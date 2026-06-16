@@ -12,12 +12,9 @@ enum APIError: LocalizedError {
     }
 }
 
-/// Client for a per-league Worker (read-only sports-data API). `shared` targets
-/// the app's home league (LeagueConfig); browse screens that let the user switch
-/// leagues (e.g. Scores) build a client per league via `init(baseURL:)`.
+/// Client for a per-league Worker (read-only sports-data API). Each league
+/// builds its own client via `LeagueOption.client` / `init(baseURL:)`.
 actor APIClient {
-    static let shared = APIClient(baseURL: LeagueConfig.shared.workerURL)
-
     private let base: URL
     private let decoder = JSONDecoder()
 
