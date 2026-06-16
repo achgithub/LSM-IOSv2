@@ -36,17 +36,29 @@ enum OutcomeEnding: String, Codable, CaseIterable {
 
 /// Which summary card to render (spec §13b.1).
 enum SummaryType: Equatable {
+    case fixtures // the round's matches — shared so players know what to pick from
     case picks    // who picked what — after the deadline / picks finalised
     case results  // who survived / went out — after the round closed
     case outcome(OutcomeEnding)  // how a tie / all-eliminated round resolved
 
     var sectionLabel: String {
         switch self {
+        case .fixtures: return "FIXTURES"
         case .picks: return "PICKS"
         case .results: return "RESULTS"
         case .outcome(let ending): return ending.sectionLabel
         }
     }
+}
+
+/// One match on the fixtures card.
+struct SummaryFixture: Identifiable {
+    let id: Int
+    let homeTla: String?
+    let awayTla: String?
+    let homeName: String
+    let awayName: String
+    let kickoff: Date?
 }
 
 /// One team's pick group for the Picks summary (spec §13b.3).
@@ -86,6 +98,9 @@ struct SummaryData {
     let outcome: OutcomeEnding?
     let outcomePlayers: [String]   // winners, carried-forward, or everyone
 
+    // Fixtures summary (the round's matches)
+    let fixtures: [SummaryFixture]
+
     // Footer (game-level standing)
     let activeCount: Int
     let eliminatedCount: Int
@@ -100,12 +115,27 @@ struct SummaryData {
         game: Game,
         round: Round,
         teamsById: [Int: TeamDTO],
+        roundFixtures: [FixtureDTO] = [],
         managerPlayerId: UUID? = nil
     ) -> SummaryData {
         func name(_ team: Int) -> String {
             teamsById[team]?.shortName ?? teamsById[team]?.name ?? "Team \(team)"
         }
         func displayName(_ player: Player) -> String { player.name }
+
+        // Fixtures: the round's matches, sorted by kick-off.
+        let summaryFixtures: [SummaryFixture] = roundFixtures
+            .map { f in
+                SummaryFixture(
+                    id: f.id,
+                    homeTla: teamsById[f.homeTeamId]?.tla,
+                    awayTla: teamsById[f.awayTeamId]?.tla,
+                    homeName: name(f.homeTeamId),
+                    awayName: name(f.awayTeamId),
+                    kickoff: FixtureFormat.kickoffDate(f.kickoff)
+                )
+            }
+            .sorted { ($0.kickoff ?? .distantFuture) < ($1.kickoff ?? .distantFuture) }
 
         // Picks: group this round's picks by team, count descending.
         var byTeam: [Int: [Player]] = [:]
@@ -178,6 +208,7 @@ struct SummaryData {
             managerEliminated: managerPlayerId.map { id in eliminated.contains { $0.id == id } } ?? false,
             outcome: outcome,
             outcomePlayers: outcomePlayers,
+            fixtures: summaryFixtures,
             activeCount: activeNow,
             eliminatedCount: eliminatedNow
         )
@@ -187,7 +218,8 @@ struct SummaryData {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE d MMM • HH:mm"
         switch type {
-        case .picks:   return "Picks locked · \(formatter.string(from: round.deadline))"
+        case .fixtures: return "Picks due · \(formatter.string(from: round.deadline))"
+        case .picks:    return "Picks locked · \(formatter.string(from: round.deadline))"
         case .results, .outcome: return "Full time · \(formatter.string(from: Date()))"
         }
     }

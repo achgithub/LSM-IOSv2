@@ -73,9 +73,39 @@ struct SummaryCardView: View {
     @ViewBuilder
     private var content: some View {
         switch data.type {
-        case .picks:   picksContent
-        case .results: resultsContent
-        case .outcome: outcomeContent
+        case .fixtures: fixturesContent
+        case .picks:    picksContent
+        case .results:  resultsContent
+        case .outcome:  outcomeContent
+        }
+    }
+
+    @ViewBuilder
+    private var fixturesContent: some View {
+        if data.fixtures.isEmpty {
+            Text("No fixtures in this round.")
+                .font(.system(size: 15)).foregroundStyle(textSecondary)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(data.fixtures) { fixture in
+                    HStack(spacing: 8) {
+                        TeamTile(tla: fixture.homeTla, fallbackAbbrev: "?", size: .small)
+                        Text(fixture.homeName)
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
+                        Text("v").font(.system(size: 13)).foregroundStyle(textSecondary)
+                        Text(fixture.awayName)
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .trailing).lineLimit(1)
+                        TeamTile(tla: fixture.awayTla, fallbackAbbrev: "?", size: .small)
+                        if let kickoff = fixture.kickoff {
+                            Text(kickoff, format: .dateTime.weekday(.abbreviated).hour().minute())
+                                .font(.system(size: 11)).foregroundStyle(textSecondary)
+                                .frame(width: 64, alignment: .trailing).lineLimit(1)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -243,6 +273,10 @@ private extension SummaryData {
             managerEliminated: false,
             outcome: { if case .outcome(let e) = type { return e } else { return nil } }(),
             outcomePlayers: mode == .anonymous ? ["Player 1", "Player 4"] : ["Andy", "Nina"],
+            fixtures: [
+                SummaryFixture(id: 1, homeTla: "ARS", awayTla: "CHE", homeName: "Arsenal", awayName: "Chelsea", kickoff: .now),
+                SummaryFixture(id: 2, homeTla: "MUN", awayTla: "LIV", homeName: "Man Utd", awayName: "Liverpool", kickoff: .now.addingTimeInterval(7200))
+            ],
             activeCount: 8,
             eliminatedCount: 2
         )
@@ -263,6 +297,10 @@ private extension SummaryData {
 
 #Preview("Results · Anonymous") {
     SummaryCardView(data: .sample(type: .results, mode: .anonymous))
+}
+
+#Preview("Fixtures") {
+    SummaryCardView(data: .sample(type: .fixtures, mode: .named))
 }
 
 #Preview("Outcome · Split") {

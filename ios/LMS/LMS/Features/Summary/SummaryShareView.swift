@@ -15,9 +15,10 @@ struct SummaryShareView: View {
 
     private var title: String {
         switch type {
-        case .picks:   return "Picks · Round \(round.roundNumber)"
-        case .results: return "Results · Round \(round.roundNumber)"
-        case .outcome: return "Outcome · Round \(round.roundNumber)"
+        case .fixtures: return "Fixtures · Round \(round.roundNumber)"
+        case .picks:    return "Picks · Round \(round.roundNumber)"
+        case .results:  return "Results · Round \(round.roundNumber)"
+        case .outcome:  return "Outcome · Round \(round.roundNumber)"
         }
     }
 
@@ -64,15 +65,21 @@ struct SummaryShareView: View {
     private func build() async {
         isLoading = true
         errorMessage = nil
-        // Team data drives tiles/names; degrade gracefully to ids if offline.
+        // Team data drives tiles/names; the fixtures card also needs the round's
+        // matches. Degrade gracefully to ids/empty if offline.
+        var roundFixtures: [FixtureDTO] = []
         do {
-            teamsById = try await LeagueData.load(for: game.leagues).teamsById
+            let leagueData = try await LeagueData.load(for: game.leagues)
+            teamsById = leagueData.teamsById
+            let ids = Set(round.fixtureIds)
+            roundFixtures = leagueData.fixtures.filter { ids.contains($0.id) }
         } catch {
             // Non-fatal — render with "Team <id>" fallbacks rather than failing.
             teamsById = [:]
         }
         let managerId = game.players.first(where: { $0.isManager })?.id
-        let data = SummaryData.make(type: type, game: game, round: round, teamsById: teamsById, managerPlayerId: managerId)
+        let data = SummaryData.make(type: type, game: game, round: round, teamsById: teamsById,
+                                    roundFixtures: roundFixtures, managerPlayerId: managerId)
         let renderer = ImageRenderer(content: SummaryCardView(data: data))
         renderer.scale = 3.0   // @3x — crisp in WhatsApp (spec §13b.4)
         if let image = renderer.uiImage {

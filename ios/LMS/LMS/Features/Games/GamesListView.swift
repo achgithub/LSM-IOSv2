@@ -7,6 +7,7 @@ struct GamesListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNew = false
+    @State private var showingWizard = false
 
     var body: some View {
         NavigationStack {
@@ -17,8 +18,9 @@ struct GamesListView: View {
                     } description: {
                         Text("Create your first Last Man Standing game.")
                     } actions: {
-                        Button("New Game") { showingNew = true }
+                        Button("Guided Setup") { showingWizard = true }
                             .buttonStyle(.borderedProminent)
+                        Button("New Game") { showingNew = true }
                     }
                 } else {
                     List {
@@ -31,12 +33,16 @@ struct GamesListView: View {
             }
             .navigationTitle("Games")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showingWizard = true } label: { Image(systemName: "wand.and.stars") }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingNew = true } label: { Image(systemName: "plus") }
                 }
             }
             .navigationDestination(for: Game.self) { GameDetailView(game: $0) }
             .sheet(isPresented: $showingNew) { NewGameView() }
+            .fullScreenCover(isPresented: $showingWizard) { FirstRunWizardView() }
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum RoundSheet: String, Identifiable {
-    case open, picks, results, declare, summaryPicks, summaryResults, summaryOutcome
+    case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome
     var id: String { rawValue }
 }
 
@@ -67,7 +67,7 @@ struct GameDetailView: View {
         List {
             infoSection
             roundSection
-            summarySection
+            declareSection
             playersSection
         }
         .navigationTitle(game.name)
@@ -85,6 +85,10 @@ struct GameDetailView: View {
                 }
             case .declare:
                 DeclareWinnersView(game: game) {}
+            case .summaryFixtures:
+                if let round = openRound {
+                    SummaryShareView(game: game, round: round, type: .fixtures)
+                }
             case .summaryPicks:
                 if let round = openRound {
                     SummaryShareView(game: game, round: round, type: .picks)
@@ -152,65 +156,70 @@ struct GameDetailView: View {
         }
     }
 
+    /// One ad-gated "share card" row — the card can't be screenshot ad-free
+    /// because the ad gates *opening* it.
+    private func shareCardButton(_ title: String, _ which: RoundSheet, enabled: Bool) -> some View {
+        Button { AdGate.run { sheet = which } } label: {
+            Label(title, systemImage: "square.and.arrow.up")
+        }
+        .disabled(!enabled)
+    }
+
+    /// The game's actions in the order they happen, with each share card sitting
+    /// right after the action that produces it (greyed until it's available).
     @ViewBuilder
     private var roundSection: some View {
-        Section("Round") {
+        Section(game.status == .complete ? "Result" : "This Round") {
             if game.status == .complete {
                 let winners = game.players.filter { $0.status == .winner }
                 LabeledContent(winners.count == 1 ? "Winner" : "Winners",
                                value: winners.map(\.name).joined(separator: ", "))
+                shareCardButton("Share Results Card", .summaryResults, enabled: latestClosedRound != nil)
+                if let ending = game.lastOutcome {
+                    shareCardButton("Share \(ending.headline) Card", .summaryOutcome, enabled: latestClosedRound != nil)
+                }
+
             } else if let round = openRound {
                 LabeledContent("Round \(round.roundNumber)", value: round.status.rawValue.capitalized)
+                // A rollover/playoff round follows a resolution — surface its card.
+                if round.roundType != .normal, let ending = game.lastOutcome {
+                    shareCardButton("Share \(ending.headline) Card", .summaryOutcome, enabled: true)
+                }
+                shareCardButton("Share Fixtures Card", .summaryFixtures, enabled: true)
                 Button { sheet = .picks } label: { Label("Enter Picks", systemImage: "checklist") }
+                shareCardButton("Share Picks Card", .summaryPicks, enabled: openRoundPicksComplete)
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
-                    // Can't close a round with players still unassigned — finish
-                    // the picks first (Auto-Assign handles any latecomers).
+                    // Can't close with players unassigned — finish picks first
+                    // (Auto-Assign handles any latecomers).
                     .disabled(!openRoundPicksComplete)
+
             } else if unresolvedTie {
-                // Everyone went out together and the round was left unresolved —
-                // let the manager finish resolving it so the game can continue.
                 LabeledContent("Round \(latestClosedRound?.roundNumber ?? 0)", value: "No clear winner")
                 Button { showResolve = true } label: {
                     Label("Resolve Round", systemImage: "exclamationmark.triangle")
                 }
+                shareCardButton("Share Results Card", .summaryResults, enabled: latestClosedRound != nil)
+
             } else {
+                // Between rounds — share the result just gone, then open the next.
+                if latestClosedRound != nil {
+                    shareCardButton("Share Results Card", .summaryResults, enabled: true)
+                }
                 Button { sheet = .open } label: { Label("Open Round", systemImage: "calendar.badge.plus") }
                     .disabled(game.activePlayers.isEmpty)
-            }
-
-            if game.status != .complete {
-                // Available only once a round has been played and at least one
-                // player is still standing — nothing to declare before then.
-                Button { sheet = .declare } label: {
-                    Label("Declare Winner(s)…", systemImage: "trophy")
-                }
-                .disabled(latestClosedRound == nil || game.activePlayers.isEmpty)
             }
         }
     }
 
     @ViewBuilder
-    private var summarySection: some View {
-        if openRound != nil || latestClosedRound != nil || game.lastOutcome != nil {
-            Section("Summary Cards") {
-                // Gate the ad on opening the card — otherwise the rendered card is
-                // on screen and users can screenshot it without watching the ad.
-                Button { AdGate.run { sheet = .summaryPicks } } label: {
-                    Label("Share Picks Card", systemImage: "square.and.arrow.up")
+    private var declareSection: some View {
+        if game.status != .complete {
+            Section("Manually declare winner(s)") {
+                // Available once a round's been played and someone's still standing.
+                Button { sheet = .declare } label: {
+                    Label("Declare Winner(s)…", systemImage: "trophy")
                 }
-                .disabled(!openRoundPicksComplete)
-
-                Button { AdGate.run { sheet = .summaryResults } } label: {
-                    Label("Share Results Card", systemImage: "square.and.arrow.up")
-                }
-                .disabled(latestClosedRound == nil)
-
-                if let ending = game.lastOutcome {
-                    Button { AdGate.run { sheet = .summaryOutcome } } label: {
-                        Label("Share \(ending.headline) Card", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(latestClosedRound == nil)
-                }
+                .disabled(latestClosedRound == nil || game.activePlayers.isEmpty)
             }
         }
     }
