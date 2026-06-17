@@ -1,12 +1,49 @@
 # App Attest — status & plan
 
-Status: **design agreed, build deferred** (2026-06-17). Blocked only on the Apple
-Developer Program account being approved and the Team ID being known. **Individual
-enrolment order placed 2026-06-17** — resume when the Team ID lands.
+Status: **UNBLOCKED — build starting** (2026-06-17). Individual Apple Developer
+Program membership approved 2026-06-17.
+
+- **Team ID: `UD928WR9RR`** (team name "Andrew Harris", individual). Active
+  2026-06-17 → expires 2027-06-17.
+- **Bundle: `com.sportsmanager.LMS`.**
+- A Team ID is **not secret** (it ships in every app), so in the Worker it is a
+  plain config var, not a rotated secret. Only `ATTEST_CHALLENGE_KEY` is secret.
 
 This is Phase 2 of the release security work. Phase 1 (custom domains +
 workers.dev lockdown + zone rate-limiting) is done and shipped. See also
 `docs/data-refresh-and-caching.md`.
+
+## Progress
+
+**Worker side — BUILT (2026-06-17), NOT deployed.** Code complete, typechecks,
+unit-tested (challenge HMAC), and bundles for workerd (581 KiB / 104 KiB gzip).
+- `worker/src/attest.ts` — stateless HMAC challenge issue/verify; attestation
+  verify (CBOR decode, Apple cert-chain, nonce, keyId, rpId, AAGUID); assertion
+  verify (ECDSA-P256 sig + monotonic counter). Apple root CA pinned.
+- `worker/src/attest-store.ts` — D1 device store (public key + sign_count).
+- `worker/src/attest-config.ts` — config + the `ATTEST_DEV_BYPASS` dev escape.
+- `worker/src/routes/attest.ts` — `POST /attest/challenge`, `POST /attest/register`.
+- `worker/src/middleware/attest.ts` — guard mounted on `/fixtures /scores
+  /standings /teams` only (`index.ts`); `/health` + `/admin` left open.
+- `schema.sql` — `attest_devices` table. Libs: `@levischuck/tiny-cbor` (pure JS),
+  `@peculiar/x509@^1.x` (v2 needs a reflect-metadata polyfill — avoided).
+
+> ⚠️ **DO NOT `wrangler deploy` the Worker yet.** Deploying now would (a) reject
+> the current live app, which sends no attestation headers, and (b) 500 on data
+> routes because `ATTEST_CHALLENGE_KEY` is unset. Deploy only once the app side
+> ships and is verified, in the coordinated go-live step below.
+
+**App side — NOT built (Phase B).** Needs the App Attest capability enabled on
+the App ID + a real device. See build plan below.
+
+### Go-live sequence (when app side is ready)
+1. `wrangler secret put ATTEST_CHALLENGE_KEY --env pl` (and elc/pd) — random 32+ byte value.
+2. Apply schema to add `attest_devices`: `pnpm db:apply:pl` (+ elc/pd).
+3. Ship the app build that performs attestation (still `APP_ATTEST_ENV=development`
+   for devicectl test builds).
+4. `wrangler deploy --env pl` (+ elc/pd). Verify the app works end-to-end and that
+   an unattested `curl` to `/scores` now gets 401.
+5. At App Store release: flip `APP_ATTEST_ENV` → `production` and redeploy.
 
 ---
 

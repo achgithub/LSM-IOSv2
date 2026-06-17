@@ -63,6 +63,21 @@ CREATE TABLE IF NOT EXISTS standings (
 
 CREATE INDEX IF NOT EXISTS idx_standings_position ON standings (position);
 
+-- ── App Attest devices ───────────────────────────────────────────────────────
+-- One row per attested app instance (a hardware-backed key on a real device).
+-- Created on /attest/register after the attestation is verified; the stored
+-- public key then verifies every subsequent assertion, and sign_count must
+-- increase monotonically (replay protection — see src/attest.ts). This is what
+-- shields the licensed football-data feed from being scraped through the proxy.
+CREATE TABLE IF NOT EXISTS attest_devices (
+  key_id      TEXT PRIMARY KEY,            -- base64 keyId = SHA256(public key)
+  public_key  TEXT NOT NULL,              -- base64 raw (uncompressed P-256) public key
+  sign_count  INTEGER NOT NULL DEFAULT 0, -- last accepted assertion counter
+  environment TEXT NOT NULL,              -- 'production' | 'development' (AAGUID)
+  created_at  TEXT NOT NULL,              -- ISO8601 UTC, attestation accepted
+  updated_at  TEXT NOT NULL               -- ISO8601 UTC, last assertion accepted
+);
+
 -- ── Sync metadata ───────────────────────────────────────────────────────────
 -- Records the last successful upstream sync per dataset, for observability and
 -- so reads can report freshness. Not strictly required but cheap and useful.

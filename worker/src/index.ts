@@ -5,7 +5,9 @@
 import { Hono } from "hono";
 import { getDemoClock } from "./demo";
 import { FootballDataProvider } from "./football";
+import { requireAttestation } from "./middleware/attest";
 import { admin } from "./routes/admin";
+import { attest } from "./routes/attest";
 import { demo } from "./routes/demo";
 import { fixtures } from "./routes/fixtures";
 import { scores } from "./routes/scores";
@@ -25,6 +27,20 @@ app.get("/health", async (c) => {
   const demoClock = await getDemoClock(c.env.SCORES);
   return c.json({ ok: true, league: c.env.LEAGUE_ID, sync: results, demo: demoClock });
 });
+
+// App Attest enrolment (public) — must mount BEFORE the guarded data routes.
+app.route("/attest", attest);
+
+// Data routes — guarded by App Attest so only the genuine iOS app can reach the
+// licensed feed. /health and /admin (own ADMIN_TOKEN) are intentionally not guarded.
+app.use("/fixtures/*", requireAttestation);
+app.use("/scores/*", requireAttestation);
+app.use("/standings/*", requireAttestation);
+app.use("/teams/*", requireAttestation);
+app.use("/fixtures", requireAttestation);
+app.use("/scores", requireAttestation);
+app.use("/standings", requireAttestation);
+app.use("/teams", requireAttestation);
 
 app.route("/fixtures", fixtures);
 app.route("/scores", scores);

@@ -16,6 +16,7 @@
     "deploy:pd": "wrangler deploy --env pd",
     "types": "wrangler types --env pl",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:apply:pl": "wrangler d1 execute lms-pl-db --env pl --remote --file=./schema.sql",
     "db:apply:pl:local": "wrangler d1 execute lms-pl-db --env pl --local --file=./schema.sql",
     "db:apply:elc": "wrangler d1 execute lms-elc-db --env elc --remote --file=./schema.sql",
@@ -24,10 +25,13 @@
     "db:apply:pd:local": "wrangler d1 execute lms-pd-db --env pd --local --file=./schema.sql"
   },
   "dependencies": {
+    "@levischuck/tiny-cbor": "^0.3.4",
+    "@peculiar/x509": "^1.14.3",
     "hono": "^4.6.14"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
+    "vitest": "^4.1.9",
     "wrangler": "^4.100.0"
   }
 }

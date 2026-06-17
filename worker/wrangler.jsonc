@@ -36,6 +36,14 @@
         "LEAGUE_ID": "PL",
         "LEAGUE_NAME": "Premier League",
         "FOOTBALL_DATA_CODE": "PL",
+        // App Attest (Phase 2). Team ID + bundle are pinned to verify attestations
+        // (NOT secret — they ship in every app). APP_ATTEST_ENV must match the build
+        // hitting this Worker: "development" for Xcode/devicectl builds, "production"
+        // for App Store/TestFlight. FLIP TO "production" AT RELEASE. The HMAC challenge
+        // key is a SECRET: `wrangler secret put ATTEST_CHALLENGE_KEY --env pl`.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
         "TEAMS_COUNT": "20",
         "ROUNDS_PER_SEASON": "38",
         // Per-resource upstream TTLs (Layer 2 — cost): scores 1 min (live),
@@ -90,6 +98,10 @@
         "LEAGUE_ID": "ELC",
         "LEAGUE_NAME": "Championship",
         "FOOTBALL_DATA_CODE": "ELC",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
         "TEAMS_COUNT": "24",
         "ROUNDS_PER_SEASON": "46",
         // Per-resource upstream TTLs — see the PL block for the rationale.
@@ -139,6 +151,10 @@
         "LEAGUE_ID": "PD",
         "LEAGUE_NAME": "La Liga",
         "FOOTBALL_DATA_CODE": "PD",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
         "TEAMS_COUNT": "20",
         "ROUNDS_PER_SEASON": "38",
         // Per-resource upstream TTLs — see the PL block for the rationale.
