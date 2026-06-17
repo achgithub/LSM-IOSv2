@@ -105,6 +105,12 @@ struct SettingsView: View {
                 Section {
                     LabeledContent("App", value: Leagues.app.name)
                     LabeledContent("Version", value: version)
+                    // Attribution required by the football-data.org licence: a
+                    // visible "Data provided by football-data.org" credit. Brand
+                    // name kept verbatim so it reads identically in every language.
+                    Link(destination: URL(string: "https://www.football-data.org")!) {
+                        Text(verbatim: "Data provided by football-data.org")
+                    }
                 } header: {
                     Text("About")
                 } footer: {
