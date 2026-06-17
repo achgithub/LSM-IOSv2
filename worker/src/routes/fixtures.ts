@@ -1,11 +1,17 @@
 import { Hono } from "hono";
 import { getFixtures, type FixtureQuery } from "../db";
 import { applyDemoToFixtures, getDemoClock } from "../demo";
+import { FootballDataProvider } from "../football";
+import { FIXTURES_KEYS, withFreshness } from "../gate";
+import { refreshMatchData } from "../refresh";
+import { getLeagueConfig } from "../types";
 
 // GET /fixtures?dateFrom=&dateTo=&matchday=
 // All times ISO8601 UTC. With no params, returns all stored fixtures.
-// When a demo clock is set, fixtures are re-timed/re-statused around "now"
-// (date filters are ignored in demo mode; the matchday filter still applies).
+// Request-triggered like /scores: past the fixtures TTL a request refreshes
+// /matches in the background (co-warming scores) and serves the current D1 data
+// immediately. When a demo clock is set, fixtures are re-timed/re-statused around
+// "now" (date filters are ignored in demo mode; the matchday filter still applies).
 export const fixtures = new Hono<{ Bindings: Env }>();
 
 fixtures.get("/", async (c) => {
@@ -23,6 +29,20 @@ fixtures.get("/", async (c) => {
     if (md !== undefined) data = data.filter((f) => f.matchday === md);
     return c.json(data);
   }
+
+  const cfg = getLeagueConfig(c.env);
+  const provider = new FootballDataProvider(
+    c.env.FOOTBALL_DATA_TOKEN,
+    cfg.footballDataCode,
+    cfg.leagueId,
+  );
+  await withFreshness(
+    c.env.SCORES,
+    FIXTURES_KEYS,
+    cfg.fixturesTtlMs,
+    () => refreshMatchData(c.env.DB, c.env.SCORES, provider),
+    c.executionCtx,
+  );
 
   const q: FixtureQuery = {};
   const dateFrom = c.req.query("dateFrom");

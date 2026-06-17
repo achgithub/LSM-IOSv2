@@ -2,13 +2,15 @@ import { Hono } from "hono";
 import { getFixtures } from "../db";
 import { demoScores, getDemoClock } from "../demo";
 import { FootballDataProvider } from "../football";
-import { getScores } from "../scores";
-import { getLeagueConfig } from "../types";
+import { SCORES_DATA_KEY, SCORES_KEYS, withFreshness } from "../gate";
+import { refreshMatchData } from "../refresh";
+import { getLeagueConfig, type ScoreEntry } from "../types";
 
 // GET /scores
 // One shared cache for everyone — free vs subscriber is not a freshness tier;
 // the app gates the refresh action behind a rewarded ad for free users. Stale
-// data is served immediately and refreshed in the background (spec §10.2).
+// data is served immediately and refreshed in the background (spec §10.2). The
+// refresh fetches /matches, which co-warms the fixtures cache too.
 // When a demo clock is set, returns the current matchday's (synthetic) scores.
 export const scores = new Hono<{ Bindings: Env }>();
 
@@ -24,11 +26,13 @@ scores.get("/", async (c) => {
     cfg.footballDataCode,
     cfg.leagueId,
   );
-  const data = await getScores(
+  await withFreshness(
     c.env.SCORES,
+    SCORES_KEYS,
     cfg.scoreTtlMs,
-    () => provider.fetchScores(),
+    () => refreshMatchData(c.env.DB, c.env.SCORES, provider),
     c.executionCtx,
   );
-  return c.json(data);
+  const cached = await c.env.SCORES.get(SCORES_DATA_KEY);
+  return c.json(cached ? (JSON.parse(cached) as ScoreEntry[]) : []);
 });

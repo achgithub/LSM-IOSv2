@@ -144,15 +144,38 @@ Empty/missing = normal first-run miss → free first fill.
 **Done earlier (shipped, commit `7e304d3`):**
 - App-side Scores & Standings cache-first + ad-gated refresh + per-league cache.
 
-**To do — Worker pass (next):**
-- **Worker:** give `/standings` (30 min) and `/fixtures` (4 h) the same
-  request-triggered TTL + shared-cache pattern that `/scores` already has. Set
-  `/scores` TTL to **1 min**. Confirm `/matches` upstream writes both scores +
-  fixtures caches/timestamps. Reconcile the existing nightly cron vs request-TTL.
-- **Remote config (option C):** serve the per-resource TTLs from the Worker so they
-  can be retuned from real usage **without an app release**; `CacheTTL` constants
-  become the offline fallback.
+**Done — Worker pass (2026-06-17, deployed pl/elc/pd):**
+- **Generic freshness gate** (`worker/src/gate.ts`): the scores-only counter-pair
+  cache (`call`/`refresh`/`ts` in KV, serve-stale-immediately, background refresh,
+  poll-if-in-flight) generalised so **all three** gated resources share one code
+  path. `withFreshness(kv, keys, ttlMs, refresh, ctx)` + `resetGate` (cron →0,0)
+  + `touchGate` (co-warm a sibling). Old `src/scores.ts` removed.
+- **`/standings` (30 min) and `/fixtures` (4 h) are now request-triggered** like
+  `/scores`. Data still lives in D1; the gate only governs *when* to re-pull
+  upstream, and the route serves current D1 immediately (stale-while-revalidate).
+  `/scores` TTL set to **60 s** (`SCORE_TTL_SECONDS` 90→60).
+- **One `/matches` → both caches/timestamps:** `provider.fetchMatchData()` fetches
+  `/matches` once and projects into scores (KV) + fixtures (D1);
+  `refresh.ts:refreshMatchData` writes both stores and `touchGate`s **both** the
+  scores and fixtures gates. So a scores refresh co-warms fixtures and vice versa
+  (worked example #1). `/standings` is its own upstream + gate.
+- **Cron reconciliation = cron-warm + request-TTL coexist** (the open decision,
+  resolved). One nightly cron per league (free-plan cap) still runs
+  `runMaintenance`: teams → matches → standings, then `resetGate`s all three to a
+  clean (0,0)+now state for the day's first user. Teams have **no** request gate
+  (seasonal), so the cron is their only refresh path. Request-TTLs cover the day.
+  Confirmed live: a single `/standings`/`/fixtures` hit advanced their
+  `synced_at` while `teams` stayed at the cron time.
+- New wrangler vars `STANDINGS_TTL_SECONDS=1800` / `FIXTURES_TTL_SECONDS=14400`
+  across all three envs; `LeagueConfig` gains `standingsTtlMs`/`fixturesTtlMs`.
+  Stale `scoreTtlSub/FreeSeconds` removed from the `configs/*/league.config.json`
+  mirror docs. **These are Worker-side gate TTLs, NOT served to the app.**
 
-**Open / not yet decided:**
-- Exact reconciliation of the Worker's existing cron warm vs the request-triggered
-  TTLs.
+**Deferred (postponed 2026-06-17):**
+- **Remote config (option C)** — serving per-resource TTLs from the Worker so they
+  retune without an app release. Postponed; `CacheTTL` stays hardcoded for now.
+- **Client refresh throttle** — grey out the Scores refresh for 60 s after a
+  refresh (the visible form of Rule A / the 60 s local TTL); short debounce on
+  Standings/Fixtures. This is the agreed alternative to Worker block-to-fresh:
+  the throttle prevents the re-refresh storm and gives the background refresh time
+  to land, so pure stale-while-revalidate stays sufficient. App-side change, next.

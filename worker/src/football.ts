@@ -13,9 +13,18 @@ import type {
 
 export interface Provider {
   fetchTeams(): Promise<Team[]>;
-  fetchFixtures(): Promise<Fixture[]>;
+  // Scores and fixtures share one upstream source (/matches), so one fetch
+  // projects into both shapes — see fetchMatchData. This keeps a scores refresh
+  // and a fixtures refresh from each making their own redundant /matches call.
+  fetchMatchData(): Promise<MatchData>;
   fetchStandings(): Promise<Standing[]>;
-  fetchScores(): Promise<ScoreEntry[]>;
+}
+
+// One /matches response projected into the two shapes the app consumes:
+// compact scores (cached in KV) and full fixtures (stored in D1).
+export interface MatchData {
+  scores: ScoreEntry[];
+  fixtures: Fixture[];
 }
 
 const BASE = "https://api.football-data.org/v4";
@@ -90,12 +99,16 @@ export class FootballDataProvider implements Provider {
     }));
   }
 
-  async fetchFixtures(): Promise<Fixture[]> {
+  // One /matches fetch → both the full fixtures (D1) and the compact scores (KV).
+  // Callers that only need one shape still pay a single upstream call, and the
+  // shared-cache warming (scores refresh co-warms fixtures and vice versa) keys
+  // off this single source.
+  async fetchMatchData(): Promise<MatchData> {
     const now = new Date().toISOString();
     const data = await this.get<{ matches: FDMatch[] }>(
       `/competitions/${this.competitionCode}/matches`,
     );
-    return data.matches.map((m) => ({
+    const fixtures: Fixture[] = data.matches.map((m) => ({
       id: m.id,
       matchday: m.matchday,
       kickoff: m.utcDate,
@@ -107,6 +120,17 @@ export class FootballDataProvider implements Provider {
       winner: m.score.winner,
       updatedAt: now,
     }));
+    const scores: ScoreEntry[] = data.matches.map((m) => ({
+      id: m.id,
+      status: normaliseStatus(m.status),
+      minute: m.minute ?? null,
+      homeTeamId: m.homeTeam.id,
+      awayTeamId: m.awayTeam.id,
+      homeScore: m.score.fullTime.home,
+      awayScore: m.score.fullTime.away,
+      winner: m.score.winner,
+    }));
+    return { scores, fixtures };
   }
 
   async fetchStandings(): Promise<Standing[]> {
@@ -128,23 +152,6 @@ export class FootballDataProvider implements Provider {
       goalDifference: r.goalDifference,
       points: r.points,
       updatedAt: now,
-    }));
-  }
-
-  // Scores reuse the matches endpoint but project to the compact KV payload.
-  async fetchScores(): Promise<ScoreEntry[]> {
-    const data = await this.get<{ matches: FDMatch[] }>(
-      `/competitions/${this.competitionCode}/matches`,
-    );
-    return data.matches.map((m) => ({
-      id: m.id,
-      status: normaliseStatus(m.status),
-      minute: m.minute ?? null,
-      homeTeamId: m.homeTeam.id,
-      awayTeamId: m.awayTeam.id,
-      homeScore: m.score.fullTime.home,
-      awayScore: m.score.fullTime.away,
-      winner: m.score.winner,
     }));
   }
 }

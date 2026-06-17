@@ -69,11 +69,16 @@ export interface LeagueConfig {
   footballDataCode: string;
   teamsCount: number;
   roundsPerSeason: number;
-  // Single shared score-cache TTL. Free vs subscriber is no longer a freshness
-  // tier — everyone gets the same data; the app gates the *refresh action*
-  // behind a rewarded ad for free users (see iOS AdGate). One cache = ~half the
-  // upstream polling of the old two-tier split.
+  // Per-resource upstream TTLs (Layer 2 — cost). Each gate hits upstream at most
+  // once per window per resource, shared across all users. Free vs subscriber is
+  // not a freshness tier — everyone gets the same cache; the app gates the
+  // *refresh action* behind a rewarded ad for free users (see iOS AdGate).
+  //   scores    — /matches, fast (live), co-warms fixtures
+  //   fixtures  — /matches, slow (schedule), co-warmed by scores
+  //   standings — /standings, its own source
   scoreTtlMs: number;
+  fixturesTtlMs: number;
+  standingsTtlMs: number;
   timezone: string;
   maintenanceWindowUTC: string;
 }
@@ -93,6 +98,8 @@ export function getLeagueConfig(env: Env): LeagueConfig {
     teamsCount: num(env.TEAMS_COUNT, "TEAMS_COUNT"),
     roundsPerSeason: num(env.ROUNDS_PER_SEASON, "ROUNDS_PER_SEASON"),
     scoreTtlMs: num(env.SCORE_TTL_SECONDS, "SCORE_TTL_SECONDS") * 1000,
+    fixturesTtlMs: num(env.FIXTURES_TTL_SECONDS, "FIXTURES_TTL_SECONDS") * 1000,
+    standingsTtlMs: num(env.STANDINGS_TTL_SECONDS, "STANDINGS_TTL_SECONDS") * 1000,
     timezone: env.TIMEZONE,
     maintenanceWindowUTC: env.MAINTENANCE_WINDOW_UTC,
   };

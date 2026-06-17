@@ -29,7 +29,12 @@
         "FOOTBALL_DATA_CODE": "PL",
         "TEAMS_COUNT": "20",
         "ROUNDS_PER_SEASON": "38",
-        "SCORE_TTL_SECONDS": "90",
+        // Per-resource upstream TTLs (Layer 2 — cost): scores 1 min (live),
+        // standings 30 min, fixtures 4 h (schedule). Scores + fixtures share the
+        // /matches upstream, so a refresh of either co-warms the other.
+        "SCORE_TTL_SECONDS": "60",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
         "TIMEZONE": "Europe/London",
         "MAINTENANCE_WINDOW_UTC": "04:00"
       },
@@ -73,7 +78,10 @@
         "FOOTBALL_DATA_CODE": "ELC",
         "TEAMS_COUNT": "24",
         "ROUNDS_PER_SEASON": "46",
-        "SCORE_TTL_SECONDS": "90",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "60",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
         "TIMEZONE": "Europe/London",
         "MAINTENANCE_WINDOW_UTC": "04:00"
       },
@@ -114,7 +122,10 @@
         "FOOTBALL_DATA_CODE": "PD",
         "TEAMS_COUNT": "20",
         "ROUNDS_PER_SEASON": "38",
-        "SCORE_TTL_SECONDS": "90",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "60",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
         "TIMEZONE": "Europe/Madrid",
         "MAINTENANCE_WINDOW_UTC": "03:00"
       },

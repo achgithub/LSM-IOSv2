@@ -4,8 +4,9 @@
   "footballDataCode": "PL",
   "teamsCount": 20,
   "roundsPerSeason": 38,
-  "scoreTtlSubSeconds": 20,
-  "scoreTtlFreeSeconds": 5400,
+  "scoreTtlSeconds": 60,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
   "timezone": "Europe/London",
   "maintenanceWindowUTC": "04:00",
   "cronMaintenance": "0 4 * * *"

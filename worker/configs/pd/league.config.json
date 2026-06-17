@@ -4,8 +4,9 @@
   "footballDataCode": "PD",
   "teamsCount": 20,
   "roundsPerSeason": 38,
-  "scoreTtlSubSeconds": 20,
-  "scoreTtlFreeSeconds": 5400,
+  "scoreTtlSeconds": 60,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
   "timezone": "Europe/Madrid",
   "maintenanceWindowUTC": "03:00",
   "cronMaintenance": "0 3 * * *"
