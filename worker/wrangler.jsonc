@@ -22,6 +22,15 @@
     "pl": {
       "name": "lms-pl-worker",
 
+      // Production hostname. Custom domain binds the whole hostname to this Worker
+      // and auto-creates the proxied DNS record + cert in the sportsmanager.site zone.
+      "routes": [{ "pattern": "pl.sportsmanager.site", "custom_domain": true }],
+      // Lockdown: a custom domain does NOT disable workers.dev — must turn both the
+      // <name>.<subdomain>.workers.dev route AND the version preview URLs off, else
+      // they bypass all zone-level protection. Verify unreachable after deploy.
+      "workers_dev": false,
+      "preview_urls": false,
+
       // League config (read at runtime via c.env). Mirrors configs/pl/league.config.json.
       "vars": {
         "LEAGUE_ID": "PL",
@@ -71,6 +80,11 @@
     "elc": {
       "name": "lms-elc-worker",
 
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "elc.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
+
       // League config (read at runtime via c.env). Mirrors configs/elc/league.config.json.
       "vars": {
         "LEAGUE_ID": "ELC",
@@ -114,6 +128,11 @@
     // CET league → maintenance window shifts to 03:00 UTC (§10.3 note).
     "pd": {
       "name": "lms-pd-worker",
+
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "pd.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
 
       // League config (read at runtime via c.env). Mirrors configs/pd/league.config.json.
       "vars": {

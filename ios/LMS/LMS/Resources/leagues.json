@@ -10,21 +10,21 @@
       "id": "PL",
       "name": "England — Premier League",
       "shortName": "PL",
-      "workerBaseURL": "https://lms-pl-worker.sportsmanager.workers.dev",
+      "workerBaseURL": "https://pl.sportsmanager.site",
       "teamsCount": 20
     },
     {
       "id": "ELC",
       "name": "England — Championship",
       "shortName": "ELC",
-      "workerBaseURL": "https://lms-elc-worker.sportsmanager.workers.dev",
+      "workerBaseURL": "https://elc.sportsmanager.site",
       "teamsCount": 24
     },
     {
       "id": "PD",
       "name": "España — La Liga",
       "shortName": "PD",
-      "workerBaseURL": "https://lms-pd-worker.sportsmanager.workers.dev",
+      "workerBaseURL": "https://pd.sportsmanager.site",
       "teamsCount": 20
     }
   ]
