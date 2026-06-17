@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Live fixture scores across the manager's enabled leagues. A magnifier opens a
@@ -12,6 +13,16 @@ struct ScoresView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var lastRefreshed: Date?
+
+    // Refresh throttle — the visible form of Rule A. While `freshUntil` is in the
+    // future, every enabled league's scores are still within the 60s local TTL,
+    // so nothing fresher exists to fetch: the refresh button is greyed and the
+    // footer shows a countdown to when it re-enables. Applies to subscribers too —
+    // scores can't be fresher than the Worker's own ~60s upstream window, so a
+    // sooner tap would only burn calls for identical data. `now` ticks once a
+    // second to drive the countdown and flip the button back on at zero.
+    @State private var now = Date()
+    @State private var freshUntil: Date?
 
     // Search / filter
     @State private var selectedLeagueIds: Set<String> = []
@@ -73,6 +84,9 @@ struct ScoresView: View {
             || (selectedLeagueIds.count != enabled.leagues.count && !selectedLeagueIds.isEmpty)
     }
 
+    /// True while the refresh is throttled (all leagues fresh within TTL).
+    private var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -100,10 +114,12 @@ struct ScoresView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    // Greyed while throttled (within the 60s TTL) — the footer
+                    // countdown says when it re-enables. See `freshUntil`.
                     Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .disabled(isLoading)
+                    .disabled(isLoading || isThrottled)
                 }
             }
             .sheet(isPresented: $showSearch) {
@@ -126,6 +142,13 @@ struct ScoresView: View {
                 if selectedLeagueIds.isEmpty { selectedLeagueIds = Set(enabled.leagues.map(\.id)) }
                 await load(force: false)
             }
+            // Only advance the clock while throttled, so we don't re-render (and
+            // re-sort the list) every second once the button is live again. The
+            // tick that crosses `freshUntil` still lands (guard sees the old
+            // `now`), flips the button on, then ticking stops until the next load.
+            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
+                if isThrottled { now = tick }
+            }
             .safeAreaInset(edge: .bottom) { footer }
         }
     }
@@ -136,6 +159,12 @@ struct ScoresView: View {
         VStack(spacing: 4) {
             if let lastRefreshed {
                 Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if isThrottled, let freshUntil {
+                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(now)))
+                Text("Next refresh in \(remaining.formatted(.time(pattern: .minuteSecond)))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -157,6 +186,26 @@ struct ScoresView: View {
     /// - any corrupt cache → recover with a **free** fetch (our bad data) — the bad
     ///   files have already been deleted by `read`;
     /// - otherwise (any stale / empty) → the normal ad-gated fetch.
+    /// The throttle deadline: the soonest moment a refresh could fetch something
+    /// newer. Returns `nil` (refresh available now) if any enabled league's scores
+    /// are stale, empty or corrupt — i.e. a refresh would do real work (an ad-gated
+    /// or free fetch). Only when *every* league is fresh do we throttle, until the
+    /// earliest-expiring cache crosses its TTL.
+    private func scoresThrottleUntil() -> Date? {
+        var earliest: Date?
+        for league in enabled.leagues {
+            switch LeagueDataCache.read(LeagueDataCache.Scores.self, key: LeagueDataCache.scoresKey(league.id)) {
+            case .hit(let cached):
+                guard LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.scores) else { return nil }
+                let expiry = cached.date.addingTimeInterval(CacheTTL.scores)
+                earliest = earliest.map { min($0, expiry) } ?? expiry
+            case .empty, .corrupt:
+                return nil
+            }
+        }
+        return earliest
+    }
+
     private func refresh() {
         var anyCorrupt = false
         var allFresh = true
@@ -219,6 +268,8 @@ struct ScoresView: View {
             errorMessage = error.localizedDescription
             items = []
         }
+        // Re-arm the throttle from the now-current caches (greyed if all fresh).
+        freshUntil = scoresThrottleUntil()
         isLoading = false
     }
 }
