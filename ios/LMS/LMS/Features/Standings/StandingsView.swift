@@ -49,19 +49,8 @@ struct StandingsView: View {
             }
             .navigationTitle("Standings")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    // Same gate as Scores: a fresh pull is a server fetch, so free
-                    // users watch a rewarded ad first (see AdGate); subscribers
-                    // refresh instantly. Greyed while within the 30m TTL — nothing
-                    // newer exists to fetch — with a footer note saying when it
-                    // re-enables. See refresh() / `freshUntil`.
-                    Button { refresh() } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(isLoading || isThrottled)
-                }
                 if enabled.leagues.count > 1 {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .topBarLeading) {
                         Menu {
                             Picker("League", selection: leagueBinding) {
                                 ForEach(enabled.leagues) { Text($0.name).tag($0) }
@@ -74,6 +63,17 @@ struct StandingsView: View {
                     ToolbarItem(placement: .principal) {
                         Text(league.name).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    // Refresh on the trailing edge to match Scores. Same gate: a
+                    // fresh pull is a server fetch, so free users watch a rewarded
+                    // ad first (see AdGate); subscribers refresh instantly. Greyed
+                    // while within the 30m TTL — nothing newer exists to fetch —
+                    // with a footer note saying when it re-enables. See refresh().
+                    Button { refresh() } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(isLoading || isThrottled)
                 }
             }
             // Reloads when the chosen league changes (browsing, so not ad-gated —
