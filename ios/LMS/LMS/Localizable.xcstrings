@@ -5006,41 +5006,6 @@
         }
       }
     },
-    "Next refresh in %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nächste Aktualisierung in %@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Próxima actualización en %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prochaine actualisation dans %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prossimo aggiornamento tra %@"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Volgende update over %@"
-          }
-        }
-      }
-    },
     "No Ads": {
       "extractionState": "manual",
       "localizations": {
@@ -6892,6 +6857,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "Leg het team van elke speler vast en wijs automatisch toe aan wie niet op tijd reageerde."
+          }
+        }
+      }
+    },
+    "Refresh available in %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualisierung verfügbar in %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualización disponible en %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualisation disponible dans %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento disponibile tra %@"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vernieuwen beschikbaar over %@"
           }
         }
       }
@@ -9482,6 +9482,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alleen ongespeeld"
+          }
+        }
+      }
+    },
+    "Up to date · refresh available ~%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuell · Aktualisierung verfügbar ~%@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizado · actualización disponible ~%@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À jour · actualisation disponible ~%@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornato · aggiornamento disponibile ~%@"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actueel · vernieuwen beschikbaar ~%@"
           }
         }
       }

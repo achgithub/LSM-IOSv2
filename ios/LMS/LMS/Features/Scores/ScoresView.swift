@@ -164,7 +164,7 @@ struct ScoresView: View {
             }
             if isThrottled, let freshUntil {
                 let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(now)))
-                Text("Next refresh in \(remaining.formatted(.time(pattern: .minuteSecond)))")
+                Text("Refresh available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

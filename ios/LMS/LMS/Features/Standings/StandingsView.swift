@@ -12,6 +12,19 @@ struct StandingsView: View {
     @State private var errorMessage: String?
     @State private var lastRefreshed: Date?
 
+    // Refresh throttle — the visible form of Rule A (same idea as Scores, gentler
+    // presentation). While `freshUntil` is in the future the table is still within
+    // its 30m local TTL, and the Worker itself only re-pulls the table every 30m,
+    // so a refresh couldn't fetch anything newer: the button is greyed and the
+    // footer says it's up to date and roughly when it'll refresh. No ticking
+    // countdown (a 30m timer would feel punitive) — a one-shot task just flips the
+    // button back on at `freshUntil`; `now` exists only to trigger that re-render.
+    @State private var now = Date()
+    @State private var freshUntil: Date?
+
+    /// True while the refresh is throttled (table fresh within its 30m TTL).
+    private var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
+
     private var league: LeagueOption { selectedLeague ?? enabled.leagues.first ?? Leagues.home }
     private var leagueBinding: Binding<LeagueOption> {
         Binding(get: { league }, set: { selectedLeague = $0 })
@@ -39,12 +52,13 @@ struct StandingsView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     // Same gate as Scores: a fresh pull is a server fetch, so free
                     // users watch a rewarded ad first (see AdGate); subscribers
-                    // refresh instantly. Within the local TTL there's nothing newer
-                    // to fetch, so it's a no-op (no ad, no call) — see refresh().
+                    // refresh instantly. Greyed while within the 30m TTL — nothing
+                    // newer exists to fetch — with a footer note saying when it
+                    // re-enables. See refresh() / `freshUntil`.
                     Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .disabled(isLoading)
+                    .disabled(isLoading || isThrottled)
                 }
                 if enabled.leagues.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -65,10 +79,23 @@ struct StandingsView: View {
             // Reloads when the chosen league changes (browsing, so not ad-gated —
             // the explicit refresh button is the gated fetch action).
             .task(id: league) { await load(force: false) }
+            // One-shot: wake exactly when the throttle lapses to flip the button
+            // back on (and immediately if it already has, e.g. on tab re-entry).
+            .task(id: freshUntil) {
+                guard let freshUntil else { return }
+                let remaining = freshUntil.timeIntervalSinceNow
+                if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
+                now = Date()
+            }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 4) {
                     if let lastRefreshed {
                         Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if isThrottled, let freshUntil {
+                        Text("Up to date · refresh available ~\(freshUntil.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -92,6 +119,18 @@ struct StandingsView: View {
     /// - corrupt cache → recover with a **free** fetch (our bad data, not a paid
     ///   refresh) — `read` has already deleted the bad file;
     /// - stale / empty → the normal ad-gated fetch.
+    /// The throttle deadline: when a refresh could next fetch a newer table.
+    /// `nil` (refresh available now) if the table is stale, empty or corrupt — a
+    /// refresh would then do real work; otherwise the cache date + the 30m TTL.
+    private func standingsThrottleUntil() -> Date? {
+        switch LeagueDataCache.read(LeagueDataCache.Standings.self, key: LeagueDataCache.standingsKey(league.id)) {
+        case .hit(let cached) where LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.standings):
+            return cached.date.addingTimeInterval(CacheTTL.standings)
+        case .hit, .empty, .corrupt:
+            return nil
+        }
+    }
+
     private func refresh() {
         let key = LeagueDataCache.standingsKey(league.id)
         switch LeagueDataCache.read(LeagueDataCache.Standings.self, key: key) {
@@ -117,6 +156,7 @@ struct StandingsView: View {
             standings = cached.rows
             teamsById = Dictionary(cached.teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
             lastRefreshed = cached.date
+            freshUntil = standingsThrottleUntil()
             isLoading = false
             return
         }
@@ -133,6 +173,8 @@ struct StandingsView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+        // Re-arm the throttle from the now-current cache (greyed if fresh).
+        freshUntil = standingsThrottleUntil()
         isLoading = false
     }
 }
