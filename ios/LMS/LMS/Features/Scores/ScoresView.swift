@@ -100,7 +100,7 @@ struct ScoresView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { AdGate.run { Task { await load(force: true) } } } label: {
+                    Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
                     .disabled(isLoading)
@@ -151,10 +151,39 @@ struct ScoresView: View {
         .background(.bar)
     }
 
+    /// Refresh button across all enabled leagues. Honours the local TTL (rule A)
+    /// and self-heals corruption:
+    /// - every league fresh within TTL → re-show cache, **no ad, no call**;
+    /// - any corrupt cache → recover with a **free** fetch (our bad data) — the bad
+    ///   files have already been deleted by `read`;
+    /// - otherwise (any stale / empty) → the normal ad-gated fetch.
+    private func refresh() {
+        var anyCorrupt = false
+        var allFresh = true
+        for league in enabled.leagues {
+            switch LeagueDataCache.read(LeagueDataCache.Scores.self, key: LeagueDataCache.scoresKey(league.id)) {
+            case .hit(let cached):
+                if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.scores) { allFresh = false }
+            case .empty:
+                allFresh = false
+            case .corrupt:
+                allFresh = false
+                anyCorrupt = true
+            }
+        }
+        if allFresh {
+            Task { await load(force: false) }       // re-show cache, no ad, no network
+        } else if anyCorrupt {
+            Task { await load(force: true) }         // recover free
+        } else {
+            AdGate.run { Task { await load(force: true) } }
+        }
+    }
+
     /// Loads scores for every enabled league. `force` (the ad-gated refresh)
     /// always hits the network and overwrites the per-league cache; otherwise each
-    /// league is served from its cache, fetching only the first time (empty cache).
-    /// This is what stops a relaunch from being a free refresh.
+    /// league is served from its cache, fetching only the first time (empty/corrupt
+    /// cache). This is what stops a relaunch from being a free refresh.
     private func load(force: Bool) async {
         isLoading = true
         errorMessage = nil

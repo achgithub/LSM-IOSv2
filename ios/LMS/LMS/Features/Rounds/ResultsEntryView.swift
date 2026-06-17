@@ -98,8 +98,10 @@ struct ResultsEntryView: View {
 
     private func pullFromServer() async {
         // Re-fetch so the rewarded ad buys genuinely fresh results, not whatever
-        // was loaded when the sheet opened. Falls back to current data on failure.
-        if let fresh = try? await LeagueData.load(for: game.leagues) { data = fresh }
+        // was loaded when the sheet opened. `forceFixtures` bypasses the fixtures
+        // TTL — the whole point of this gated action is fresh results. Falls back
+        // to current data on failure.
+        if let fresh = try? await LeagueData.load(for: game.leagues, forceFixtures: true) { data = fresh }
         for fixture in roundFixtures {
             if fixture.status == "POSTPONED" {
                 outcomes[fixture.id] = .postponed

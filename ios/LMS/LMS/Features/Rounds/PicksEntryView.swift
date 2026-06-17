@@ -13,6 +13,7 @@ struct PicksEntryView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showAutoAssignConfirm = false
+    @State private var showStaleTablePrompt = false
     @State private var showShare = false
     @State private var searchText = ""
     @State private var unassignedOnly = false
@@ -116,6 +117,22 @@ struct PicksEntryView: View {
             } message: {
                 Text("Each unassigned player gets the bottom-of-table team still available to them.")
             }
+            .confirmationDialog(
+                AppString("The league table is over an hour old"),
+                isPresented: $showStaleTablePrompt,
+                titleVisibility: .visible
+            ) {
+                // Fetching fresh standings is a gated action (free users watch an
+                // ad; subscribers instant). Declining assigns on the held table —
+                // the manager's call.
+                Button("Fetch latest table") {
+                    AdGate.run { Task { await refreshTableThenAssign() } }
+                }
+                Button("Use current table") { commitAutoAssign() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Auto-assign uses the bottom-of-table team. Fetch the latest table first, or assign on the one you have?")
+            }
         }
     }
 
@@ -130,7 +147,26 @@ struct PicksEntryView: View {
         isLoading = false
     }
 
+    /// Confirmed auto-assign. If the held table is over the staleness threshold,
+    /// offer a (gated) refresh first; otherwise assign straight away.
     private func runAutoAssign() {
+        if let date = data?.standingsDate,
+           !LeagueDataCache.isFresh(date, ttl: CacheTTL.autoAssignTableStale) {
+            showStaleTablePrompt = true
+            return
+        }
+        commitAutoAssign()
+    }
+
+    /// Gated path: refresh the table for the game's leagues, reload from the
+    /// (now-fresh) cache, then assign against it.
+    private func refreshTableThenAssign() async {
+        await LeagueData.refreshStandings(for: game.leagues)
+        if let fresh = try? await LeagueData.load(for: game.leagues) { data = fresh }
+        commitAutoAssign()
+    }
+
+    private func commitAutoAssign() {
         let proposals = GameLogicService.proposeAutoAssign(round: round, game: game, teamRefs: teamRefs)
         for proposal in proposals {
             GameLogicService.setPick(player: proposal.player, round: round, teamId: proposal.teamId, context: context)

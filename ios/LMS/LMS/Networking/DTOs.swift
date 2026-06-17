@@ -15,7 +15,9 @@ struct TeamDTO: Codable, Identifiable {
     let leagueId: String
 }
 
-struct FixtureDTO: Decodable, Identifiable {
+// Codable (not just Decodable) so the league-data cache can persist fixtures to
+// disk, the same way teams/standings are cached — see LeagueDataCache.
+struct FixtureDTO: Codable, Identifiable {
     let id: Int
     let matchday: Int?
     let kickoff: String

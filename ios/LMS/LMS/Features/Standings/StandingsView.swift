@@ -39,8 +39,9 @@ struct StandingsView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     // Same gate as Scores: a fresh pull is a server fetch, so free
                     // users watch a rewarded ad first (see AdGate); subscribers
-                    // refresh instantly.
-                    Button { AdGate.run { Task { await load(force: true) } } } label: {
+                    // refresh instantly. Within the local TTL there's nothing newer
+                    // to fetch, so it's a no-op (no ad, no call) — see refresh().
+                    Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
                     .disabled(isLoading)
@@ -86,9 +87,28 @@ struct StandingsView: View {
         }
     }
 
+    /// Refresh button. Honours the local TTL (rule A) and self-heals corruption:
+    /// - fresh within TTL → re-show cache, **no ad, no Worker call**;
+    /// - corrupt cache → recover with a **free** fetch (our bad data, not a paid
+    ///   refresh) — `read` has already deleted the bad file;
+    /// - stale / empty → the normal ad-gated fetch.
+    private func refresh() {
+        let key = LeagueDataCache.standingsKey(league.id)
+        switch LeagueDataCache.read(LeagueDataCache.Standings.self, key: key) {
+        case .hit(let cached) where LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.standings):
+            standings = cached.rows
+            teamsById = Dictionary(cached.teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            lastRefreshed = cached.date
+        case .corrupt:
+            Task { await load(force: true) }
+        case .hit, .empty:
+            AdGate.run { Task { await load(force: true) } }
+        }
+    }
+
     /// `force` (the ad-gated refresh) hits the network and overwrites the cache;
     /// otherwise the league is served from its cache, fetching only the first time
-    /// (empty cache) — so a relaunch isn't a free refresh.
+    /// (empty/corrupt cache) — so a relaunch isn't a free refresh.
     private func load(force: Bool) async {
         isLoading = true
         errorMessage = nil
