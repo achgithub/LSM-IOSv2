@@ -183,8 +183,8 @@ struct GameWizardView: View {
         let icon: String
         let title: LocalizedStringKey
         let detail: LocalizedStringKey
-        var hint: LocalizedStringKey? = nil
-        var primary: Action? = nil
+        var hint: LocalizedStringKey?
+        var primary: Action?
         var shares: [Action] = []
         var showFinish: Bool = false
     }
@@ -221,7 +221,9 @@ struct GameWizardView: View {
                 icon: "checklist",
                 title: "Enter & assign picks",
                 detail: "Record each player's team, then Auto-Assign anyone who didn't reply in time.",
-                hint: "Still waiting on players? You don't have to do this now — close the wizard and come back any time by swiping the game to the right. It picks up right here.",
+                hint: LocalizedStringKey(
+                    "Still waiting on players? You don't have to do this now — close the wizard and come back any time by swiping the game to the right. "
+                        + "It picks up right here."),
                 primary: .init(label: "Enter Picks", sheet: .picks),
                 shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)])
         case .enterResults:
@@ -235,7 +237,9 @@ struct GameWizardView: View {
             return PhaseCard(
                 icon: "exclamationmark.triangle",
                 title: "Resolve the round",
-                detail: "Everyone still in went out together — no clear winner. Choose how it ends: split the win, roll the week for the tied players, or bring everyone back in.",
+                detail: LocalizedStringKey(
+                    "Everyone still in went out together — no clear winner. Choose how it ends: split the win, roll the week for the tied players, "
+                        + "or bring everyone back in."),
                 primary: .init(label: "Resolve Round", sheet: .resolveTie),
                 shares: [.init(label: "Share Results Card", sheet: .shareResults)])
         case .complete:
@@ -275,6 +279,14 @@ struct GameWizardView: View {
                     pendingAutoOpen = followUp
                 }
             }
+        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome:
+            shareSheetContent(which)
+        }
+    }
+
+    @ViewBuilder
+    private func shareSheetContent(_ which: WizardSheet) -> some View {
+        switch which {
         case .shareFixtures:
             if let game, let round = openRound {
                 SummaryShareView(game: game, round: round, type: .fixtures)
@@ -291,6 +303,8 @@ struct GameWizardView: View {
             if let game, let ending = game.lastOutcome, let round = latestClosedRound {
                 SummaryShareView(game: game, round: round, type: .outcome(ending))
             }
+        default:
+            EmptyView()
         }
     }
 

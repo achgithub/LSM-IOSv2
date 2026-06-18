@@ -423,7 +423,7 @@ struct ScoreItem: Identifiable, Codable {
     }
 
     /// Undated fixtures (no kickoff) sort last; otherwise by kickoff then id.
-    static func byKickoffThenId(_ a: ScoreItem, _ b: ScoreItem) -> Bool {
+    nonisolated static func byKickoffThenId(_ a: ScoreItem, _ b: ScoreItem) -> Bool {
         switch (a.kickoff, b.kickoff) {
         case let (x?, y?): return x == y ? a.id < b.id : x < y
         case (nil, _?): return false
