@@ -96,19 +96,20 @@ enum GameLogicService {
     }
 
     /// Set or change a player's pick for a round (clears any prior result).
+    /// Always deletes-and-recreates rather than mutating an existing pick's
+    /// `teamId` in place: mutating an attribute on an already-related SwiftData
+    /// object doesn't reliably propagate to the row in one pass (the row shows
+    /// the old team until the screen is re-entered), whereas inserting a fresh
+    /// `Pick` and wiring its relationships does update synchronously — so
+    /// changing a pick (e.g. overriding an auto-assign) reuses that same path.
     static func setPick(player: Player, round: Round, teamId: Int, context: ModelContext) {
         if let existing = pick(for: player, in: round) {
-            existing.teamId = teamId
-            existing.result = nil
-        } else {
-            // Insert first, then wire relationships, so SwiftData updates the
-            // inverse arrays (round.picks / player.picks) synchronously — otherwise
-            // the row re-renders in two passes after a pick is chosen.
-            let newPick = Pick(teamId: teamId)
-            context.insert(newPick)
-            newPick.player = player
-            newPick.round = round
+            context.delete(existing)
         }
+        let newPick = Pick(teamId: teamId)
+        context.insert(newPick)
+        newPick.player = player
+        newPick.round = round
     }
 
     /// Remove a player's pick for a round (e.g. picked in error before close).

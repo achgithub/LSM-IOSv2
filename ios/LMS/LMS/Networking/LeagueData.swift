@@ -28,10 +28,7 @@ struct LeagueData {
     let standingsDate: Date?
 
     /// Load and merge data for a set of leagues (a game's leagues).
-    /// - Parameter forceFixtures: bypass the fixtures TTL and pull fresh fixtures
-    ///   from the Worker. Used by the ad-gated "pull results from server" action,
-    ///   where the whole point is genuinely fresh results.
-    static func load(for leagues: [LeagueOption], forceFixtures: Bool = false) async throws -> LeagueData {
+    static func load(for leagues: [LeagueOption]) async throws -> LeagueData {
         let targets = leagues.isEmpty ? [Leagues.home] : leagues
 
         var fixtures: [FixtureDTO] = []
@@ -44,7 +41,7 @@ struct LeagueData {
         // 1–3 leagues typically, so a sequential merge is fine.
         for league in targets {
             let teams = try await cachedTeams(for: league)
-            let f = try await cachedFixtures(for: league, force: forceFixtures)
+            let f = try await cachedFixtures(for: league)
             let (rows, date) = try await cachedStandings(for: league, teams: teams)
 
             fixtures.append(contentsOf: f)
@@ -68,8 +65,51 @@ struct LeagueData {
     }
 
     /// Convenience for a single league.
-    static func load(for league: LeagueOption, forceFixtures: Bool = false) async throws -> LeagueData {
-        try await load(for: [league], forceFixtures: forceFixtures)
+    static func load(for league: LeagueOption) async throws -> LeagueData {
+        try await load(for: [league])
+    }
+
+    /// Canonical "pull live data" for one league — the single action every
+    /// screen that refreshes live match info shares (Scores tab's refresh,
+    /// Results entry's "Pull results from server"), so a manager is never
+    /// asked to watch a rewarded ad twice for the same underlying fetch.
+    /// Fetches /scores + /fixtures + /teams once, writes the Scores cache
+    /// (the priority/canonical snapshot), and patches the Fixtures cache for
+    /// any now-FINISHED match so Open Round / Picks / Results entry see it
+    /// without a separate fetch. Pure cache refresh: callers decide what to
+    /// do with the result (e.g. Results entry still requires the manager to
+    /// review and confirm before Close Round applies anything).
+    static func pullLiveScores(for league: LeagueOption) async throws -> (items: [ScoreItem], teams: [TeamDTO]) {
+        let client = league.client
+        async let scoresReq = client.scores()
+        async let fixturesReq = client.fixtures()
+        async let teamsReq = client.teams()
+        let (scores, fixtures, teams) = try await (scoresReq, fixturesReq, teamsReq)
+
+        let metaById = Dictionary(fixtures.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let items = scores.map { ScoreItem(score: $0, fixture: metaById[$0.id], leagueId: league.id) }
+        LeagueDataCache.save(
+            LeagueDataCache.Scores(date: Date(), items: items, teams: teams),
+            key: LeagueDataCache.scoresKey(league.id)
+        )
+        LeagueDataCache.recordLivePull(league.id)
+
+        let finished = fixtures.filter { $0.status == "FINISHED" }
+        patchFixturesCache(for: league, finished: finished)
+
+        return (items, teams)
+    }
+
+    /// Merges freshly-pulled FINISHED fixtures into the existing Fixtures
+    /// cache by id, leaving everything else untouched. No-op if there's
+    /// nothing cached yet (the next normal fixtures load will fill it).
+    private static func patchFixturesCache(for league: LeagueOption, finished: [FixtureDTO]) {
+        guard !finished.isEmpty else { return }
+        let key = LeagueDataCache.fixturesKey(league.id)
+        guard let cached = LeagueDataCache.load(LeagueDataCache.Fixtures.self, key: key) else { return }
+        let finishedById = Dictionary(uniqueKeysWithValues: finished.map { ($0.id, $0) })
+        let merged = cached.items.map { finishedById[$0.id] ?? $0 }
+        LeagueDataCache.save(LeagueDataCache.Fixtures(date: Date(), items: merged), key: key)
     }
 
     /// Gated, forced refresh of the league table(s) — fetches fresh standings from
@@ -111,13 +151,12 @@ struct LeagueData {
         return teams
     }
 
-    /// Fixtures: functional/free. Cache-first within TTL unless `force` (the
-    /// ad-gated results pull) demands fresh. Falls back to a stale copy on a fetch
-    /// failure when one exists.
-    private static func cachedFixtures(for league: LeagueOption, force: Bool) async throws -> [FixtureDTO] {
+    /// Fixtures: functional/free. Cache-first within TTL. Falls back to a stale
+    /// copy on a fetch failure when one exists.
+    private static func cachedFixtures(for league: LeagueOption) async throws -> [FixtureDTO] {
         let key = LeagueDataCache.fixturesKey(league.id)
         let cached = LeagueDataCache.load(LeagueDataCache.Fixtures.self, key: key)
-        if !force, let cached, LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.fixtures) {
+        if let cached, LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.fixtures) {
             return cached.items
         }
         do {

@@ -146,14 +146,15 @@ struct ResultsEntryView: View {
     }
 
     private func pullFromServer() async {
-        // Re-fetch so the rewarded ad buys genuinely fresh results, not whatever
-        // was loaded when the sheet opened. `forceFixtures` bypasses the fixtures
-        // TTL — the whole point of this gated action is fresh results. Falls back
-        // to current data on failure.
-        if let fresh = try? await LeagueData.load(for: game.leagues, forceFixtures: true) {
+        // Same shared pull as Scores' refresh (LeagueData.pullLiveScores) — one
+        // fetch, one cooldown, no separate ad for the same underlying data. It
+        // writes the Scores cache and patches the Fixtures cache for any
+        // FINISHED match; reloading from cache below picks that up without a
+        // second network call. Falls back to current data on failure.
+        for league in game.leagues { _ = try? await LeagueData.pullLiveScores(for: league) }
+        if let fresh = try? await LeagueData.load(for: game.leagues) {
             data = fresh
             lastPulled = Date()
-            for league in game.leagues { LeagueDataCache.recordLivePull(league.id) }
         }
         for fixture in roundFixtures {
             if fixture.status == "POSTPONED" {

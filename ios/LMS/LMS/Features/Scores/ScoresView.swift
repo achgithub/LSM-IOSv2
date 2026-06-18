@@ -236,19 +236,10 @@ struct ScoresView: View {
                     for team in cached.teams { allTeams[team.externalId] = team }
                     dates.append(cached.date)
                 } else {
-                    let client = league.client
-                    async let scoresReq = client.scores()
-                    async let fixturesReq = client.fixtures()
-                    async let teamsReq = client.teams()
-                    let (scores, fixtures, teams) = try await (scoresReq, fixturesReq, teamsReq)
-                    let metaById = Dictionary(fixtures.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-                    let leagueItems = scores.map { ScoreItem(score: $0, fixture: metaById[$0.id], leagueId: league.id) }
+                    let (leagueItems, teams) = try await LeagueData.pullLiveScores(for: league)
                     allItems += leagueItems
                     for team in teams { allTeams[team.externalId] = team }
-                    let now = Date()
-                    dates.append(now)
-                    LeagueDataCache.save(LeagueDataCache.Scores(date: now, items: leagueItems, teams: teams), key: key)
-                    LeagueDataCache.recordLivePull(league.id)
+                    dates.append(Date())
                 }
             }
             items = allItems
