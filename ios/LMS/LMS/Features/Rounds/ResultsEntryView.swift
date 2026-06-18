@@ -139,10 +139,27 @@ struct ResultsEntryView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+        // Seed any results already sitting in the (possibly already-fresh) cache —
+        // e.g. the manager refreshed Scores moments ago and the fixtures cache was
+        // already patched with FINISHED results. Without this, opening Results
+        // looked empty even though no further fetch/ad was actually needed.
+        seedOutcomesFromCache()
         // Re-arm the throttle from the now-current caches (greyed if all fresh).
         now = Date()
         freshUntil = fixturesThrottleUntil()
         isLoading = false
+    }
+
+    /// Fills in any not-yet-entered outcomes from the currently loaded `data`,
+    /// without overwriting outcomes the manager has already set manually.
+    private func seedOutcomesFromCache() {
+        for fixture in roundFixtures where outcomes[fixture.id] == nil {
+            if fixture.status == "POSTPONED" {
+                outcomes[fixture.id] = .postponed
+            } else if let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
+                outcomes[fixture.id] = outcome
+            }
+        }
     }
 
     private func pullFromServer() async {
@@ -156,13 +173,7 @@ struct ResultsEntryView: View {
             data = fresh
             lastPulled = Date()
         }
-        for fixture in roundFixtures {
-            if fixture.status == "POSTPONED" {
-                outcomes[fixture.id] = .postponed
-            } else if let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
-                outcomes[fixture.id] = outcome
-            }
-        }
+        seedOutcomesFromCache()
         // Re-arm the throttle from the now-current caches (greyed if all fresh).
         now = Date()
         freshUntil = fixturesThrottleUntil()

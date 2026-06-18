@@ -253,7 +253,10 @@ private struct TeamPickSheet: View {
                     }
                 }
                 Section {
-                    ForEach(eligible, id: \.id) { team in
+                    // Sorted alphabetically for easy scanning here — the underlying
+                    // `eligible` order (bottom-of-table-first) is what auto-assign uses,
+                    // not relevant when a manager is picking manually.
+                    ForEach(eligible.sorted { $0.name < $1.name }, id: \.id) { team in
                         Button {
                             onSelect(team.id)
                         } label: {
