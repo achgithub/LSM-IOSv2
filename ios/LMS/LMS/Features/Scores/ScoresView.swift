@@ -106,6 +106,7 @@ struct ScoresView: View {
                     }
                 }
             }
+            .appBackground()
             .navigationTitle("Scores")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

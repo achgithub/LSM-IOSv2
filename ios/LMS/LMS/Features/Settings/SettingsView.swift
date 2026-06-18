@@ -119,6 +119,7 @@ struct SettingsView: View {
                     Text("Not affiliated with, licensed by or endorsed by any football club, league or federation. An independent tool — team names and fixtures are factual data shown for reference only.")
                 }
             }
+            .appBackground()
             .navigationTitle("Settings")
             .sheet(isPresented: $showPaywall) {
                 PaywallView().environment(entitlements)

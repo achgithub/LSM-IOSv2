@@ -47,6 +47,7 @@ struct StandingsView: View {
                     }
                 }
             }
+            .appBackground()
             .navigationTitle("Standings")
             .toolbar {
                 if enabled.leagues.count > 1 {

@@ -41,6 +41,7 @@ struct GamesListView: View {
                     }
                 }
             }
+            .appBackground()
             .navigationTitle("Games")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

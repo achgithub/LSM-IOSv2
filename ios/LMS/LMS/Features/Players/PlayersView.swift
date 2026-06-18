@@ -96,6 +96,7 @@ struct PlayersView: View {
                     }
                 }
             }
+            .appBackground()
             .navigationTitle("Players")
             .toolbar { if !members.isEmpty { EditButton() } }
             .fileImporter(
