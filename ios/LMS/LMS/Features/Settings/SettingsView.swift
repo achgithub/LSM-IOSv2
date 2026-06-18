@@ -111,6 +111,8 @@ struct SettingsView: View {
                     Link(destination: URL(string: "https://www.football-data.org")!) {
                         Text(verbatim: "Data provided by football-data.org")
                     }
+                    Link("Privacy Policy", destination: URL(string: "https://sportsmanager-site.pages.dev/lms/privacy")!)
+                    Link("Terms of Use (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                 } header: {
                     Text("About")
                 } footer: {

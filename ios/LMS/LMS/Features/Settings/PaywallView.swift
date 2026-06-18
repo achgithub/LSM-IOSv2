@@ -47,6 +47,14 @@ struct PaywallView: View {
                 } footer: {
                     Text("Subscriptions renew automatically until cancelled. Manage or cancel anytime in the App Store under your Apple ID → Subscriptions.")
                 }
+
+                Section {
+                    // Required by App Store Review Guideline 3.1.2 — functional links to
+                    // the Terms of Use (Apple's standard EULA) and Privacy Policy must be
+                    // present on or reachable from the purchase screen.
+                    Link("Terms of Use (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                    Link("Privacy Policy", destination: URL(string: "https://sportsmanager-site.pages.dev/lms/privacy")!)
+                }
             }
             .navigationTitle("Go Premium")
             .navigationBarTitleDisplayMode(.inline)
