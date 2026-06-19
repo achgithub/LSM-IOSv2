@@ -10,6 +10,24 @@ struct LeagueOption: Identifiable, Hashable, Sendable, Decodable {
     let shortName: String   // chip label, e.g. "PL"
     let workerBaseURL: String
     let teamsCount: Int
+    /// True for the standalone screenshot/demo league (frozen data, no live
+    /// feed) — visible only in DEBUG builds, see `Leagues.all`. Defaults to
+    /// false since most manifest entries omit the key entirely.
+    let devOnly: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        shortName = try c.decode(String.self, forKey: .shortName)
+        workerBaseURL = try c.decode(String.self, forKey: .workerBaseURL)
+        teamsCount = try c.decode(Int.self, forKey: .teamsCount)
+        devOnly = try c.decodeIfPresent(Bool.self, forKey: .devOnly) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, shortName, workerBaseURL, teamsCount, devOnly
+    }
 
     var workerURL: URL {
         guard let url = URL(string: workerBaseURL) else {
@@ -43,8 +61,16 @@ enum Leagues {
     /// App-wide settings (product name, default season + gameplay rules).
     static var app: AppSettings { manifest.app }
 
-    /// Every registered league, in manifest order.
-    static var all: [LeagueOption] { manifest.leagues }
+    /// Every registered league, in manifest order. `devOnly` leagues (the
+    /// standalone screenshot/demo league — see leagues.json) only ever appear
+    /// in DEBUG builds; a Release/TestFlight/App Store build never sees them.
+    static var all: [LeagueOption] {
+        #if DEBUG
+        manifest.leagues
+        #else
+        manifest.leagues.filter { !$0.devOnly }
+        #endif
+    }
 
     /// The user's configured home league (the one a new game defaults to).
     static var home: LeagueOption { byId(manifest.homeLeagueId) ?? all[0] }

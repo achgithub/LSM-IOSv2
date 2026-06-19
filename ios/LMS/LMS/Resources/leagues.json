@@ -26,6 +26,14 @@
       "shortName": "PD",
       "workerBaseURL": "https://pd.sportsmanager.site",
       "teamsCount": 20
+    },
+    {
+      "id": "DEMO",
+      "name": "Demo League (Dev)",
+      "shortName": "DEMO",
+      "workerBaseURL": "https://lms-demo-worker.sportsmanager.workers.dev",
+      "teamsCount": 20,
+      "devOnly": true
     }
   ]
 }

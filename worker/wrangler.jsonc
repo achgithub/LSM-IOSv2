@@ -187,6 +187,58 @@
       "triggers": {
         "crons": ["0 3 * * *"]
       }
+    },
+
+    // Standalone demo instance — La Liga-shaped, for App Store screenshots and
+    // Android demo work. NOT a live league: seeded ONCE from a frozen copy of
+    // the real `pd` D1 (see worker/README.md), then never synced again — no
+    // FOOTBALL_DATA_TOKEN, no cron, no calls to football-data.org at all. The
+    // demo clock (src/demo.ts) is left permanently ON so every read is served
+    // through its transform path, which never touches FOOTBALL_DATA_TOKEN.
+    // Chosen over Premier League deliberately: PL fixture data carries extra
+    // database-right risk via Football DataCo; La Liga doesn't carry the same
+    // exposure for public marketing assets.
+    "demo": {
+      "name": "lms-demo-worker",
+      // No custom domain / lockdown — default workers.dev is fine, this env
+      // holds only a frozen, non-licensed-feed snapshot, not the live product.
+
+      "vars": {
+        "LEAGUE_ID": "PD",
+        "LEAGUE_NAME": "La Liga (Demo)",
+        "FOOTBALL_DATA_CODE": "PD",
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
+        "TEAMS_COUNT": "20",
+        "ROUNDS_PER_SEASON": "38",
+        "SCORE_TTL_SECONDS": "120",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
+        "TIMEZONE": "Europe/Madrid",
+        "MAINTENANCE_WINDOW_UTC": "03:00"
+      },
+
+      // ADMIN_TOKEN is a SECRET (only secret this env needs):
+      //   wrangler secret put ADMIN_TOKEN --env demo
+      // No FOOTBALL_DATA_TOKEN — this env never calls the provider.
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-demo-db",
+          "database_id": "122c1964-ddaa-424a-b8f8-a406b871a491"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "d62de474e1ce452b81c2638bf131cc98"
+        }
+      ]
+
+      // No "triggers" — this env must never run the maintenance cron.
     }
   }
 }
