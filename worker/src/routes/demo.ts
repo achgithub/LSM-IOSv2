@@ -3,6 +3,7 @@ import { requireAdmin } from "../auth";
 import {
   advanceClock,
   clearDemoClock,
+  demoClockIfEnabled,
   getDemoClock,
   PHASES,
   setDemoClock,
@@ -11,8 +12,13 @@ import {
 } from "../demo";
 import { getLeagueConfig } from "../types";
 
-// Demo-clock control (spec testing aid). GET status is open; mutations need the
-// admin bearer token.
+// Demo-clock control (spec testing aid) — ONLY live for envs with
+// `DEMO_ENABLED = "true"` in wrangler.jsonc (currently just the standalone
+// `demo` env). A live league (pl/elc/pd) has no `DEMO_ENABLED` var at all, so
+// every mutation below is hard-rejected regardless of admin token, and GET
+// always reports `demo: null` — this is a capability removal, not a value
+// that happens to be unset, so calling these by mistake against a live
+// league can never tweak it.
 //
 //   GET  /admin/demo                       → current clock
 //   POST /admin/demo/start?matchday=1      → begin demo at MD1, phase "scheduled"
@@ -22,6 +28,10 @@ import { getLeagueConfig } from "../types";
 export const demo = new Hono<{ Bindings: Env }>();
 
 demo.use("/*", async (c, next) => {
+  if (c.env.DEMO_ENABLED !== "true") {
+    if (c.req.method === "GET") return c.json({ demo: null });
+    return c.json({ error: "demo mode is disabled for this league" }, 403);
+  }
   if (c.req.method !== "GET" && !requireAdmin(c.env, c.req.header("Authorization"))) {
     return c.json({ error: "unauthorized" }, 401);
   }
@@ -29,7 +39,7 @@ demo.use("/*", async (c, next) => {
 });
 
 demo.get("/", async (c) => {
-  return c.json({ demo: await getDemoClock(c.env.SCORES) });
+  return c.json({ demo: await demoClockIfEnabled(c.env) });
 });
 
 demo.post("/start", async (c) => {

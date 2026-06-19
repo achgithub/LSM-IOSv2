@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getFixtures, getStandings, getTeams } from "../db";
-import { demoStandings, getDemoClock } from "../demo";
+import { demoStandings, demoClockIfEnabled } from "../demo";
 import { FootballDataProvider } from "../football";
 import { STANDINGS_KEYS, withFreshness } from "../gate";
 import { refreshStandings } from "../refresh";
@@ -13,7 +13,7 @@ import { getLeagueConfig } from "../types";
 export const standings = new Hono<{ Bindings: Env }>();
 
 standings.get("/", async (c) => {
-  const clock = await getDemoClock(c.env.SCORES);
+  const clock = await demoClockIfEnabled(c.env);
   if (clock) {
     const [fixtures, teams] = await Promise.all([getFixtures(c.env.DB), getTeams(c.env.DB)]);
     return c.json(demoStandings(fixtures, teams, clock));

@@ -3,7 +3,7 @@
 // per-env config (see types.ts / wrangler.jsonc). Game state lives on the app.
 
 import { Hono } from "hono";
-import { getDemoClock } from "./demo";
+import { demoClockIfEnabled } from "./demo";
 import { FootballDataProvider } from "./football";
 // import { requireAttestation } from "./middleware/attest"; // see TODO below
 import { admin } from "./routes/admin";
@@ -24,7 +24,7 @@ app.get("/health", async (c) => {
   const { results } = await c.env.DB.prepare(
     "SELECT dataset, synced_at, row_count FROM sync_meta",
   ).all<{ dataset: string; synced_at: string; row_count: number }>();
-  const demoClock = await getDemoClock(c.env.SCORES);
+  const demoClock = await demoClockIfEnabled(c.env);
   return c.json({ ok: true, league: c.env.LEAGUE_ID, sync: results, demo: demoClock });
 });
 

@@ -39,6 +39,20 @@ export async function getDemoClock(kv: KVNamespace): Promise<DemoClock | null> {
   return null;
 }
 
+/**
+ * The demo clock, but ONLY for envs with `DEMO_ENABLED = "true"` (currently
+ * just the standalone `demo` env — see wrangler.jsonc). Every read of the demo
+ * clock in this Worker (routes, /health) goes through this, not `getDemoClock`
+ * directly, so a live league (pl/elc/pd) can NEVER observe or apply a demo
+ * clock even if a stray `demo:clock` KV key existed — capability is removed
+ * for those envs, not just left unused. See `requireDemoEnabled` in
+ * routes/demo.ts for the matching write-side guard.
+ */
+export async function demoClockIfEnabled(env: Env): Promise<DemoClock | null> {
+  if (env.DEMO_ENABLED !== "true") return null;
+  return getDemoClock(env.SCORES);
+}
+
 export async function setDemoClock(kv: KVNamespace, clock: DemoClock): Promise<void> {
   await kv.put(CLOCK_KEY, JSON.stringify(clock));
 }

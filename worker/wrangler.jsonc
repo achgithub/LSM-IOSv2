@@ -204,6 +204,10 @@
       // holds only a frozen, non-licensed-feed snapshot, not the live product.
 
       "vars": {
+        // The ONLY env with this set — gates every demo-clock read/write in
+        // src/demo.ts + routes/demo.ts. pl/elc/pd have no DEMO_ENABLED var at
+        // all, so they can never run demo mode, by construction.
+        "DEMO_ENABLED": "true",
         "LEAGUE_ID": "PD",
         "LEAGUE_NAME": "La Liga (Demo)",
         "FOOTBALL_DATA_CODE": "PD",

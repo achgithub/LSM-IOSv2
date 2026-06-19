@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getFixtures, type FixtureQuery } from "../db";
-import { applyDemoToFixtures, getDemoClock } from "../demo";
+import { applyDemoToFixtures, demoClockIfEnabled } from "../demo";
 import { FootballDataProvider } from "../football";
 import { FIXTURES_KEYS, withFreshness } from "../gate";
 import { refreshMatchData } from "../refresh";
@@ -23,7 +23,7 @@ fixtures.get("/", async (c) => {
     md = n;
   }
 
-  const clock = await getDemoClock(c.env.SCORES);
+  const clock = await demoClockIfEnabled(c.env);
   if (clock) {
     let data = applyDemoToFixtures(await getFixtures(c.env.DB), clock);
     if (md !== undefined) data = data.filter((f) => f.matchday === md);

@@ -6,7 +6,6 @@ interface Env {
 }
 
 type SyncRow    = { dataset: string; synced_at: string; row_count: number };
-type DemoClock  = { matchday: number; phase: "scheduled" | "live" | "finished" } | null;
 type GateState  = { call: number; refresh: number; ts: string | null };
 type StatusRow  = { status: string; cnt: number };
 type NextFixRow = { kickoff: string; matchday: number | null };
@@ -26,8 +25,11 @@ function parseInt0(v: string | null): number {
 }
 
 async function fetchLeague(db: D1Database, kv: KVNamespace) {
+  // No "demo:clock" read here — pl/elc/pd have no demo-clock capability at
+  // all (see worker/src/demo.ts demoClockIfEnabled / DEMO_ENABLED), so this
+  // dashboard has nothing to report for it. The standalone `demo` env isn't
+  // in LEAGUES above and never will be.
   const kvKeys = [
-    "demo:clock",
     "scores",
     ...GATES.flatMap((g) => [`${g}:call`, `${g}:refresh`, `${g}:ts`]),
   ];
@@ -38,11 +40,7 @@ async function fetchLeague(db: D1Database, kv: KVNamespace) {
     ...kvKeys.map((k) => kv.get(k)),
   ]);
 
-  const [clockRaw, scoresRaw, ...gateVals] = kvVals;
-  let demoClock: DemoClock = null;
-  if (clockRaw) {
-    try { demoClock = JSON.parse(clockRaw) as DemoClock; } catch { /* malformed */ }
-  }
+  const [scoresRaw, ...gateVals] = kvVals;
 
   const gates: Record<GateName, GateState> = {} as Record<GateName, GateState>;
   GATES.forEach((g, i) => {
@@ -59,7 +57,6 @@ async function fetchLeague(db: D1Database, kv: KVNamespace) {
     statusCounts: statusResult.results,
     nextFixture: nextFixResult ?? null,
     scoresCacheBytes: scoresRaw ? scoresRaw.length : null,
-    demoClock,
     gates,
   };
 }
@@ -139,7 +136,6 @@ function shellHtml(): Response {
     .missing { color: #553; }
     .badge { display: inline-block; margin-top: 0.6rem; padding: 0.3rem 0.6rem;
              border-radius: 4px; font-size: 11px; }
-    .badge-demo   { background: #1a1400; color: #fa0; border: 1px solid #332200; }
     .badge-live   { background: #0d1a0d; color: #4a4; border: 1px solid #1a331a; }
     .badge-flight { background: #1a0a0a; color: #f66; border: 1px solid #330000; }
     .season { color: #e0e0e0; margin-top: 0.6rem; font-size: 13px; }
@@ -207,18 +203,13 @@ function shellHtml(): Response {
           ? '<span class="badge badge-live">Scores cache: '+esc((d.scoresCacheBytes/1024).toFixed(1))+' KB</span>'
           : '<span class="badge badge-flight">Scores cache: empty</span>';
 
-        // Demo clock badge
-        const clockBadge = d.demoClock
-          ? '<span class="badge badge-demo">Demo: matchday '+esc(d.demoClock.matchday)+' · '+esc(d.demoClock.phase)+'</span>'
-          : '<span class="badge badge-live">Live mode</span>';
-
         out.innerHTML =
           '<h3>D1 — sync</h3>'
           + '<table><thead><tr><th>Dataset</th><th>Rows</th><th>Last synced</th></tr></thead><tbody>'+syncRows+'</tbody></table>'
           + seasonLine
           + '<h3>KV — gates</h3>'
           + '<table><thead><tr><th>Resource</th><th>call/refresh</th><th>Status</th><th>Last reset</th></tr></thead><tbody>'+gateRows+'</tbody></table>'
-          + '<div style="margin-top:0.5rem">'+cacheNote+' '+clockBadge+'</div>'
+          + '<div style="margin-top:0.5rem">'+cacheNote+' <span class="badge badge-live">Live mode</span></div>'
           + '<div class="fetched">Fetched '+esc(d.fetchedAt)+'</div>';
       } catch(e) {
         out.textContent = 'Error: ' + e.message;
