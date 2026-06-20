@@ -4,6 +4,7 @@ import { demoScores, demoClockIfEnabled } from "../demo";
 import { FootballDataProvider } from "../football";
 import { SCORES_DATA_KEY, SCORES_KEYS, withFreshness } from "../gate";
 import { refreshMatchData } from "../refresh";
+import { currentSeasonYear } from "../seasonPhase";
 import { getLeagueConfig, type ScoreEntry } from "../types";
 
 // GET /scores
@@ -30,7 +31,7 @@ scores.get("/", async (c) => {
     c.env.SCORES,
     SCORES_KEYS,
     cfg.scoreTtlMs,
-    () => refreshMatchData(c.env.DB, c.env.SCORES, provider),
+    async () => refreshMatchData(c.env.DB, c.env.SCORES, provider, await currentSeasonYear(c.env.DB)),
     c.executionCtx,
   );
   const cached = await c.env.SCORES.get(SCORES_DATA_KEY);

@@ -2,26 +2,27 @@ import { Hono } from "hono";
 import { requireAdmin } from "../auth";
 import { FootballDataProvider } from "../football";
 import { refreshMatchData, refreshStandings } from "../refresh";
-import { getSeasonPhase, setSeasonPhase, type SeasonPhase } from "../seasonPhase";
+import { currentSeasonYear, getSeasonPhase, setSeasonPhase, type SeasonPhase } from "../seasonPhase";
 import { syncTeams } from "../sync";
 import { getLeagueConfig } from "../types";
 
-// Admin endpoint to trigger a provider sync on demand (ops / first seed),
-// instead of waiting for the maintenance-window cron. Guarded by ADMIN_TOKEN.
+// Admin endpoint to trigger a provider sync on demand (ops / first seed, or
+// pulling in a new season's data immediately instead of waiting for the next
+// live cron). Guarded by ADMIN_TOKEN. Independent of the season-phase flag —
+// this always runs the real upstream call regardless of live/closed, and
+// never touches the phase flag itself; that's a separate, deliberate switch
+// (see seasonPhase.ts) the manager controls on its own.
 //
 //   POST /admin/sync?what=all|teams|fixtures|standings|scores&season=YYYY
 //   Authorization: Bearer <ADMIN_TOKEN>
 //
-// `season` (optional) pins the upstream call to a specific season (the year it
-// starts, e.g. 2026 for "2026/27") instead of football-data.org's default
-// "current season" pointer — for deliberately pulling in next season's data
-// during a rollover, ahead of/independent from that pointer flipping. Omit it
-// for normal operation (today's behaviour, unchanged).
+// `season` (optional, defaults to currentSeasonYear()) pins the upstream call
+// to a specific season instead of football-data.org's own "current
+// competition season" pointer — which can lag behind a season that's already
+// been published. Override it to deliberately check a different year.
 //
 // Note: scores + fixtures share one upstream (/matches), so what=fixtures and
 // what=scores both run the single combined match refresh (and report both counts).
-//
-// Safe to remove post-launch — the cron (§10.3) covers normal operation.
 export const admin = new Hono<{ Bindings: Env }>();
 
 admin.post("/sync", async (c) => {
@@ -36,7 +37,7 @@ admin.post("/sync", async (c) => {
     cfg.leagueId,
   );
   const seasonParam = c.req.query("season");
-  const season = seasonParam ? parseInt(seasonParam, 10) : undefined;
+  const season = seasonParam ? parseInt(seasonParam, 10) : await currentSeasonYear(c.env.DB);
 
   const what = c.req.query("what") ?? "all";
   const synced: Record<string, number> = {};
@@ -59,14 +60,14 @@ admin.post("/sync", async (c) => {
 // started season returns an empty table or still falls back to a previous
 // one, before deciding to run a real (destructive, replaces D1) sync.
 //
-//   GET /admin/probe-standings?season=YYYY
+//   GET /admin/probe-standings?season=YYYY   (season optional, defaults to currentSeasonYear())
 //   Authorization: Bearer <ADMIN_TOKEN>
 admin.get("/probe-standings", async (c) => {
   if (!requireAdmin(c.env, c.req.header("Authorization"))) {
     return c.json({ error: "unauthorized" }, 401);
   }
   const seasonParam = c.req.query("season");
-  const season = seasonParam ? parseInt(seasonParam, 10) : undefined;
+  const season = seasonParam ? parseInt(seasonParam, 10) : await currentSeasonYear(c.env.DB);
   const cfg = getLeagueConfig(c.env);
   const provider = new FootballDataProvider(
     c.env.FOOTBALL_DATA_TOKEN,
@@ -81,13 +82,16 @@ admin.get("/probe-standings", async (c) => {
   }
 });
 
-// Season-lifecycle phase (live | closed | rollover — see seasonPhase.ts).
-// Curl fallback for the dashboard's buttons (worker-dash writes the same KV
-// key directly, since it's already bound there); kept here too so this is
+// Season-phase flag (live | closed — see seasonPhase.ts). A PURE cost switch:
+// "closed" blocks the cron and all request-triggered upstream calls entirely;
+// it has no bearing on correctness, since every upstream call (through this
+// gate or /admin/sync above) is always pinned to an explicit season. Curl
+// fallback for the dashboard's buttons (worker-dash writes the same KV key
+// directly, since it's already bound there); kept here too so this is
 // controllable without dashboard access, and documented in one place.
 //
 //   GET  /admin/phase
-//   POST /admin/phase?value=live|closed|rollover
+//   POST /admin/phase?value=live|closed
 //   Authorization: Bearer <ADMIN_TOKEN>
 admin.get("/phase", async (c) => {
   if (!requireAdmin(c.env, c.req.header("Authorization"))) {
@@ -101,8 +105,8 @@ admin.post("/phase", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
   const value = c.req.query("value");
-  if (value !== "live" && value !== "closed" && value !== "rollover") {
-    return c.json({ error: "value must be live|closed|rollover" }, 400);
+  if (value !== "live" && value !== "closed") {
+    return c.json({ error: "value must be live|closed" }, 400);
   }
   await setSeasonPhase(c.env.SCORES, value as SeasonPhase);
   return c.json({ ok: true, phase: value });

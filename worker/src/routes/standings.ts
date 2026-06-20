@@ -4,6 +4,7 @@ import { demoStandings, demoClockIfEnabled } from "../demo";
 import { FootballDataProvider } from "../football";
 import { STANDINGS_KEYS, withFreshness } from "../gate";
 import { refreshStandings } from "../refresh";
+import { currentSeasonYear } from "../seasonPhase";
 import { getLeagueConfig } from "../types";
 
 // GET /standings — full league table, ordered by position. Request-triggered:
@@ -29,7 +30,7 @@ standings.get("/", async (c) => {
     c.env.SCORES,
     STANDINGS_KEYS,
     cfg.standingsTtlMs,
-    () => refreshStandings(c.env.DB, provider),
+    async () => refreshStandings(c.env.DB, provider, await currentSeasonYear(c.env.DB)),
     c.executionCtx,
   );
   return c.json(await getStandings(c.env.DB));

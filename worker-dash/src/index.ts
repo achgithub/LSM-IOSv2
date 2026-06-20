@@ -13,7 +13,7 @@ type SyncRow    = { dataset: string; synced_at: string; row_count: number };
 type GateState  = { call: number; refresh: number; ts: string | null };
 type StatusRow  = { status: string; cnt: number };
 type NextFixRow = { kickoff: string; matchday: number | null };
-type SeasonPhase = "live" | "closed" | "rollover";
+type SeasonPhase = "live" | "closed";
 
 const GATES = ["scores", "fixtures", "standings"] as const;
 type GateName = typeof GATES[number];
@@ -58,7 +58,7 @@ async function fetchLeague(db: D1Database, kv: KVNamespace) {
   ]);
 
   const [scoresRaw, phaseRaw, ...gateVals] = kvVals;
-  const phase: SeasonPhase = phaseRaw === "closed" || phaseRaw === "rollover" ? phaseRaw : "live";
+  const phase: SeasonPhase = phaseRaw === "closed" ? phaseRaw : "live";
 
   const gates: Record<GateName, GateState> = {} as Record<GateName, GateState>;
   GATES.forEach((g, i) => {
@@ -120,15 +120,17 @@ function shellHtml(): Response {
       <h3>Season control</h3>
       <div class="phase-row">
         <span>Phase: <span id="phase-${l.key}" class="phase-badge">—</span></span>
+        — closed = no API calls at all, regardless of TTL/cron. Pure cost switch;
+        every call (closed or live) is always pinned to the correct season.
       </div>
       <div class="season-actions">
-        <button onclick="setPhase('${l.key}','closed')">Mark Closed</button>
-        <button onclick="setPhase('${l.key}','live')">Go Live</button>
+        <button onclick="setPhase('${l.key}','closed')">Mark Closed (season ended)</button>
+        <button onclick="setPhase('${l.key}','live')">Go Live (resume polling)</button>
       </div>
       <div class="season-actions">
-        <input id="year-${l.key}" type="number" placeholder="e.g. 2026" style="width:5.5em">
-        <button onclick="probeSeason('${l.key}')">Probe season</button>
-        <button onclick="syncSeason('${l.key}')">Sync new season →</button>
+        <input id="year-${l.key}" type="number" placeholder="auto (current season)" style="width:9em">
+        <button onclick="probeSeason('${l.key}')">Probe (read-only check)</button>
+        <button onclick="syncSeason('${l.key}')">Sync now (updates cache, phase unchanged)</button>
       </div>
       <div id="season-msg-${l.key}" class="season-msg"></div>
     </section>`).join("");
@@ -178,7 +180,6 @@ function shellHtml(): Response {
     .phase-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: bold; }
     .phase-live     { background: #0d1a0d; color: #4a4; border: 1px solid #1a331a; }
     .phase-closed   { background: #1a1505; color: #ca6; border: 1px solid #332a0d; }
-    .phase-rollover { background: #0a1420; color: #6af; border: 1px solid #14304d; }
     .season-actions { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
     input { background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px;
             padding: 0.3rem 0.5rem; font-family: inherit; font-size: 12px; }
@@ -281,12 +282,12 @@ function shellHtml(): Response {
     async function probeSeason(key) {
       const msg = document.getElementById('season-msg-' + key);
       const year = document.getElementById('year-' + key).value;
-      if (!year) { msg.textContent = 'Enter a season year first.'; return; }
-      msg.textContent = 'Probing season ' + year + ' upstream (read-only)…';
+      msg.textContent = 'Probing ' + (year || 'current season') + ' upstream (read-only)…';
       try {
-        const r = await fetch('/action/' + key + '/probe?season=' + year, { method: 'POST' }).then(r => r.json());
+        const q = year ? ('?season=' + year) : '';
+        const r = await fetch('/action/' + key + '/probe' + q, { method: 'POST' }).then(r => r.json());
         msg.textContent = r.ok
-          ? 'Season ' + year + ': ' + r.rowCount + ' rows. Sample team ids: ' + (r.sampleTeamIds || []).join(', ')
+          ? 'Season ' + r.season + ': ' + r.rowCount + ' rows. Sample team ids: ' + (r.sampleTeamIds || []).join(', ')
           : 'Probe failed: ' + (r.error || 'unknown');
       } catch (e) { msg.textContent = 'Error: ' + e.message; }
     }
@@ -294,14 +295,12 @@ function shellHtml(): Response {
     async function syncSeason(key) {
       const msg = document.getElementById('season-msg-' + key);
       const year = document.getElementById('year-' + key).value;
-      if (!year) { msg.textContent = 'Enter a season year first.'; return; }
-      if (!confirm('Sync season ' + year + ' for ' + key.toUpperCase() + '?\\n\\nThis replaces teams/fixtures/standings in D1 and sets phase to "rollover" (stops automatic polling until you go Live).')) return;
-      msg.textContent = 'Syncing season ' + year + '…';
+      if (!confirm('Sync ' + (year || 'current season') + ' for ' + key.toUpperCase() + ' now?\\n\\nThis replaces teams/fixtures/standings in D1 immediately. Phase is left exactly as it is — this does not go Live.')) return;
+      msg.textContent = 'Syncing ' + (year || 'current season') + '…';
       try {
-        const r = await fetch('/action/' + key + '/sync?season=' + year, { method: 'POST' }).then(r => r.json());
-        if (!r.ok) { msg.textContent = 'Sync failed: ' + JSON.stringify(r); return; }
-        setPhaseBadge(key, 'rollover');
-        msg.textContent = 'Synced: ' + JSON.stringify(r.synced) + '. Phase set to rollover.';
+        const q = year ? ('?season=' + year) : '';
+        const r = await fetch('/action/' + key + '/sync' + q, { method: 'POST' }).then(r => r.json());
+        msg.textContent = r.ok ? 'Synced: ' + JSON.stringify(r.synced) + '.' : 'Sync failed: ' + JSON.stringify(r);
       } catch (e) { msg.textContent = 'Error: ' + e.message; }
     }
   </script>
@@ -310,22 +309,30 @@ function shellHtml(): Response {
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
-// Season-control actions — see docs/season-phase.md for the runbook these map to.
-// All three POST to the league's own KV directly for the phase flag (already
-// bound here, same as the read-only gate display above); the sync/probe
-// actions instead proxy to the league Worker's public /admin endpoints, since
-// only it holds the FOOTBALL_DATA_TOKEN needed to call football-data.org.
+// Season-control actions — see lms-season-phase-rollover memory for the
+// runbook these map to. The phase flag POSTs to the league's own KV directly
+// (already bound here, same as the read-only gate display above); sync/probe
+// instead proxy to the league Worker's public /admin endpoints, since only it
+// holds the FOOTBALL_DATA_TOKEN needed to call football-data.org. `season` is
+// optional on both — omitted, the league Worker defaults to the correct
+// current season itself (currentSeasonYear()); this dashboard does NOT
+// duplicate that calculation.
+//
+// Sync deliberately never touches the phase flag — phase is a pure on/off
+// switch for automatic polling, sync is an explicit one-off pull, and the two
+// are independent by design (see seasonPhase.ts on the league Worker).
 async function setPhase(kv: KVNamespace, value: string): Promise<Response> {
-  if (value !== "live" && value !== "closed" && value !== "rollover") {
-    return Response.json({ ok: false, error: "value must be live|closed|rollover" }, { status: 400 });
+  if (value !== "live" && value !== "closed") {
+    return Response.json({ ok: false, error: "value must be live|closed" }, { status: 400 });
   }
   await kv.put(PHASE_KEY, value);
   return Response.json({ ok: true, phase: value });
 }
 
-async function proxySync(url: string, token: string | undefined, season: string): Promise<Response> {
+async function proxySync(url: string, token: string | undefined, season: string | null): Promise<Response> {
   if (!token) return Response.json({ ok: false, error: "admin token not configured for this league" }, { status: 500 });
-  const upstream = await fetch(`${url}/admin/sync?what=all&season=${encodeURIComponent(season)}`, {
+  const q = season ? `&season=${encodeURIComponent(season)}` : "";
+  const upstream = await fetch(`${url}/admin/sync?what=all${q}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -334,13 +341,17 @@ async function proxySync(url: string, token: string | undefined, season: string)
   return Response.json(body);
 }
 
-async function proxyProbe(url: string, token: string | undefined, season: string): Promise<Response> {
+async function proxyProbe(url: string, token: string | undefined, season: string | null): Promise<Response> {
   if (!token) return Response.json({ ok: false, error: "admin token not configured for this league" }, { status: 500 });
-  const upstream = await fetch(`${url}/admin/probe-standings?season=${encodeURIComponent(season)}`, {
+  const q = season ? `?season=${encodeURIComponent(season)}` : "";
+  const upstream = await fetch(`${url}/admin/probe-standings${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const body = await upstream.json() as { ok: boolean; rowCount?: number; rows?: { teamId: number }[] };
-  return Response.json({ ok: body.ok, rowCount: body.rowCount, sampleTeamIds: body.rows?.slice(0, 5).map((r) => r.teamId) });
+  const body = await upstream.json() as { ok: boolean; season?: number; rowCount?: number; rows?: { teamId: number }[] };
+  return Response.json({
+    ok: body.ok, season: body.season, rowCount: body.rowCount,
+    sampleTeamIds: body.rows?.slice(0, 5).map((r) => r.teamId),
+  });
 }
 
 export default {
@@ -371,17 +382,9 @@ export default {
       const league = LEAGUES.find((l) => l.key === key);
       if (!league) return new Response("not found", { status: 404 });
       if (action === "phase") return setPhase(env[league.kv], searchParams.get("value") ?? "");
-      const season = searchParams.get("season") ?? "";
-      if (!season) return Response.json({ ok: false, error: "season is required" }, { status: 400 });
+      const season = searchParams.get("season"); // optional — null lets the league Worker pick the current season itself
       const token = env[league.tokenEnv];
-      if (action === "sync") {
-        const res = await proxySync(league.url, token, season);
-        // A successful season sync means the new roster/fixtures/zeroed table
-        // are now in D1 — immediately stop automatic polling so the close-
-        // season cache-only window holds until the manager explicitly goes live.
-        if (res.ok) await env[league.kv].put(PHASE_KEY, "rollover");
-        return res;
-      }
+      if (action === "sync") return proxySync(league.url, token, season);
       return proxyProbe(league.url, token, season);
     }
 

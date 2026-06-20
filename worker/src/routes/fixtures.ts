@@ -4,6 +4,7 @@ import { applyDemoToFixtures, demoClockIfEnabled } from "../demo";
 import { FootballDataProvider } from "../football";
 import { FIXTURES_KEYS, withFreshness } from "../gate";
 import { refreshMatchData } from "../refresh";
+import { currentSeasonYear } from "../seasonPhase";
 import { getLeagueConfig } from "../types";
 
 // GET /fixtures?dateFrom=&dateTo=&matchday=
@@ -40,7 +41,7 @@ fixtures.get("/", async (c) => {
     c.env.SCORES,
     FIXTURES_KEYS,
     cfg.fixturesTtlMs,
-    () => refreshMatchData(c.env.DB, c.env.SCORES, provider),
+    async () => refreshMatchData(c.env.DB, c.env.SCORES, provider, await currentSeasonYear(c.env.DB)),
     c.executionCtx,
   );
 
