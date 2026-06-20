@@ -181,6 +181,13 @@ export async function upsertFixtures(db: D1Database, fixtures: Fixture[]): Promi
   );
 }
 
+// Genuinely replaces the table with exactly the fetched rows — a team that
+// drops out (e.g. relegated, no longer in the new season's table) must stop
+// being returned, not linger with its last real points/position forever.
+// Nothing has a foreign key into standings.team_id (unlike teams, which
+// fixtures/standings reference and so can only prune what's unreferenced —
+// see upsertTeams), so a straightforward delete-anything-not-in-this-fetch
+// is safe here.
 export async function replaceStandings(db: D1Database, standings: Standing[]): Promise<void> {
   if (standings.length === 0) return;
   const insert = db.prepare(
@@ -195,14 +202,17 @@ export async function replaceStandings(db: D1Database, standings: Standing[]): P
        goal_difference = excluded.goal_difference, points = excluded.points,
        updated_at = excluded.updated_at`,
   );
-  await db.batch(
-    standings.map((s) =>
+  const placeholders = standings.map(() => "?").join(",");
+  const prune = db.prepare(`DELETE FROM standings WHERE team_id NOT IN (${placeholders})`);
+  await db.batch([
+    ...standings.map((s) =>
       insert.bind(
         s.teamId, s.position, s.played, s.won, s.drawn, s.lost,
         s.goalsFor, s.goalsAgainst, s.goalDifference, s.points, s.updatedAt,
       ),
     ),
-  );
+    prune.bind(...standings.map((s) => s.teamId)),
+  ]);
 }
 
 export async function recordSync(
