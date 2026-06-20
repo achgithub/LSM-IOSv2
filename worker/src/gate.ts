@@ -57,6 +57,14 @@ export const STANDINGS_KEYS: GateKeys = {
 
 const MAX_RETRIES = 5; // 5 × 1s = 5s max background poll
 
+// If a claimed refresh hasn't landed within this long, treat it as abandoned
+// (the Worker instance that claimed it died, threw before the catch, or hit
+// an edge case `runRefresh`'s try/catch didn't cover) rather than polling
+// forever. A real refresh — one upstream fetch + a D1/KV write — should land
+// in low single-digit seconds; this is a generous multiple of that, not tied
+// to any resource's own (much longer) cache TTL.
+const ABANDONED_CLAIM_MS = 30_000;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -100,17 +108,25 @@ export async function withFreshness(
   const call = parseInt0(callStr);
   const refresh_ = parseInt0(refreshStr);
   const ts = tsStr ? new Date(tsStr).getTime() : 0;
-  const stale = Date.now() - ts >= ttlMs;
+  const age = Date.now() - ts;
+  const stale = age >= ttlMs;
+  const abandoned = call > refresh_ && age >= ABANDONED_CLAIM_MS;
 
-  if (call === refresh_ && stale) {
+  if ((call === refresh_ && stale) || abandoned) {
     // This Worker claims the refresh — bump call, then refresh in background.
     // (Residual race per spec §10.2: two Workers can both claim; worst case is
-    // one duplicate upstream call. Correctness is unaffected.)
+    // one duplicate upstream call. Correctness is unaffected. The `abandoned`
+    // case adds one more residual race, same accepted class: if the original
+    // stuck claim belatedly completes after we've already reclaimed and
+    // resolved, its write could momentarily clobber `refresh` backwards —
+    // self-corrects on the next stale check, never visible to a served
+    // response since reads always come from the data store, not the gate.)
     await kv.put(keys.call, String(call + 1));
     await kv.put(keys.ts, new Date().toISOString());
     ctx.waitUntil(runRefresh(kv, keys, call + 1, refresh));
   } else if (call > refresh_) {
-    // Refresh already in flight elsewhere — background housekeeping only.
+    // Refresh already in flight elsewhere (and recent) — background
+    // housekeeping only.
     ctx.waitUntil(pollUntilFresh(kv, keys, call));
   }
   // call === refresh && !stale -> store fresh, serve directly.
