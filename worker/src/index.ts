@@ -4,7 +4,6 @@
 
 import { Hono } from "hono";
 import { demoClockIfEnabled } from "./demo";
-import { FootballDataProvider } from "./football";
 // import { requireAttestation } from "./middleware/attest"; // see TODO below
 import { admin } from "./routes/admin";
 import { attest } from "./routes/attest";
@@ -13,8 +12,6 @@ import { fixtures } from "./routes/fixtures";
 import { scores } from "./routes/scores";
 import { standings } from "./routes/standings";
 import { teams } from "./routes/teams";
-import { runMaintenance } from "./sync";
-import { getLeagueConfig } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -59,18 +56,10 @@ app.onError((err, c) => {
   return c.json({ error: "internal error" }, 500);
 });
 
+// No `scheduled` export here — maintenance is no longer driven by a per-league
+// Cloudflare Cron Trigger. worker-registry holds the single shared orchestrator
+// cron and pings POST /admin/sync-if-due on every league instead (see admin.ts);
+// that keeps the cron-trigger count flat at 1 regardless of league count.
 export default {
   fetch: app.fetch,
-
-  // Single nightly maintenance cron per league (spec §10.3). One trigger per env
-  // keeps us under the Workers free-plan cap of 5 cron triggers per account.
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    const cfg = getLeagueConfig(env);
-    const provider = new FootballDataProvider(
-      env.FOOTBALL_DATA_TOKEN,
-      cfg.footballDataCode,
-      cfg.leagueId,
-    );
-    ctx.waitUntil(runMaintenance(env.DB, env.SCORES, provider));
-  },
 } satisfies ExportedHandler<Env>;

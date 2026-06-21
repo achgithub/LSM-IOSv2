@@ -8,6 +8,5 @@
   "standingsTtlSeconds": 1800,
   "fixturesTtlSeconds": 14400,
   "timezone": "Europe/London",
-  "maintenanceWindowUTC": "04:00",
-  "cronMaintenance": "0 4 * * *"
+  "maintenanceWindowUTC": "04:00"
 }

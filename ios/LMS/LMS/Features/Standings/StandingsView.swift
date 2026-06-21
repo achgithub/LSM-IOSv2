@@ -57,7 +57,7 @@ struct StandingsView: View {
                                 ForEach(enabled.leagues) { Text($0.name).tag($0) }
                             }
                         } label: {
-                            Label(league.shortName, systemImage: "trophy")
+                            Label(league.displayName, systemImage: "trophy")
                         }
                     }
                 } else {

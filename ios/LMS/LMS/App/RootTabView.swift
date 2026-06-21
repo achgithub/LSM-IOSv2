@@ -76,6 +76,9 @@ struct RootTabView: View {
             // Drop any leagues that no longer exist. Going over the subscription
             // allowance is handled by the blocking downgrade gate, not silently.
             EnabledLeagues.shared.pruneInvalid()
+            // Fire-and-forget: refreshes the league list for the *next* launch
+            // (see Leagues.refreshFromRegistry) — never blocks this launch.
+            Task { await Leagues.refreshFromRegistry() }
         }
         // Interstitial dropped (2026-06-15) — foreground trigger disabled.
         // .onChange(of: scenePhase) { _, phase in

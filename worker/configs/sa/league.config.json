@@ -1,0 +1,12 @@
+{
+  "leagueId": "SA",
+  "leagueName": "Serie A",
+  "footballDataCode": "SA",
+  "teamsCount": 20,
+  "roundsPerSeason": 38,
+  "scoreTtlSeconds": 120,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
+  "timezone": "Europe/Rome",
+  "maintenanceWindowUTC": "01:00"
+}

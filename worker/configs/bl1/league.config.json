@@ -1,0 +1,12 @@
+{
+  "leagueId": "BL1",
+  "leagueName": "Bundesliga",
+  "footballDataCode": "BL1",
+  "teamsCount": 18,
+  "roundsPerSeason": 34,
+  "scoreTtlSeconds": 120,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
+  "timezone": "Europe/Berlin",
+  "maintenanceWindowUTC": "02:00"
+}

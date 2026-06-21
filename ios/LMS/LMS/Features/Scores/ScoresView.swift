@@ -345,7 +345,7 @@ private struct ScoresSearchSheet: View {
         return Button {
             toggle(league.id)
         } label: {
-            Text(league.shortName)
+            Text(league.displayName)
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(on ? Color.accentColor : Color.gray.opacity(0.2), in: Capsule())

@@ -128,15 +128,13 @@ export async function getTeams(db: D1Database): Promise<Team[]> {
 
 // ── Writes (cron sync) ──────────────────────────────────────────────────────
 
-// Upserts the provider's current team list, then prunes any team no longer
-// referenced by a fixture or standings row. We deliberately keep ~2 seasons
-// of fixtures cached at once (current + next), so a team can legitimately
-// outlive its season in this table (e.g. a just-relegated club's last-season
-// results still need its name) — pruning by "not in the latest /teams fetch"
-// would delete those and either violate the fixtures/standings FK on
-// teams.external_id or orphan historical fixture display ("Team 1076"
-// instead of "Coventry City"). Pruning by "not referenced anywhere" is safe
-// and self-heals once those old fixtures eventually age out.
+// Upserts the provider's current team list. Pruning teams no longer
+// referenced by a fixture or standings row happens separately, in
+// pruneOrphanedTeams below — NOT in the same batch as this insert. On a
+// brand-new league's very first sync, fixtures/standings are still empty, so
+// running the prune here would delete every team this call just inserted
+// (nothing references them yet), and the matches sync right after would then
+// hit a FK violation on the team rows it expects to still exist.
 export async function upsertTeams(db: D1Database, teams: Team[]): Promise<void> {
   if (teams.length === 0) return;
   const stmt = db.prepare(
@@ -146,39 +144,57 @@ export async function upsertTeams(db: D1Database, teams: Team[]): Promise<void> 
        name = excluded.name, short_name = excluded.short_name,
        tla = excluded.tla, league_id = excluded.league_id`,
   );
-  const prune = db.prepare(
-    `DELETE FROM teams WHERE external_id NOT IN (
-       SELECT home_team_id FROM fixtures UNION SELECT away_team_id FROM fixtures
-       UNION SELECT team_id FROM standings
-     )`,
-  );
-  await db.batch([
-    ...teams.map((t) => stmt.bind(t.id, t.externalId, t.name, t.shortName, t.tla, t.leagueId)),
-    prune,
-  ]);
+  await db.batch(teams.map((t) => stmt.bind(t.id, t.externalId, t.name, t.shortName, t.tla, t.leagueId)));
 }
 
-export async function upsertFixtures(db: D1Database, fixtures: Fixture[]): Promise<void> {
+// Prunes any team no longer referenced by a fixture or standings row — e.g. a
+// team that drops out of the league entirely once `replaceFixtures` +
+// `replaceStandings` have cut over to a new season and it's no longer in
+// either. Pruning by "not in the latest /teams fetch" instead would risk
+// violating the fixtures/standings FK mid-cutover; pruning by "not referenced
+// anywhere" is always safe. Call this AFTER fixtures/standings have been
+// refreshed in the same maintenance run (see sync.ts runMaintenance), so a
+// new league's just-inserted teams are already referenced by the time this runs.
+export async function pruneOrphanedTeams(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `DELETE FROM teams WHERE external_id NOT IN (
+         SELECT home_team_id FROM fixtures UNION SELECT away_team_id FROM fixtures
+         UNION SELECT team_id FROM standings
+       )`,
+    )
+    .run();
+}
+
+// Genuinely replaces the table with exactly the fetched rows — same semantics
+// as replaceStandings below, and for the same reason: the manager explicitly
+// blocks the league, checks the new season is published (read-only probe),
+// then runs one deliberate sync to cut over. That sync should leave D1
+// holding only the season just fetched, not accumulate old seasons forever —
+// the app never lets a user pick a season, so nothing reads historical rows.
+// A routine same-season refresh replacing itself with an identical set is a
+// harmless no-op; a genuine cutover (different season) is exactly the point.
+// DELETE-all-then-insert (not a NOT-IN prune) avoids a 380-row bind-parameter
+// list. Guarded on empty input — an empty fetch (transient hiccup, or a
+// not-yet-published next season) must never wipe what's already there.
+export async function replaceFixtures(db: D1Database, fixtures: Fixture[]): Promise<void> {
   if (fixtures.length === 0) return;
-  const stmt = db.prepare(
+  const del = db.prepare(`DELETE FROM fixtures`);
+  const insert = db.prepare(
     `INSERT INTO fixtures
        (id, matchday, kickoff, status, home_team_id, away_team_id,
         home_score, away_score, winner, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       matchday = excluded.matchday, kickoff = excluded.kickoff,
-       status = excluded.status, home_score = excluded.home_score,
-       away_score = excluded.away_score, winner = excluded.winner,
-       updated_at = excluded.updated_at`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  await db.batch(
-    fixtures.map((f) =>
-      stmt.bind(
+  await db.batch([
+    del,
+    ...fixtures.map((f) =>
+      insert.bind(
         f.id, f.matchday, f.kickoff, f.status, f.homeTeamId, f.awayTeamId,
         f.homeScore, f.awayScore, f.winner, f.updatedAt,
       ),
     ),
-  );
+  ]);
 }
 
 // Genuinely replaces the table with exactly the fetched rows — a team that

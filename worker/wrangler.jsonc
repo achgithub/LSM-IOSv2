@@ -75,12 +75,13 @@
         }
       ],
 
-      // Single nightly maintenance trigger (teams→fixtures→standings→scores).
-      // One cron per league keeps us under the free-plan cap of 5/account.
-      // Maintenance window (UTC), winter offset = safe conservative choice (§10.3).
-      "triggers": {
-        "crons": ["0 4 * * *"]
-      }
+      // Explicit empty list — maintenance is driven by worker-registry's single
+      // shared orchestrator cron pinging POST /admin/sync-if-due (see admin.ts),
+      // not a per-league Cloudflare Cron Trigger. Keeps the account-wide cron
+      // count flat at 1 regardless of how many leagues exist. Must stay explicit
+      // (not just an absent "triggers" key) — an absent key leaves the OLD
+      // schedule registered server-side instead of clearing it on deploy.
+      "triggers": { "crons": [] }
     },
 
     // England Championship — second league instance. Free tier on football-data.
@@ -130,10 +131,8 @@
         }
       ],
 
-      // Same UTC maintenance window as PL (both England, Europe/London).
-      "triggers": {
-        "crons": ["0 4 * * *"]
-      }
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
     },
 
     // Spain La Liga (Primera División) — third league instance. Free tier.
@@ -183,10 +182,220 @@
         }
       ],
 
-      // CET league → 03:00 UTC window (winter offset, runs 1h early in summer).
-      "triggers": {
-        "crons": ["0 3 * * *"]
-      }
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
+    },
+
+    // Germany Bundesliga — fourth league instance. CET league → maintenance
+    // window 02:00 UTC. No "triggers" — see the pl block for rationale.
+    "bl1": {
+      "name": "lms-bl1-worker",
+
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "bl1.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
+
+      // League config (read at runtime via c.env). Mirrors configs/bl1/league.config.json.
+      "vars": {
+        "LEAGUE_ID": "BL1",
+        "LEAGUE_NAME": "Bundesliga",
+        "FOOTBALL_DATA_CODE": "BL1",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
+        "TEAMS_COUNT": "18",
+        "ROUNDS_PER_SEASON": "34",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "120",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
+        "TIMEZONE": "Europe/Berlin",
+        "MAINTENANCE_WINDOW_UTC": "02:00"
+      },
+
+      // FOOTBALL_DATA_TOKEN is a SECRET:
+      //   wrangler secret put FOOTBALL_DATA_TOKEN --env bl1
+      // OPS_SYNC_TOKEN is a SECRET, same shared value as every other league env:
+      //   wrangler secret put OPS_SYNC_TOKEN --env bl1
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-bl1-db",
+          "database_id": "be1c4811-1290-40d3-b367-6ed017335176"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "a5587014b93b410386bf5fa51b690b71"
+        }
+      ],
+
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
+    },
+
+    // Italy Serie A — fifth league instance. CET league → maintenance window
+    // 01:00 UTC. Explicit empty crons — see the pl block for rationale.
+    "sa": {
+      "name": "lms-sa-worker",
+
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "sa.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
+
+      // League config (read at runtime via c.env). Mirrors configs/sa/league.config.json.
+      "vars": {
+        "LEAGUE_ID": "SA",
+        "LEAGUE_NAME": "Serie A",
+        "FOOTBALL_DATA_CODE": "SA",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
+        "TEAMS_COUNT": "20",
+        "ROUNDS_PER_SEASON": "38",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "120",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
+        "TIMEZONE": "Europe/Rome",
+        "MAINTENANCE_WINDOW_UTC": "01:00"
+      },
+
+      // FOOTBALL_DATA_TOKEN is a SECRET:
+      //   wrangler secret put FOOTBALL_DATA_TOKEN --env sa
+      // OPS_SYNC_TOKEN is a SECRET, same shared value as every other league env:
+      //   wrangler secret put OPS_SYNC_TOKEN --env sa
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-sa-db",
+          "database_id": "506a317e-ab54-4701-819e-cf75de6dc231"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "2d13750bc1394e5da3305fe237af89fb"
+        }
+      ],
+
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
+    },
+
+    // France Ligue 1 — sixth league instance. CET league → maintenance window
+    // 00:00 UTC. Explicit empty crons — see the pl block for rationale.
+    "fl1": {
+      "name": "lms-fl1-worker",
+
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "fl1.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
+
+      // League config (read at runtime via c.env). Mirrors configs/fl1/league.config.json.
+      "vars": {
+        "LEAGUE_ID": "FL1",
+        "LEAGUE_NAME": "Ligue 1",
+        "FOOTBALL_DATA_CODE": "FL1",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
+        "TEAMS_COUNT": "18",
+        "ROUNDS_PER_SEASON": "34",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "120",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
+        "TIMEZONE": "Europe/Paris",
+        "MAINTENANCE_WINDOW_UTC": "00:00"
+      },
+
+      // FOOTBALL_DATA_TOKEN is a SECRET:
+      //   wrangler secret put FOOTBALL_DATA_TOKEN --env fl1
+      // OPS_SYNC_TOKEN is a SECRET, same shared value as every other league env:
+      //   wrangler secret put OPS_SYNC_TOKEN --env fl1
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-fl1-db",
+          "database_id": "63ebf525-0e18-43c6-b36f-c21c7a7b146d"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "8bcb36c55577424794991d1b6808f14f"
+        }
+      ],
+
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
+    },
+
+    // Netherlands Eredivisie — seventh league instance. CET league →
+    // maintenance window 05:00 UTC. Explicit empty crons — see the pl block.
+    "ded": {
+      "name": "lms-ded-worker",
+
+      // Production hostname + lockdown — see the pl block for rationale.
+      "routes": [{ "pattern": "ded.sportsmanager.site", "custom_domain": true }],
+      "workers_dev": false,
+      "preview_urls": false,
+
+      // League config (read at runtime via c.env). Mirrors configs/ded/league.config.json.
+      "vars": {
+        "LEAGUE_ID": "DED",
+        "LEAGUE_NAME": "Eredivisie",
+        "FOOTBALL_DATA_CODE": "DED",
+        // App Attest (Phase 2) — see the pl block. FLIP TO "production" AT RELEASE.
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "development",
+        "TEAMS_COUNT": "18",
+        "ROUNDS_PER_SEASON": "34",
+        // Per-resource upstream TTLs — see the PL block for the rationale.
+        "SCORE_TTL_SECONDS": "120",
+        "STANDINGS_TTL_SECONDS": "1800",
+        "FIXTURES_TTL_SECONDS": "14400",
+        "TIMEZONE": "Europe/Amsterdam",
+        "MAINTENANCE_WINDOW_UTC": "05:00"
+      },
+
+      // FOOTBALL_DATA_TOKEN is a SECRET:
+      //   wrangler secret put FOOTBALL_DATA_TOKEN --env ded
+      // OPS_SYNC_TOKEN is a SECRET, same shared value as every other league env:
+      //   wrangler secret put OPS_SYNC_TOKEN --env ded
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lms-ded-db",
+          "database_id": "5b4bd732-4e8b-4ff0-a8c9-aa79967b3586"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SCORES",
+          "id": "234299ab72b94dcb998955daa0d740cb"
+        }
+      ],
+
+      // Explicit empty list — see the pl block for rationale.
+      "triggers": { "crons": [] }
     },
 
     // Standalone demo instance — La Liga-shaped, for App Store screenshots and

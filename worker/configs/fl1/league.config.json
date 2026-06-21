@@ -1,0 +1,12 @@
+{
+  "leagueId": "FL1",
+  "leagueName": "Ligue 1",
+  "footballDataCode": "FL1",
+  "teamsCount": 18,
+  "roundsPerSeason": 34,
+  "scoreTtlSeconds": 120,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
+  "timezone": "Europe/Paris",
+  "maintenanceWindowUTC": "00:00"
+}

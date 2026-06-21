@@ -1,12 +1,12 @@
 // No auth here — Cloudflare Access handles it at the edge before this Worker runs.
 
 interface Env {
-  PL_DB: D1Database;  ELC_DB: D1Database;  PD_DB: D1Database;
-  PL_KV: KVNamespace; ELC_KV: KVNamespace; PD_KV: KVNamespace;
+  PL_DB: D1Database;  ELC_DB: D1Database;  PD_DB: D1Database;  BL1_DB: D1Database;  SA_DB: D1Database;  FL1_DB: D1Database;  DED_DB: D1Database;
+  PL_KV: KVNamespace; ELC_KV: KVNamespace; PD_KV: KVNamespace; BL1_KV: KVNamespace; SA_KV: KVNamespace; FL1_KV: KVNamespace; DED_KV: KVNamespace;
   // Same value as each league Worker's own ADMIN_TOKEN secret — needed to call
   // its public /admin/sync + /admin/probe-standings (season rollover actions).
   // Not needed for the phase buttons, which write the KV binding directly.
-  PL_ADMIN_TOKEN?: string; ELC_ADMIN_TOKEN?: string; PD_ADMIN_TOKEN?: string;
+  PL_ADMIN_TOKEN?: string; ELC_ADMIN_TOKEN?: string; PD_ADMIN_TOKEN?: string; BL1_ADMIN_TOKEN?: string; SA_ADMIN_TOKEN?: string; FL1_ADMIN_TOKEN?: string; DED_ADMIN_TOKEN?: string;
 }
 
 type SyncRow    = { dataset: string; synced_at: string; row_count: number };
@@ -33,11 +33,54 @@ const LEAGUES = [
     key: "pd", name: "La Liga", db: "PD_DB" as const, kv: "PD_KV" as const,
     url: "https://pd.sportsmanager.site", tokenEnv: "PD_ADMIN_TOKEN" as const,
   },
+  {
+    key: "bl1", name: "Bundesliga", db: "BL1_DB" as const, kv: "BL1_KV" as const,
+    url: "https://bl1.sportsmanager.site", tokenEnv: "BL1_ADMIN_TOKEN" as const,
+  },
+  {
+    key: "sa", name: "Serie A", db: "SA_DB" as const, kv: "SA_KV" as const,
+    url: "https://sa.sportsmanager.site", tokenEnv: "SA_ADMIN_TOKEN" as const,
+  },
+  {
+    key: "fl1", name: "Ligue 1", db: "FL1_DB" as const, kv: "FL1_KV" as const,
+    url: "https://fl1.sportsmanager.site", tokenEnv: "FL1_ADMIN_TOKEN" as const,
+  },
+  {
+    key: "ded", name: "Eredivisie", db: "DED_DB" as const, kv: "DED_KV" as const,
+    url: "https://ded.sportsmanager.site", tokenEnv: "DED_ADMIN_TOKEN" as const,
+  },
 ];
 
 function parseInt0(v: string | null): number {
   const n = parseInt(v ?? "0", 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+// Cheap, KV-only phase read — used by /overview to paint every league's
+// blocked/live status instantly on page load, without touching any D1 (the
+// per-league D1 + KV-gate detail stays behind the per-row "Details" click,
+// see fetchLeague below).
+async function fetchPhase(kv: KVNamespace): Promise<SeasonPhase> {
+  const v = await kv.get(PHASE_KEY);
+  return v === "closed" ? v : "live";
+}
+
+// Mirrors worker/src/seasonPhase.ts currentSeasonYear exactly (same fixtures
+// table, same derivation) — the season a manager would actually see if they
+// hit the league Worker right now. A single indexed lookup each, cheap
+// enough to include in /overview alongside the KV phase read.
+function seasonOfDate(d: Date): number {
+  const month = d.getUTCMonth() + 1;
+  return month >= 7 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+}
+
+async function fetchSeason(db: D1Database): Promise<number | null> {
+  const next = await db
+    .prepare(`SELECT kickoff FROM fixtures WHERE status NOT IN ('FINISHED','CANCELLED') ORDER BY kickoff ASC LIMIT 1`)
+    .first<{ kickoff: string }>();
+  if (next) return seasonOfDate(new Date(next.kickoff));
+  const latest = await db.prepare(`SELECT kickoff FROM fixtures ORDER BY kickoff DESC LIMIT 1`).first<{ kickoff: string }>();
+  return latest ? seasonOfDate(new Date(latest.kickoff)) : null;
 }
 
 async function fetchLeague(db: D1Database, kv: KVNamespace) {
@@ -110,29 +153,35 @@ self.addEventListener('fetch',(e)=>e.respondWith(fetch(e.request)));`;
 }
 
 function shellHtml(): Response {
-  const leagueSections = LEAGUES.map((l) => `
-    <section id="s-${l.key}">
-      <div class="league-header">
-        <h2>${l.name}</h2>
-        <button onclick="load('${l.key}')">Load</button>
-      </div>
-      <div id="d-${l.key}" class="league-data">—</div>
-      <h3>API control</h3>
-      <div class="toggle-row">
-        <button id="toggle-${l.key}" class="api-toggle" onclick="toggleApi('${l.key}')">—</button>
-        <span class="toggle-hint">One switch, mutually exclusive — live or blocked, never both.
-        Blocked = zero upstream calls, regardless of TTL/cron; serves whatever's cached, however
-        stale. Use it for a season-end freeze (most common) or to ride out a worker deploy/incident
-        without users seeing errors. Correctness is unaffected either way — every call is always
-        pinned to the right season.</span>
-      </div>
-      <div class="season-actions">
-        <input id="year-${l.key}" type="number" placeholder="auto (current season)" style="width:9em">
-        <button onclick="probeSeason('${l.key}')">Probe (read-only check)</button>
-        <button onclick="syncSeason('${l.key}')">Sync now (updates cache, switch unchanged)</button>
-      </div>
-      <div id="season-msg-${l.key}" class="season-msg"></div>
-    </section>`).join("");
+  // Static row skeleton — name/code are known at request time; the status
+  // badge and detail panel are filled in client-side (overview() / load()),
+  // so the page is interactive the instant the leagues list itself renders.
+  const rows = LEAGUES.map((l) => {
+    const search = (l.name + " " + l.key).toLowerCase();
+    return `
+      <tr class="league-row" data-key="${l.key}" data-search="${search}" data-phase="">
+        <td>${l.name}</td>
+        <td class="code">${l.key.toUpperCase()}</td>
+        <td id="season-${l.key}" class="season-col">—</td>
+        <td><button id="toggle-${l.key}" class="api-toggle" onclick="toggleApi('${l.key}')">…</button></td>
+        <td><button class="details-btn" onclick="toggleDetails('${l.key}')">Details ▾</button></td>
+      </tr>
+      <tr id="detail-row-${l.key}" class="detail-row" hidden>
+        <td colspan="5">
+          <div id="d-${l.key}" class="league-data">—</div>
+          <h3>Season actions</h3>
+          <div class="toggle-hint">Blocked = zero upstream calls, regardless of TTL/cron; serves
+          whatever's cached, however stale. Use it for a season-end freeze (most common) or to
+          ride out a worker deploy/incident without users seeing errors.</div>
+          <div class="season-actions">
+            <input id="year-${l.key}" type="number" placeholder="auto (current season)" style="width:9em">
+            <button onclick="probeSeason('${l.key}')">Probe (read-only check)</button>
+            <button onclick="syncSeason('${l.key}')">Sync now (cutover — replaces D1, switch unchanged)</button>
+          </div>
+          <div id="season-msg-${l.key}" class="season-msg"></div>
+        </td>
+      </tr>`;
+  }).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -149,11 +198,8 @@ function shellHtml(): Response {
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: ui-monospace, monospace; background: #0d0d0d; color: #e0e0e0;
-           padding: 1.5rem; font-size: 14px; max-width: 720px; }
-    h1 { font-size: 1.2rem; margin-bottom: 2rem; color: #fff; }
-    section { margin-bottom: 1.5rem; border: 1px solid #1e1e1e; border-radius: 6px; padding: 1rem; }
-    .league-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
-    h2 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; }
+           padding: 1.5rem; font-size: 14px; max-width: 920px; }
+    h1 { font-size: 1.2rem; margin-bottom: 1.2rem; color: #fff; }
     h3 { font-size: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em;
          margin: 0.8rem 0 0.4rem; }
     button { background: #1a1a1a; color: #e0e0e0; border: 1px solid #333;
@@ -162,9 +208,13 @@ function shellHtml(): Response {
     button:active { background: #222; }
     button:disabled { opacity: 0.4; cursor: default; }
     .league-data { color: #555; font-size: 12px; }
+    .toolbar { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    #filter { flex: 1; min-width: 12em; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid #1a1a1a; }
+    #overview-table { margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid #1a1a1a; }
     th { color: #444; font-weight: normal; font-size: 11px; text-transform: uppercase; }
+    td.code { color: #888; letter-spacing: 0.05em; }
     td.num { color: #6cf; }
     td.ts  { color: #888; }
     .missing { color: #553; }
@@ -175,23 +225,38 @@ function shellHtml(): Response {
     .season { color: #e0e0e0; margin-top: 0.6rem; font-size: 13px; }
     .next   { color: #888; font-size: 12px; margin-top: 0.2rem; margin-bottom: 0.2rem; }
     .fetched { color: #333; font-size: 11px; margin-top: 0.6rem; }
-    .toggle-row { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.7rem; }
-    .toggle-hint { font-size: 11px; color: #777; line-height: 1.4; padding-top: 0.3rem; }
-    .api-toggle { flex-shrink: 0; min-width: 9.5em; font-size: 12px; font-weight: bold;
-                  padding: 0.5rem 0.8rem; border-radius: 6px; cursor: pointer; }
+    .toggle-hint { font-size: 11px; color: #777; line-height: 1.4; margin-bottom: 0.6rem; }
+    .api-toggle { min-width: 8em; font-size: 11px; font-weight: bold;
+                  padding: 0.35rem 0.6rem; border-radius: 6px; cursor: pointer; }
     .api-toggle.live    { background: #0d1a0d; color: #4f4; border: 1px solid #2a5; }
     .api-toggle.closed  { background: #260d0d; color: #f55; border: 1px solid #722; }
     .season-actions { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
-    input { background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px;
+    input, select { background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px;
             padding: 0.3rem 0.5rem; font-family: inherit; font-size: 12px; }
     .season-msg { font-size: 11px; color: #888; white-space: pre-wrap; }
+    .detail-row td { padding-top: 0.8rem; padding-bottom: 1rem; background: #111; }
+    .count { color: #555; font-size: 12px; margin-left: 0.4rem; }
   </style>
 </head>
 <body>
   <h1>⚽ LMS Dashboard</h1>
-  ${leagueSections}
+  <div class="toolbar">
+    <input id="filter" type="text" placeholder="Filter by league name or code…" oninput="applyFilter()">
+    <select id="statusFilter" onchange="applyFilter()">
+      <option value="all">All statuses</option>
+      <option value="live">🟢 Live only</option>
+      <option value="closed">🔴 Blocked only</option>
+    </select>
+    <span class="count" id="rowCount"></span>
+  </div>
+  <table id="overview-table">
+    <thead><tr><th>League</th><th>Code</th><th>Season</th><th>Status</th><th></th></tr></thead>
+    <tbody id="overview-body">${rows}</tbody>
+  </table>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+    const loaded = new Set();
 
     function esc(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -204,13 +269,61 @@ function shellHtml(): Response {
       });
     }
 
+    // Instant, KV-only status for every league — no D1 touched, so this is
+    // cheap regardless of how many leagues are configured.
+    function fmtSeason(season) {
+      if (season === null || season === undefined) return '—';
+      return season + '/' + String(season + 1).slice(-2);
+    }
+
+    async function loadOverview() {
+      try {
+        const d = await fetch('/overview').then(r => r.json());
+        d.leagues.forEach(l => {
+          setToggle(l.key, l.phase);
+          document.querySelector('tr[data-key="' + l.key + '"]').dataset.phase = l.phase;
+          document.getElementById('season-' + l.key).textContent = fmtSeason(l.season);
+        });
+        applyFilter();
+      } catch (e) {
+        document.getElementById('rowCount').textContent = 'Error loading overview: ' + e.message;
+      }
+    }
+
+    function applyFilter() {
+      const q = document.getElementById('filter').value.toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+      let shown = 0;
+      document.querySelectorAll('#overview-body > tr.league-row').forEach(tr => {
+        const matchesText = tr.dataset.search.includes(q);
+        const matchesStatus = status === 'all' || tr.dataset.phase === status;
+        const visible = matchesText && matchesStatus;
+        tr.style.display = visible ? '' : 'none';
+        if (visible) shown++;
+        const detail = document.getElementById('detail-row-' + tr.dataset.key);
+        if (detail && !visible) detail.hidden = true;
+      });
+      document.getElementById('rowCount').textContent = shown + ' league' + (shown === 1 ? '' : 's');
+    }
+
+    // D1 + KV-gate detail, lazy — only fetched the first time a row is
+    // expanded, exactly like the old per-league "Load" button.
+    async function toggleDetails(key) {
+      const row = document.getElementById('detail-row-' + key);
+      row.hidden = !row.hidden;
+      if (!row.hidden && !loaded.has(key)) {
+        loaded.add(key);
+        await load(key);
+      }
+    }
+
     async function load(key) {
-      const btn = document.querySelector('#s-' + key + ' button');
       const out = document.getElementById('d-' + key);
-      btn.disabled = true; btn.textContent = '…';
+      out.textContent = 'Loading…';
       try {
         const d = await fetch('/data/' + key).then(r => r.json());
         setToggle(key, d.phase);
+        document.querySelector('tr[data-key="' + key + '"]').dataset.phase = d.phase;
 
         // D1 sync table
         const datasets = ['fixtures','standings','teams'];
@@ -223,7 +336,6 @@ function shellHtml(): Response {
 
         // Fixture status breakdown
         const finished  = d.statusCounts.find(s => s.status === 'FINISHED')?.cnt  ?? 0;
-        const scheduled = d.statusCounts.find(s => s.status === 'TIMED' || s.status === 'SCHEDULED');
         const inPlay    = d.statusCounts.find(s => s.status === 'IN_PLAY')?.cnt   ?? 0;
         const total     = d.statusCounts.reduce((a, s) => a + s.cnt, 0);
         const nextFix   = d.nextFixture
@@ -255,18 +367,17 @@ function shellHtml(): Response {
           + '<h3>KV — gates</h3>'
           + '<table><thead><tr><th>Resource</th><th>call/refresh</th><th>Status</th><th>Last reset</th></tr></thead><tbody>'+gateRows+'</tbody></table>'
           + '<div style="margin-top:0.5rem">'+cacheNote+'</div>'
-          + '<div class="fetched">Fetched '+esc(d.fetchedAt)+'</div>';
+          + '<div class="fetched">Fetched '+esc(d.fetchedAt)+' · <a href="#" onclick="loaded.delete(\\''+key+'\\'); load(\\''+key+'\\'); return false;" style="color:#6cf">Refresh</a></div>';
       } catch(e) {
         out.textContent = 'Error: ' + e.message;
-      } finally {
-        btn.disabled = false; btn.textContent = 'Refresh';
       }
     }
 
     function setToggle(key, phase) {
       const btn = document.getElementById('toggle-' + key);
       const isLive = phase !== 'closed';
-      btn.textContent = isLive ? '🟢 LIVE — tap to block' : '🔴 BLOCKED — serving stale, tap to go live';
+      btn.textContent = isLive ? '🟢 LIVE' : '🔴 BLOCKED';
+      btn.title = isLive ? 'Tap to block' : 'Tap to go live';
       btn.className = 'api-toggle ' + (isLive ? 'live' : 'closed');
       btn.dataset.phase = isLive ? 'live' : 'closed';
     }
@@ -274,16 +385,17 @@ function shellHtml(): Response {
     async function toggleApi(key) {
       const btn = document.getElementById('toggle-' + key);
       const next = btn.dataset.phase === 'closed' ? 'live' : 'closed';
-      const msg = document.getElementById('season-msg-' + key);
-      msg.textContent = 'Setting to ' + next + '…';
       try {
         const r = await fetch('/action/' + key + '/phase?value=' + next, { method: 'POST' }).then(r => r.json());
-        if (!r.ok) { msg.textContent = 'Error: ' + (r.error || 'unknown'); return; }
+        if (!r.ok) { alert('Error: ' + (r.error || 'unknown')); return; }
         setToggle(key, r.phase);
-        msg.textContent = r.phase === 'closed'
+        document.querySelector('tr[data-key="' + key + '"]').dataset.phase = r.phase;
+        applyFilter();
+        const msg = document.getElementById('season-msg-' + key);
+        if (msg) msg.textContent = r.phase === 'closed'
           ? 'Blocked — serving cached data only, no upstream calls.'
           : 'Live — normal polling resumed.';
-      } catch (e) { msg.textContent = 'Error: ' + e.message; }
+      } catch (e) { alert('Error: ' + e.message); }
     }
 
     async function probeSeason(key) {
@@ -302,14 +414,25 @@ function shellHtml(): Response {
     async function syncSeason(key) {
       const msg = document.getElementById('season-msg-' + key);
       const year = document.getElementById('year-' + key).value;
-      if (!confirm('Sync ' + (year || 'current season') + ' for ' + key.toUpperCase() + ' now?\\n\\nThis replaces teams/fixtures/standings in D1 immediately. Phase is left exactly as it is — this does not go Live.')) return;
+      if (!confirm('Sync ' + (year || 'current season') + ' for ' + key.toUpperCase() + ' now?\\n\\nThis REPLACES teams/fixtures/standings in D1 with exactly this fetch — any other season currently stored is dropped. Phase is left exactly as it is — this does not go Live.')) return;
       msg.textContent = 'Syncing ' + (year || 'current season') + '…';
       try {
         const q = year ? ('?season=' + year) : '';
         const r = await fetch('/action/' + key + '/sync' + q, { method: 'POST' }).then(r => r.json());
         msg.textContent = r.ok ? 'Synced: ' + JSON.stringify(r.synced) + '.' : 'Sync failed: ' + JSON.stringify(r);
+        loaded.delete(key); // detail panel is stale now — force a refetch next expand
+        if (r.ok) {
+          // The overview's Season column may have just changed (a cutover) —
+          // refresh that one cell rather than the whole table.
+          fetch('/overview').then(r => r.json()).then(d => {
+            const row = d.leagues.find(l => l.key === key);
+            if (row) document.getElementById('season-' + key).textContent = fmtSeason(row.season);
+          });
+        }
       } catch (e) { msg.textContent = 'Error: ' + e.message; }
     }
+
+    loadOverview();
   </script>
 </body>
 </html>`;
@@ -369,6 +492,22 @@ export default {
     if (pathname === "/sw.js")         return serviceWorkerJs();
     if (pathname === "/icon.svg")      return iconSvg();
 
+    // Bulk overview for the table — one cheap KV read + one indexed D1
+    // lookup per league, in parallel. Still light enough to populate
+    // instantly regardless of how many leagues exist (no full scans, no
+    // joins) — the heavier sync/gate detail stays behind "Details".
+    if (pathname === "/overview") {
+      const rows = await Promise.all(
+        LEAGUES.map(async (l) => ({
+          key: l.key,
+          name: l.name,
+          phase: await fetchPhase(env[l.kv]),
+          season: await fetchSeason(env[l.db]),
+        })),
+      );
+      return Response.json({ leagues: rows });
+    }
+
     if (pathname.startsWith("/data/")) {
       const key = pathname.slice(6);
       const league = LEAGUES.find((l) => l.key === key);
@@ -383,7 +522,7 @@ export default {
       });
     }
 
-    const actionMatch = pathname.match(/^\/action\/([a-z]+)\/(phase|sync|probe)$/);
+    const actionMatch = pathname.match(/^\/action\/([a-z0-9]+)\/(phase|sync|probe)$/);
     if (actionMatch && req.method === "POST") {
       const [, key, action] = actionMatch;
       const league = LEAGUES.find((l) => l.key === key);

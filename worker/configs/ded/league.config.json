@@ -1,0 +1,12 @@
+{
+  "leagueId": "DED",
+  "leagueName": "Eredivisie",
+  "footballDataCode": "DED",
+  "teamsCount": 18,
+  "roundsPerSeason": 34,
+  "scoreTtlSeconds": 120,
+  "standingsTtlSeconds": 1800,
+  "fixturesTtlSeconds": 14400,
+  "timezone": "Europe/Amsterdam",
+  "maintenanceWindowUTC": "05:00"
+}

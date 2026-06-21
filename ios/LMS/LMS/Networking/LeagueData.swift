@@ -88,6 +88,15 @@ struct LeagueData {
 
         let metaById = Dictionary(fixtures.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let items = scores.map { ScoreItem(score: $0, fixture: metaById[$0.id], leagueId: league.id) }
+        // Same empty-response guard as cachedTeams/cachedFixtures: a "blocked"
+        // league or a transient upstream hiccup must never look like the
+        // scores cache just emptied out. recordLivePull still happens either
+        // way — the throttle clock reflects the pull attempt, not its outcome.
+        let existing = LeagueDataCache.load(LeagueDataCache.Scores.self, key: LeagueDataCache.scoresKey(league.id))
+        if items.isEmpty, let existing, !existing.items.isEmpty {
+            LeagueDataCache.recordLivePull(league.id)
+            return (existing.items, existing.teams)
+        }
         LeagueDataCache.save(
             LeagueDataCache.Scores(date: Date(), items: items, teams: teams),
             key: LeagueDataCache.scoresKey(league.id)
@@ -121,6 +130,14 @@ struct LeagueData {
             let client = league.client
             guard let rows = try? await client.standings(),
                   let teams = try? await client.teams() else { continue }
+            // Same empty-response guard as cachedTeams/cachedFixtures — a
+            // "blocked" league must keep its last real table, not show blank.
+            if rows.isEmpty {
+                let key = LeagueDataCache.standingsKey(league.id)
+                if let existing = LeagueDataCache.load(LeagueDataCache.Standings.self, key: key), !existing.rows.isEmpty {
+                    continue
+                }
+            }
             LeagueDataCache.save(
                 LeagueDataCache.Standings(date: Date(), rows: rows, teams: teams),
                 key: LeagueDataCache.standingsKey(league.id)
@@ -139,20 +156,27 @@ struct LeagueData {
         case .hit(let cached) where LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.teams):
             return cached.items
         case .hit(let cached):
-            return (try? await fetchTeams(league, key: key)) ?? cached.items
+            return (try? await fetchTeams(league, key: key, fallback: cached.items)) ?? cached.items
         case .empty, .corrupt:
-            return try await fetchTeams(league, key: key)
+            return try await fetchTeams(league, key: key, fallback: [])
         }
     }
 
-    private static func fetchTeams(_ league: LeagueOption, key: String) async throws -> [TeamDTO] {
+    // `fallback` covers a *successful but empty* response (e.g. the league is in
+    // its close-season "blocked" window — see seasonPhase.ts — and the Worker is
+    // correctly serving its current store as-is). That must never overwrite a
+    // cache that already has real data; only a genuinely fresh/non-empty result
+    // gets written. A network failure is handled separately, by the caller's `try?`.
+    private static func fetchTeams(_ league: LeagueOption, key: String, fallback: [TeamDTO]) async throws -> [TeamDTO] {
         let teams = try await league.client.teams()
+        if teams.isEmpty, !fallback.isEmpty { return fallback }
         LeagueDataCache.save(LeagueDataCache.Teams(date: Date(), items: teams), key: key)
         return teams
     }
 
     /// Fixtures: functional/free. Cache-first within TTL. Falls back to a stale
-    /// copy on a fetch failure when one exists.
+    /// copy on a fetch failure, or on a successful-but-empty response, when one
+    /// exists — see the `fallback` note on `fetchTeams` above; same reasoning.
     private static func cachedFixtures(for league: LeagueOption) async throws -> [FixtureDTO] {
         let key = LeagueDataCache.fixturesKey(league.id)
         let cached = LeagueDataCache.load(LeagueDataCache.Fixtures.self, key: key)
@@ -161,6 +185,7 @@ struct LeagueData {
         }
         do {
             let fixtures = try await league.client.fixtures()
+            if fixtures.isEmpty, let cached { return cached.items }
             LeagueDataCache.save(LeagueDataCache.Fixtures(date: Date(), items: fixtures), key: key)
             return fixtures
         } catch {

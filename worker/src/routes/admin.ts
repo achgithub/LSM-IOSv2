@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { requireAdmin } from "../auth";
+import { requireAdmin, requireOps } from "../auth";
+import { pruneOrphanedTeams } from "../db";
 import { FootballDataProvider } from "../football";
 import { refreshMatchData, refreshStandings } from "../refresh";
 import { currentSeasonYear, getSeasonPhase, setSeasonPhase, type SeasonPhase } from "../seasonPhase";
-import { syncTeams } from "../sync";
+import { runMaintenance, syncTeams } from "../sync";
 import { getLeagueConfig } from "../types";
 
 // Admin endpoint to trigger a provider sync on demand (ops / first seed, or
@@ -51,6 +52,10 @@ admin.post("/sync", async (c) => {
   if (what === "all" || what === "standings") {
     synced.standings = await refreshStandings(c.env.DB, provider, season);
   }
+  // Same ordering rationale as runMaintenance: prune only after fixtures/
+  // standings exist, so a brand-new league's just-inserted teams aren't
+  // deleted before anything references them.
+  if (what === "all") await pruneOrphanedTeams(c.env.DB);
 
   return c.json({ ok: true, synced });
 });
@@ -80,6 +85,45 @@ admin.get("/probe-standings", async (c) => {
   } catch (err) {
     return c.json({ ok: false, season, error: String(err) }, 502);
   }
+});
+
+// Self-gating maintenance trigger, called by worker-registry's single shared
+// orchestrator cron (not by a per-league Cloudflare Cron Trigger — see
+// sync.ts runMaintenance doc and worker-registry). Each league decides for
+// itself whether "now" is its own MAINTENANCE_WINDOW_UTC hour; the orchestrator
+// just pings every league on a short interval and lets this no-op the rest of
+// the time. Keeps the Cloudflare cron-trigger count flat (1, total) no matter
+// how many leagues exist.
+//
+//   POST /admin/sync-if-due
+//   Authorization: Bearer <OPS_SYNC_TOKEN>
+const MAINTENANCE_LAST_RUN_KEY = "maintenance:lastRunDate";
+
+admin.post("/sync-if-due", async (c) => {
+  if (!requireOps(c.env, c.req.header("Authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const now = new Date();
+  const currentHour = `${now.getUTCHours().toString().padStart(2, "0")}:00`;
+  if (currentHour !== c.env.MAINTENANCE_WINDOW_UTC) {
+    return c.json({ ok: true, skipped: true });
+  }
+  // The orchestrator pings every league every 15-30 min, so the matching hour
+  // can be hit several times — guard with a once-per-day marker so a single
+  // day's window only ever runs the real upstream sync once.
+  const today = now.toISOString().slice(0, 10);
+  if ((await c.env.SCORES.get(MAINTENANCE_LAST_RUN_KEY)) === today) {
+    return c.json({ ok: true, skipped: true });
+  }
+  const cfg = getLeagueConfig(c.env);
+  const provider = new FootballDataProvider(
+    c.env.FOOTBALL_DATA_TOKEN,
+    cfg.footballDataCode,
+    cfg.leagueId,
+  );
+  await runMaintenance(c.env.DB, c.env.SCORES, provider);
+  await c.env.SCORES.put(MAINTENANCE_LAST_RUN_KEY, today);
+  return c.json({ ok: true, skipped: false });
 });
 
 // Season-phase flag (live | closed — see seasonPhase.ts). A PURE cost switch:
