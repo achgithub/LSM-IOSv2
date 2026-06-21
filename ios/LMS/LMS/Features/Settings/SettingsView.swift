@@ -59,7 +59,7 @@ struct SettingsView: View {
                     LabeledContent("Plan", value: entitlements.tier.label)
                     Text(entitlements.tier.detail)
                         .font(.caption).foregroundStyle(.secondary)
-                    if entitlements.tier != .unlimited {
+                    if entitlements.tier != .leagues7 {
                         Button("Upgrade") { showPaywall = true }
                     }
                     Button("Restore Purchases") {
@@ -77,7 +77,7 @@ struct SettingsView: View {
                     Picker("Simulate tier", selection: tierBinding) {
                         ForEach(Tier.allCases) { Text($0.label).tag($0) }
                     }
-                    Text("Flips ad-on / ad-off + league allowance without a purchase. Free/No Ads = 1, 3 Leagues = 3, Unlimited = all.")
+                    Text("Flips ad-on / ad-off + league allowance without a purchase. Free/No Ads = 1, then 3 / 5 / 7 leagues by tier.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 #endif

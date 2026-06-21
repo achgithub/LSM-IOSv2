@@ -3,10 +3,9 @@ import Foundation
 import RevenueCat
 #endif
 
-/// A subscription's billing length. Distinct from `Tier`: a tier is the
-/// *entitlement* (what access it grants); a `PurchaseOption` is the actual
-/// purchasable RevenueCat package — one tier can offer more than one billing
-/// length (only Unlimited does today; 3 Leagues is named ready for one later).
+/// A subscription's billing length. Monthly only for now (no annual option on
+/// any tier) — kept as an enum, not collapsed away, so adding an annual option
+/// to a tier later is a RevenueCat + `PurchaseOption.all` change, not a rename.
 enum BillingPeriod: String {
     case monthly
     case annual
@@ -15,9 +14,9 @@ enum BillingPeriod: String {
 /// One purchasable package: a tier + billing length. Maps to a RevenueCat
 /// package identifier — `"<tier>"` for No Ads (it will never have an annual
 /// option, so no suffix is needed), `"<tier>_<period>"` for everything else
-/// (suffixed even where only one length exists today, e.g. "three_league_monthly",
-/// so adding an annual option later is a RevenueCat-only change, no app-side
-/// rename). Multiple options can share a `Tier` (and so the same RevenueCat
+/// (suffixed even though only monthly exists today, e.g. "leagues_3_monthly",
+/// so adding annual later is a RevenueCat-only change, no app-side rename).
+/// Multiple options can share a `Tier` (and so the same RevenueCat
 /// entitlement) — purchasing either grants the same access.
 struct PurchaseOption: Identifiable, Hashable {
     let tier: Tier
@@ -32,9 +31,9 @@ struct PurchaseOption: Identifiable, Hashable {
     /// duration for a tier here only — no other code needs to change.
     static let all: [PurchaseOption] = [
         PurchaseOption(tier: .noAds, period: .monthly),
-        PurchaseOption(tier: .threeLeague, period: .monthly),
-        PurchaseOption(tier: .unlimited, period: .monthly),
-        PurchaseOption(tier: .unlimited, period: .annual),
+        PurchaseOption(tier: .leagues3, period: .monthly),
+        PurchaseOption(tier: .leagues5, period: .monthly),
+        PurchaseOption(tier: .leagues7, period: .monthly),
     ]
 }
 
@@ -126,16 +125,17 @@ final class PurchaseService {
 
     #if canImport(RevenueCat)
     private static func tier(from info: CustomerInfo) -> Tier {
-        if info.entitlements[Entitlements.entitlementUnlimited]?.isActive == true { return .unlimited }
-        if info.entitlements[Entitlements.entitlementThreeLeague]?.isActive == true { return .threeLeague }
+        if info.entitlements[Entitlements.entitlementLeagues7]?.isActive == true { return .leagues7 }
+        if info.entitlements[Entitlements.entitlementLeagues5]?.isActive == true { return .leagues5 }
+        if info.entitlements[Entitlements.entitlementLeagues3]?.isActive == true { return .leagues3 }
         if info.entitlements[Entitlements.entitlementNoAds]?.isActive == true { return .noAds }
         return .free
     }
 
     /// Maps a purchase option to its RevenueCat package by `packageId`. TODO:
     /// confirm these identifiers in the RevenueCat dashboard match
-    /// `PurchaseOption.packageId` (e.g. "no_ads", "three_league_monthly",
-    /// "unlimited_monthly", "unlimited_annual").
+    /// `PurchaseOption.packageId` (e.g. "no_ads", "leagues_3_monthly",
+    /// "leagues_5_monthly", "leagues_7_monthly").
     private static func package(for option: PurchaseOption, in offerings: Offerings) -> Package? {
         let packages = offerings.current?.availablePackages ?? []
         return packages.first { $0.identifier == option.packageId }

@@ -3,12 +3,13 @@ import Observation
 
 /// Subscription tiers (see docs/pricing-model.md for the priced ladder).
 /// RevenueCat entitlement identifiers MUST match the raw values `no_ads` /
-/// `three_league` / `unlimited`.
+/// `leagues_3` / `leagues_5` / `leagues_7`.
 enum Tier: String, CaseIterable, Identifiable {
     case free
     case noAds = "no_ads"
-    case threeLeague = "three_league"
-    case unlimited
+    case leagues3 = "leagues_3"
+    case leagues5 = "leagues_5"
+    case leagues7 = "leagues_7"
 
     var id: String { rawValue }
 
@@ -16,8 +17,9 @@ enum Tier: String, CaseIterable, Identifiable {
         switch self {
         case .free: return AppString("Free")
         case .noAds: return AppString("No Ads")
-        case .threeLeague: return AppString("3 Leagues")
-        case .unlimited: return AppString("Unlimited")
+        case .leagues3: return AppString("3 Leagues")
+        case .leagues5: return AppString("5 Leagues")
+        case .leagues7: return AppString("7 Leagues")
         }
     }
 
@@ -25,8 +27,9 @@ enum Tier: String, CaseIterable, Identifiable {
         switch self {
         case .free: return AppString("Ad-supported · 1 league")
         case .noAds: return AppString("Ads removed · 1 league")
-        case .threeLeague: return AppString("Ads removed · 3 leagues")
-        case .unlimited: return AppString("Ads removed · all leagues, today and as we add more")
+        case .leagues3: return AppString("Ads removed · 3 leagues")
+        case .leagues5: return AppString("Ads removed · 5 leagues")
+        case .leagues7: return AppString("Ads removed · 7 leagues")
         }
     }
 
@@ -35,8 +38,9 @@ enum Tier: String, CaseIterable, Identifiable {
 }
 
 /// App-wide entitlement state. In production the tier comes from RevenueCat; a
-/// dev override lets you flip free / no_ads / pro on-device to test ad-on vs
-/// ad-off without a real purchase (same approach as the darts EntitlementsService).
+/// dev override lets you flip between any `Tier` on-device (ads on/off, league
+/// allowance) without a real purchase (same approach as the darts
+/// EntitlementsService).
 @Observable @MainActor
 final class Entitlements {
     static let shared = Entitlements()
@@ -47,8 +51,9 @@ final class Entitlements {
 
     // RevenueCat entitlement identifiers (match the dashboard + Tier raw values).
     static let entitlementNoAds = Tier.noAds.rawValue
-    static let entitlementThreeLeague = Tier.threeLeague.rawValue
-    static let entitlementUnlimited = Tier.unlimited.rawValue
+    static let entitlementLeagues3 = Tier.leagues3.rawValue
+    static let entitlementLeagues5 = Tier.leagues5.rawValue
+    static let entitlementLeagues7 = Tier.leagues7.rawValue
 
     private static let devTierKey = "devTierOverride"
 
@@ -68,15 +73,18 @@ final class Entitlements {
     var shouldShowAds: Bool { !tier.removesAds }
 
     /// How many leagues the user may have enabled at once (ticked in Settings).
-    /// Free / No Ads = 1, 3 Leagues = up to 3, Unlimited = the whole catalogue.
-    /// Capped at the number of leagues that actually exist so a small catalogue
-    /// never claims more than it has. Change tier→count here only.
+    /// Free / No Ads = 1, then 3 / 5 / 7 leagues by tier — a fixed step ladder,
+    /// not "all leagues", so price always tracks exactly what's enabled even as
+    /// the league catalogue grows past 7 (see docs/pricing-model.md). Capped at
+    /// the number of leagues that actually exist so a small catalogue never
+    /// claims more than it has. Change tier→count here only.
     var leagueAllowance: Int {
         switch tier {
-        case .free:       return 1
-        case .noAds:       return 1
-        case .threeLeague: return min(3, Leagues.all.count)
-        case .unlimited:   return Leagues.all.count
+        case .free:     return 1
+        case .noAds:    return 1
+        case .leagues3: return min(3, Leagues.all.count)
+        case .leagues5: return min(5, Leagues.all.count)
+        case .leagues7: return min(7, Leagues.all.count)
         }
     }
 

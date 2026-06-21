@@ -4,8 +4,8 @@ import Foundation
 /// The leagues the user has enabled (ticked in Settings). A game can use any of
 /// these; Scores/Standings browse among them. How many can be enabled at once is
 /// capped by the subscription (`Entitlements.leagueAllowance`): Free/No Ads = 1,
-/// 3 Leagues = 3, Unlimited = the whole catalogue. Persisted in UserDefaults;
-/// never empty (falls back to the home league). Observe via
+/// then 3 / 5 / 7 leagues by tier — a fixed step ladder, not the whole catalogue.
+/// Persisted in UserDefaults; never empty (falls back to the home league). Observe via
 /// `@Environment(EnabledLeagues.self)`.
 @Observable @MainActor
 final class EnabledLeagues {

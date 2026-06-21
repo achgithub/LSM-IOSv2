@@ -1,19 +1,25 @@
 # Pricing model
 
-Status: **decided (2026-06-18)**. Supersedes any earlier £2.99/£4.49/£5.99
-"Manager/Club/Pro" ladder mentioned in older notes — this is current.
+Status: **decided (2026-06-21)**, supersedes the 2026-06-18 Free/No Ads/3
+Leagues/Unlimited ladder below, which itself superseded an earlier
+£2.99/£4.49/£5.99 "Manager/Club/Pro" ladder — this is current.
 
 ## The ladder
 
-| Tier | Leagues | UK (£) | Eurozone (€) |
+| Tier | Leagues | UK (£/mo) | Eurozone (€/mo) |
 |---|---|---|---|
 | Free | 1 (home league, PL by default) | £0 (ads) | €0 |
-| No Ads | 1 league | £2.49/mo | €2.99/mo |
-| 3 Leagues | 3 leagues | £3.49/mo | €3.99/mo |
-| Unlimited | all leagues (= 3 today, grows with the catalogue) | £5.99/mo or £42.00/yr | €6.49/mo or €42.50/yr |
+| No Ads | 1 league | £2.49 | €2.99 |
+| 3 Leagues | 3 leagues | £3.49 | €3.99 |
+| 5 Leagues | 5 leagues | £4.49 | €4.99 |
+| 7 Leagues | 7 leagues | £5.49 | €5.99 |
 
-- Eurozone is GBP face-value **+€0.50**, not an FX conversion — set per-region in
-  App Store Connect, not computed.
+- Each step is the previous tier's UK price **+50p per added league**
+  (£2.49 base, +50p × leagues beyond 1); Eurozone is the UK face-value
+  **+€0.50**, not an FX conversion — set per-region in App Store Connect,
+  not computed.
+- **No annual option on any tier for now** — monthly only at launch; revisit
+  once there's real usage/conversion data.
 - USD pricing not yet decided — separate task before US launch.
 - **No mid-season price hikes on existing subscribers.** Apple grandfathers
   existing subscribers when you raise a price anyway — a hike only ever
@@ -22,37 +28,56 @@ Status: **decided (2026-06-18)**. Supersedes any earlier £2.99/£4.49/£5.99
   experiment; revisit the ladder between seasons using real RevenueCat
   conversion data, not more modelling.
 
+## Why there's no "Unlimited" tier
+
+The earlier ladder topped out at a flat-rate "Unlimited (all leagues)" tier.
+Dropped (2026-06-21) because it doesn't scale safely: the league catalogue
+is designed to grow well past today's 7 leagues (see the generic league
+architecture) — potentially toward leagues with real per-call/metered data
+costs, not football-data.org's flat-rate plan. A flat "Unlimited" price would
+mean a subscriber paying today's rate could end up entitled to refresh an
+arbitrarily large, arbitrarily expensive future catalogue at no extra cost
+to them. Capping the top tier at a fixed league count (7, picked because
+it equals today's full catalogue) means **price always tracks exactly what
+a subscriber is entitled to enable** — same mechanism the 3-League tier
+already used (pick any N from the catalogue via the Settings checklist),
+just extended up the ladder. The tradeoff: someone wanting more than 7
+leagues today has no path until a higher step is added — deliberately
+deferred ("revisit higher after some time live and responding to any
+requests").
+
 ## Known temporary gap
 
-"3 Leagues" and "Unlimited" are functionally identical right now — only 3
-leagues exist (PL/ELC/PD). Unlimited is priced on *future* value (the
-catalogue is built to grow past 3 — see the generic league architecture),
-not on current cost-to-serve, since extra leagues barely move infra cost
-(see below). Expect close to zero real differentiation or uptake for
-Unlimited until a 4th+ league ships — that's expected, not a bug.
+3/5/7 Leagues are progressively less differentiated right now since only 7
+leagues exist (PL/ELC/PD/Bundesliga/Serie A/Ligue 1/Eredivisie) — the 7
+Leagues tier is currently identical in practice to "all leagues". That's
+expected, not a bug: the ladder is priced for a catalogue that's expected to
+keep growing, not for today's exact league count.
 
-## Implementation status (app side done, 2026-06-18)
+## Implementation status (app side done, 2026-06-21)
 
-`Entitlements.Tier` is `free` / `no_ads` / `three_league` / `unlimited`,
-matching this ladder. `PurchaseOption` (tier + `BillingPeriod`) represents
-one purchasable RevenueCat package — needed because Unlimited offers two
-billing lengths sharing one entitlement.
+`Entitlements.Tier` is `free` / `no_ads` / `leagues_3` / `leagues_5` /
+`leagues_7`, matching this ladder. `PurchaseOption` (tier + `BillingPeriod`)
+represents one purchasable RevenueCat package; only `.monthly` options exist
+today, but the type stays in place so adding `.annual` to a tier later is a
+RevenueCat + `PurchaseOption.all` change, not a rename.
 
-**RevenueCat/App Store Connect package identifiers to create** (4 products,
-not the 6 first floated — No Ads and 3 Leagues don't get an annual option
-at launch):
+**RevenueCat/App Store Connect package identifiers to create** (4 products):
 
 | Package id | Tier (entitlement) | Billing |
 |---|---|---|
 | `no_ads` | `no_ads` | monthly (no suffix — will never have an annual option) |
-| `three_league_monthly` | `three_league` | monthly (suffixed now so adding annual later needs no app change) |
-| `unlimited_monthly` | `unlimited` | monthly |
-| `unlimited_annual` | `unlimited` | annual, £42.00/yr |
+| `leagues_3_monthly` | `leagues_3` | monthly (suffixed now so adding annual later needs no app change) |
+| `leagues_5_monthly` | `leagues_5` | monthly |
+| `leagues_7_monthly` | `leagues_7` | monthly |
 
 Still open: confirm these exact identifiers in the RevenueCat dashboard
 match `PurchaseOption.packageId`; set the real API key
 (`PurchaseService.apiKey`); add the SPM packages in Xcode (RevenueCat +
 Google Mobile Ads) — see [[lms-monetization]] for that activation checklist.
+**Both RevenueCat and AdMob are deliberately not yet configured** (test
+AdMob IDs, placeholder RevenueCat key) — pre-release state, tracked in
+[[lms-release-security-checklist]].
 
 ## The cost/revenue model behind the decision
 

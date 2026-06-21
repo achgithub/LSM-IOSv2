@@ -76,9 +76,9 @@ struct LeagueDowngradeView: View {
 
                 #if DEBUG
                 Section {
-                    Button("Simulate Unlimited (testing)") { entitlements.setDevTier(.unlimited) }
+                    Button("Simulate 7 Leagues (testing)") { entitlements.setDevTier(.leagues7) }
                 } footer: {
-                    Text("Dev only: unlock all leagues without a purchase (persists across rebuilds).")
+                    Text("Dev only: unlock the top league tier without a purchase (persists across rebuilds).")
                 }
                 #endif
             }

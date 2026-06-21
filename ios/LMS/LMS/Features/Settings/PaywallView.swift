@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// The in-app upgrade screen — the path the Settings "Upgrade" copy now leads to.
-/// One section per paid tier (No Ads, 3 Leagues, Unlimited), each listing its
-/// purchasable `PurchaseOption`s (Unlimited has both Monthly and Annual) with a
-/// Subscribe button, plus Restore. Always reports the outcome (success / failure
-/// / unavailable) via an alert so a tap is never a silent no-op. Until RevenueCat
-/// is linked + a real key is set, purchases resolve to `.unavailable` and the
-/// user is told so, rather than nothing happening.
+/// One section per paid tier (No Ads, 3 Leagues, 5 Leagues, 7 Leagues), each
+/// listing its purchasable `PurchaseOption`s (monthly only, no annual yet) with
+/// a Subscribe button, plus Restore. Always reports the outcome (success /
+/// failure / unavailable) via an alert so a tap is never a silent no-op. Until
+/// RevenueCat is linked + a real key is set, purchases resolve to `.unavailable`
+/// and the user is told so, rather than nothing happening.
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(Entitlements.self) private var entitlements
@@ -19,7 +19,7 @@ struct PaywallView: View {
     /// in the UK, €2.99 in the Eurozone) without any region logic in the app.
     @State private var prices: [PurchaseOption: String] = [:]
 
-    private let paidTiers: [Tier] = [.noAds, .threeLeague, .unlimited]
+    private let paidTiers: [Tier] = [.noAds, .leagues3, .leagues5, .leagues7]
 
     private func options(for tier: Tier) -> [PurchaseOption] {
         PurchaseOption.all.filter { $0.tier == tier }
