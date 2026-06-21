@@ -38,7 +38,7 @@ struct SummaryCardView: View {
                 .fill(accent)
                 .frame(width: 64, height: 64)
                 .overlay(
-                    Text("LMS")
+                    Text("LSM")
                         .font(.system(size: 22, weight: .heavy, design: .rounded))
                         .foregroundStyle(bg)
                 )
