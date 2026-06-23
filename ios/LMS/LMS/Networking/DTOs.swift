@@ -15,27 +15,48 @@ struct TeamDTO: Codable, Identifiable {
     let leagueId: String
 }
 
-// Codable (not just Decodable) so the league-data cache can persist fixtures to
+// Codable (not just Decodable) so the league-data cache can persist matches to
 // disk, the same way teams/standings are cached — see LeagueDataCache.
-struct FixtureDTO: Codable, Identifiable {
+//
+// One unified record for a match — schedule (matchday/kickoff, from /fixtures)
+// and live state (minute/status/score/winner, from /scores) merged into a
+// single on-device representation. There used to be a separate FixtureDTO and
+// ScoreItem with the same match duplicated across two caches that had to be
+// reconciled after the fact (`patchFixturesCache`); merging removes that
+// reconciliation step entirely — there's only ever one copy to update.
+// `/fixtures`' wire JSON decodes straight into this (no `minute` key there,
+// so it's just nil); `/scores`' wire JSON decodes into `ScoreDTO` and is
+// merged in by `LeagueData.pullLiveMatches`, which overlays the live fields.
+struct MatchDTO: Codable, Identifiable {
     let id: Int
     let matchday: Int?
     let kickoff: String
     let status: String
+    let minute: Int?
     let homeTeamId: Int
     let awayTeamId: Int
     let homeScore: Int?
     let awayScore: Int?
     let winner: String?
-    let updatedAt: String
-    /// Which league this fixture was fetched from — absent on the wire (each
+    /// Which league this match was fetched from — absent on the wire (each
     /// Worker serves one league per request), so `LeagueData.load` stamps it
     /// right after fetching, before anything else sees it. Deliberately NOT
     /// inferred from team-roster membership: a promoted/relegated club can
     /// briefly appear in two leagues' team lists at once, which would
-    /// mislabel a fixture based on roster-sync timing rather than which
+    /// mislabel a match based on roster-sync timing rather than which
     /// league it actually belongs to.
     var leagueId: String?
+
+    /// Undated matches (no parseable kickoff) sort last; otherwise by kickoff
+    /// then id.
+    nonisolated static func byKickoffThenId(_ a: MatchDTO, _ b: MatchDTO) -> Bool {
+        switch (FixtureFormat.kickoffDate(a.kickoff), FixtureFormat.kickoffDate(b.kickoff)) {
+        case let (x?, y?): return x == y ? a.id < b.id : x < y
+        case (nil, _?): return false
+        case (_?, nil): return true
+        case (nil, nil): return a.id < b.id
+        }
+    }
 }
 
 struct StandingDTO: Codable, Identifiable {

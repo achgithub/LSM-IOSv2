@@ -22,7 +22,7 @@ struct PicksEntryView: View {
         guard let data else { return [] }
         return GameLogicService.teamRefs(
             forFixtureIds: round.fixtureIds,
-            fixtures: data.fixtures,
+            fixtures: data.matches,
             teamsById: data.teamsById,
             standingsByTeam: data.standingsByTeam
         )

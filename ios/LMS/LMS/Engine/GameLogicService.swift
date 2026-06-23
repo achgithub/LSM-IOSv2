@@ -43,7 +43,7 @@ enum GameLogicService {
     /// Distinct teams playing in a round, as engine `TeamRef`s (with positions).
     static func teamRefs(
         forFixtureIds ids: [Int],
-        fixtures: [FixtureDTO],
+        fixtures: [MatchDTO],
         teamsById: [Int: TeamDTO],
         standingsByTeam: [Int: StandingDTO]
     ) -> [TeamRef] {

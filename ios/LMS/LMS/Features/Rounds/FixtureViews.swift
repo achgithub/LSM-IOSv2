@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum FixtureFormat {
+nonisolated enum FixtureFormat {
     static let iso = ISO8601DateFormatter()
     static func kickoffDate(_ string: String) -> Date? { iso.date(from: string) }
 }
@@ -8,7 +8,7 @@ enum FixtureFormat {
 /// Compact, text-only fixture row: home name · v · away name, with the kick-off
 /// date + time and matchday stacked on the trailing edge (info only).
 struct FixtureLabel: View {
-    let fixture: FixtureDTO
+    let fixture: MatchDTO
     let teamsById: [Int: TeamDTO]
 
     private func name(_ id: Int) -> String {

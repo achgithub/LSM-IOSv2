@@ -3,9 +3,9 @@ import SwiftUI
 /// The five tabs. Tagged so the selection survives the language re-key (see
 /// `AppRootView`): changing language recreates this view, so the selection lives
 /// in the parent and is restored via the binding rather than resetting to Games.
-enum RootTab: Hashable { case games, players, scores, standings, settings }
+enum RootTab: Hashable { case games, players, matches, standings, settings }
 
-/// The five-tab navigation: Games, Players, Scores, Standings, Settings.
+/// The five-tab navigation: Games, Players, Matches, Standings, Settings.
 /// (Picks are entered inside a game — Games → Enter Picks — so the second tab
 /// is the reusable player roster rather than a read-only picks view.)
 struct RootTabView: View {
@@ -33,9 +33,9 @@ struct RootTabView: View {
                 PlayersView()
                     .tabItem { Label("Players", systemImage: "person.2") }
                     .tag(RootTab.players)
-                ScoresView()
-                    .tabItem { Label("Scores", systemImage: "sportscourt") }
-                    .tag(RootTab.scores)
+                MatchesView()
+                    .tabItem { Label("Matches", systemImage: "sportscourt") }
+                    .tag(RootTab.matches)
                 StandingsView()
                     .tabItem { Label("Standings", systemImage: "list.number") }
                     .tag(RootTab.standings)
@@ -76,6 +76,9 @@ struct RootTabView: View {
             // Drop any leagues that no longer exist. Going over the subscription
             // allowance is handled by the blocking downgrade gate, not silently.
             EnabledLeagues.shared.pruneInvalid()
+            // The device's one-ever free look at real data (home league only) —
+            // see LeagueData's doc comment. A no-op after the first-ever launch.
+            await LeagueData.performFirstLaunchFreeFillIfNeeded()
             // Fire-and-forget: refreshes the league list for the *next* launch
             // (see Leagues.refreshFromRegistry) — never blocks this launch.
             Task { await Leagues.refreshFromRegistry() }

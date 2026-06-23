@@ -50,8 +50,21 @@ enum AdConsent {
         #endif
     }
 
+    /// Devices that should always get Google's test ads, even though the app
+    /// ships real ad unit IDs everywhere — so a tester's device never serves
+    /// (or risks invalid-clicks on) real inventory, without ever needing to
+    /// swap IDs before/after release. Find a device's hashed identifier in its
+    /// console log (Xcode → Window → Devices and Simulators → view device log,
+    /// or Console.app) the first time it requests an ad — Google logs a line
+    /// like `To get test ads on this device, set: ...testDeviceIdentifiers =
+    /// @[ @"<hash>" ]`. Add that hash here, not the raw IDFA.
+    private static let testDeviceIdentifiers: [String] = []
+
     private static func startSDK() {
         #if canImport(GoogleMobileAds)
+        if !testDeviceIdentifiers.isEmpty {
+            MobileAds.shared.requestConfiguration.testDeviceIdentifiers = testDeviceIdentifiers
+        }
         MobileAds.shared.start(completionHandler: nil)
         #endif
     }

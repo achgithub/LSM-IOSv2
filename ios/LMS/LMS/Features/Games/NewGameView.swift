@@ -105,6 +105,8 @@ struct NewGameView: View {
                 } header: {
                     Text("Result Rules")
                 } footer: {
+                    // Single localized string key — can't wrap without changing the key.
+                    // swiftlint:disable:next line_length
                     Text("A win always survives and a loss always eliminates. Toggle on for Postponed/Draw to treat them as a loss too — off keeps them as a survive.")
                 }
 

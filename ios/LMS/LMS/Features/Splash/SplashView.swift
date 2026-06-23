@@ -55,7 +55,7 @@ struct SplashView: View {
                     Text("SPORTS MANAGER")
                         .font(.custom("MontserratThin-Black", size: 15))
                         .kerning(2)
-                        .foregroundStyle(Brand.masterBlue)
+                        .foregroundStyle(Brand.sharedBlue)
                         .opacity(wordmarkOpacity)
 
                     Text("LAST STAND MANAGER")
@@ -102,9 +102,9 @@ enum Brand {
     /// This app's own accent colour (LMS = orange). Swap per product variant.
     static let accent = Color(hex: "F97316")
 
-    /// The shared master brand colour used for the splash shield/wordmark
-    /// across every app in the family — NOT per-app.
-    static let masterBlue = Color(hex: "3DA8FF")
+    /// The shared brand colour used for the splash shield/wordmark across
+    /// every app in the family — NOT per-app.
+    static let sharedBlue = Color(hex: "3DA8FF")
 
     /// An asset-catalog image by name, or nil if the slot is empty (so a caller
     /// can fall back). Guards against an empty/zero-size imageset.

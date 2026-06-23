@@ -109,7 +109,7 @@ struct SummaryData {
         game: Game,
         round: Round,
         teamsById: [Int: TeamDTO],
-        roundFixtures: [FixtureDTO] = [],
+        roundFixtures: [MatchDTO] = [],
         managerPlayerId: UUID? = nil
     ) -> SummaryData {
         func name(_ team: Int) -> String {

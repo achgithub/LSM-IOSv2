@@ -33,10 +33,24 @@ struct OpenRoundView: View {
     private var gameLeagues: [LeagueOption] { game.leagues }
     private var isBlended: Bool { gameLeagues.count > 1 }
 
-    private var allFixtures: [FixtureDTO] { data?.fixtures ?? [] }
+    private var allFixtures: [MatchDTO] { data?.matches ?? [] }
+
+    /// True when the held match data is more than the courtesy threshold old —
+    /// shows a "refresh?" nudge rather than silently serving it forever. This
+    /// is a courtesy, not a gate of its own: accepting goes through the exact
+    /// same Matches ad gate as the Matches tab's refresh button (subscriber →
+    /// instant, free → rewarded ad) — there's no separate free path for
+    /// fixtures, just a much longer tolerance before bothering to ask.
+    private var matchesAreStale: Bool {
+        // nil = never fetched at all (e.g. a league switched into for the
+        // first time, after the device's one-ever free fill is already
+        // spent) — just as worth prompting about as genuinely old data.
+        guard let date = data?.matchesDate else { return true }
+        return !LeagueDataCache.isFresh(date, ttl: CacheTTL.fixturesCourtesyAge)
+    }
 
     /// Fixtures after every active filter, sorted by kickoff.
-    private var visibleFixtures: [FixtureDTO] {
+    private var visibleFixtures: [MatchDTO] {
         allFixtures.filter { f in
             (f.leagueId.map { selectedLeagueIds.contains($0) } ?? false)
                 && (!unplayedOnly || Self.isUnplayed(f))
@@ -79,6 +93,18 @@ struct OpenRoundView: View {
                     Label("A game needs at least 2 players to start a round.",
                           systemImage: "person.2.slash")
                         .foregroundStyle(.orange)
+                }
+            }
+
+            // Courtesy, not a gate — accepting still goes through the same
+            // Matches ad gate as the Matches tab (instant for subscribers, one
+            // ad for free users); this just decides when it's even worth
+            // asking. Declining proceeds with whatever's held, however stale.
+            if matchesAreStale {
+                Section {
+                    Label("This fixture list is over 12 hours old — refresh?", systemImage: "clock.arrow.circlepath")
+                        .foregroundStyle(.secondary)
+                    Button("Refresh fixtures") { refreshMatches() }
                 }
             }
 
@@ -207,11 +233,11 @@ struct OpenRoundView: View {
 
     // MARK: Filtering helpers
 
-    private static func isUnplayed(_ f: FixtureDTO) -> Bool {
+    private static func isUnplayed(_ f: MatchDTO) -> Bool {
         f.status != "FINISHED" && f.status != "CANCELLED"
     }
 
-    private func dateInRange(_ f: FixtureDTO) -> Bool {
+    private func dateInRange(_ f: MatchDTO) -> Bool {
         guard let k = FixtureFormat.kickoffDate(f.kickoff) else { return false }
         let cal = Calendar.current
         return k >= cal.startOfDay(for: dateFrom) && k < cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: dateTo) ?? dateTo)
@@ -231,6 +257,18 @@ struct OpenRoundView: View {
         isLoading = false
         if selectedLeagueIds.isEmpty {
             selectedLeagueIds = Set(gameLeagues.map(\.id))
+        }
+    }
+
+    /// The Fixtures-view courtesy prompt's "yes" action — goes through the
+    /// exact same ad gate as the Matches tab's refresh (subscriber → instant,
+    /// free → rewarded ad), then reloads from the now-fresh cache.
+    private func refreshMatches() {
+        AdGate.run {
+            Task {
+                for league in gameLeagues { _ = try? await LeagueData.pullLiveMatches(for: league) }
+                await load()
+            }
         }
     }
 

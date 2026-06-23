@@ -10,14 +10,14 @@ import Foundation
 /// separate from the revenue gate (AdGate) and from the Worker's own upstream
 /// TTLs (a later pass).
 enum CacheTTL {
-    /// Live scores change minute-to-minute. 120s (not 60) to discourage
+    /// Live match state changes minute-to-minute. 120s (not 60) to discourage
     /// constant-refresh misuse at scale — matches the Worker's own
-    /// SCORE_TTL_SECONDS, which can't return anything fresher anyway.
-    static let scores: TimeInterval = 120
+    /// SCORE_TTL_SECONDS, which can't return anything fresher anyway. This is
+    /// the hard local TTL: an explicit refresh tap inside this window is a
+    /// no-op (Rule A), gated or not.
+    static let matches: TimeInterval = 120
     /// The table only moves when matches finish.
     static let standings: TimeInterval = 30 * 60
-    /// The schedule is near-static; only kickoff edits / postponements move it.
-    static let fixtures: TimeInterval = 4 * 60 * 60
     /// Names / promotions change at most seasonally.
     static let teams: TimeInterval = 7 * 24 * 60 * 60
 
@@ -25,21 +25,30 @@ enum CacheTTL {
     /// than this, offer a (gated) refresh before assigning bottom-of-table. A
     /// different job from `standings` above, so a different number on purpose.
     static let autoAssignTableStale: TimeInterval = 60 * 60
+    /// UX-only courtesy threshold for the Fixtures view (Open Round / New Game /
+    /// Picks) — much longer than `matches` above, since the schedule barely
+    /// moves and constantly nagging every two minutes would be absurd for a
+    /// browse-and-pick flow. Crossing this just offers a refresh; it isn't a
+    /// hard cutoff, and accepting still goes through the same Matches ad gate
+    /// as the Scores tab — there's no separate free path for fixtures.
+    static let fixturesCourtesyAge: TimeInterval = 12 * 60 * 60
 }
 
-/// On-disk cache for per-league sports data, so browsing the Scores / Standings
+/// On-disk cache for per-league sports data, so browsing the Matches / Standings
 /// screens and running rounds shows the last fetched data without hitting the
-/// network. The explicit, ad-gated refresh fetches fresh gated data (scores,
-/// table) and overwrites the cache; functional data (fixtures, teams) refreshes
-/// itself only once its local TTL (see `CacheTTL`) lapses. Either way a fresh
-/// launch reads the cache rather than re-fetching — closing the "relaunch for a
-/// free refresh" back door.
+/// network. The explicit, ad-gated refresh fetches fresh gated data (matches,
+/// table) and overwrites the cache; a fresh launch reads the cache rather than
+/// re-fetching — closing the "relaunch for a free refresh" back door.
 enum LeagueDataCache {
-    /// One league's scores snapshot.
-    struct Scores: Codable {
+    /// One league's matches snapshot — schedule (matchday/kickoff) and live
+    /// state (status/score/minute/winner) together, one record per match, one
+    /// cache, one timestamp. Previously split across a separate Fixtures cache
+    /// (schedule, free) and Scores cache (live state, gated), which had to be
+    /// reconciled after the fact whenever a live pull found a newly-FINISHED
+    /// match. One unified cache means there's nothing left to reconcile.
+    struct Matches: Codable {
         let date: Date
-        let items: [ScoreItem]
-        let teams: [TeamDTO]
+        let items: [MatchDTO]
     }
 
     /// One league's standings snapshot.
@@ -49,26 +58,10 @@ enum LeagueDataCache {
         let teams: [TeamDTO]
     }
 
-    /// One league's fixtures (schedule) snapshot — functional/free data.
-    struct Fixtures: Codable {
-        let date: Date
-        let items: [FixtureDTO]
-    }
-
     /// One league's teams snapshot — functional/free, near-static data.
     struct Teams: Codable {
         let date: Date
         let items: [TeamDTO]
-    }
-
-    /// Marks when a league's *live* match data (scores or results) was last
-    /// pulled from the Worker — shared by every screen that does that job
-    /// (Scores tab, Results entry's "Pull results from server"), even though
-    /// they hit different endpoints (/scores vs /fixtures). Without this each
-    /// screen had its own independent 60s clock, so a manager could pull twice
-    /// in quick succession by switching screens.
-    struct LivePull: Codable {
-        let date: Date
     }
 
     /// Outcome of a cache read. Distinguishes "nothing cached yet" (normal first
@@ -126,36 +119,49 @@ enum LeagueDataCache {
         Date().timeIntervalSince(date) < ttl
     }
 
-    static func scoresKey(_ leagueId: String) -> String { "scores-\(leagueId)" }
+    /// The device's single free data fill, ever — see
+    /// docs/data-refresh-and-caching.md: "Single exception: first install...
+    /// Period." Explicitly NOT per-league and NOT checked lazily from inside
+    /// any screen (that's what let switching/enabling leagues bypass the gate
+    /// repeatedly, before this fix). The only place this is ever consumed is
+    /// the one explicit, centralized bootstrap at launch
+    /// (`LeagueData.performFirstLaunchFreeFillIfNeeded`), which fills Matches
+    /// + Standings for the home league only — never anywhere else.
+    private static let freeFillUsedKey = "hasUsedFreeDataFill"
+
+    static var hasUsedFreeFill: Bool {
+        UserDefaults.standard.bool(forKey: freeFillUsedKey)
+    }
+
+    static func consumeFreeFill() {
+        UserDefaults.standard.set(true, forKey: freeFillUsedKey)
+    }
+
+    static func matchesKey(_ leagueId: String) -> String { "matches-\(leagueId)" }
     static func standingsKey(_ leagueId: String) -> String { "standings-\(leagueId)" }
-    static func fixturesKey(_ leagueId: String) -> String { "fixtures-\(leagueId)" }
     static func teamsKey(_ leagueId: String) -> String { "teams-\(leagueId)" }
-    static func livePullKey(_ leagueId: String) -> String { "live-pull-\(leagueId)" }
 
-    /// The soonest moment a live-data pull (Scores tab or Results entry) could
-    /// fetch something newer for this league. `nil` if no pull has happened yet
-    /// or its 60s window has lapsed.
-    static func livePullThrottleUntil(_ leagueId: String) -> Date? {
-        guard case .hit(let pull) = read(LivePull.self, key: livePullKey(leagueId)),
-              isFresh(pull.date, ttl: CacheTTL.scores) else { return nil }
-        return pull.date.addingTimeInterval(CacheTTL.scores)
+    /// The soonest moment a live pull (Matches tab or Results entry) could
+    /// fetch something newer for this league — just the Matches cache's own
+    /// timestamp against its TTL. `nil` once that window has lapsed (a pull is
+    /// available now). No separate tracking struct needed: there's one cache,
+    /// so its own timestamp IS the throttle clock — both Matches tab and
+    /// Results entry's "Pull from server" read the same file, so a pull from
+    /// either one naturally throttles the other too.
+    static func matchesThrottleUntil(_ leagueId: String) -> Date? {
+        guard let cached = load(Matches.self, key: matchesKey(leagueId)),
+              isFresh(cached.date, ttl: CacheTTL.matches) else { return nil }
+        return cached.date.addingTimeInterval(CacheTTL.matches)
     }
 
-    /// Record that a live-data pull just happened for this league (call after a
-    /// successful fetch from either Scores or Results entry).
-    static func recordLivePull(_ leagueId: String) {
-        save(LivePull(date: Date()), key: livePullKey(leagueId))
-    }
-
-    /// Shared cooldown across every screen that pulls live match data (Scores
+    /// Shared cooldown across every screen that pulls live match data (Matches
     /// tab, Results entry). `nil` (pull available now) if any league hasn't
     /// been pulled yet or its window has lapsed; otherwise the earliest expiry
-    /// across the given leagues — matching how each screen previously computed
-    /// its own (now-shared) throttle.
-    static func sharedLiveThrottleUntil(for leagueIds: [String]) -> Date? {
+    /// across the given leagues.
+    static func sharedMatchesThrottleUntil(for leagueIds: [String]) -> Date? {
         var earliest: Date?
         for id in leagueIds {
-            guard let expiry = livePullThrottleUntil(id) else { return nil }
+            guard let expiry = matchesThrottleUntil(id) else { return nil }
             earliest = earliest.map { min($0, expiry) } ?? expiry
         }
         return earliest

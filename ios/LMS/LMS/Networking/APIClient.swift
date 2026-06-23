@@ -28,7 +28,7 @@ actor APIClient {
     // app-side rewarded-ad gate on the refresh action (see AdGate), not the data.
     func scores() async throws -> [ScoreDTO] { try await get("/scores") }
 
-    func fixtures(dateFrom: String? = nil, dateTo: String? = nil, matchday: Int? = nil) async throws -> [FixtureDTO] {
+    func fixtures(dateFrom: String? = nil, dateTo: String? = nil, matchday: Int? = nil) async throws -> [MatchDTO] {
         var query: [URLQueryItem] = []
         if let dateFrom { query.append(URLQueryItem(name: "dateFrom", value: dateFrom)) }
         if let dateTo { query.append(URLQueryItem(name: "dateTo", value: dateTo)) }

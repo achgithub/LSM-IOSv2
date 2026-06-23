@@ -1,24 +1,25 @@
 import Combine
 import SwiftUI
 
-/// Live fixture scores across the manager's enabled leagues. A magnifier opens a
-/// search panel (league pills, team text + Home/Away, matchday, date range, A–Z
-/// sort) so a manager can look things up fast without leaving the app. The
-/// monetization gate is on explicit refresh *actions* (see AdGate), not browsing.
-struct ScoresView: View {
+/// Live matches (schedule + score together) across the manager's enabled
+/// leagues. A magnifier opens a search panel (league pills, team text +
+/// Home/Away, matchday, date range, A–Z sort) so a manager can look things up
+/// fast without leaving the app. The monetization gate is on explicit refresh
+/// *actions* (see AdGate), not browsing.
+struct MatchesView: View {
     @Environment(EnabledLeagues.self) private var enabled
 
-    @State private var items: [ScoreItem] = []
+    @State private var items: [MatchDTO] = []
     @State private var teamsById: [Int: TeamDTO] = [:]
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var lastRefreshed: Date?
 
     // Refresh throttle — the visible form of Rule A. While `freshUntil` is in the
-    // future, every enabled league's scores are still within the 120s local TTL,
+    // future, every enabled league's matches are still within the 120s local TTL,
     // so nothing fresher exists to fetch: the refresh button is greyed and the
     // footer shows a countdown to when it re-enables. Applies to subscribers too —
-    // scores can't be fresher than the Worker's own ~120s upstream window, so a
+    // matches can't be fresher than the Worker's own ~120s upstream window, so a
     // sooner tap would only burn calls for identical data. `now` ticks once a
     // second to drive the countdown and flip the button back on at zero.
     @State private var now = Date()
@@ -46,7 +47,7 @@ struct ScoresView: View {
         teamsById[id]?.shortName ?? teamsById[id]?.name ?? "Team \(id)"
     }
 
-    private func teamMatches(_ item: ScoreItem) -> Bool {
+    private func teamMatches(_ item: MatchDTO) -> Bool {
         let q = teamQuery.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return true }
         let home = name(item.homeTeamId).localizedCaseInsensitiveContains(q)
@@ -66,17 +67,17 @@ struct ScoresView: View {
         return kickoff >= lo && kickoff < hi
     }
 
-    private var filtered: [ScoreItem] {
+    private var filtered: [MatchDTO] {
         let result = items.filter { item in
-            activeLeagueIds.contains(item.leagueId)
+            (item.leagueId.map { activeLeagueIds.contains($0) } ?? false)
                 && (matchdayFilter == nil || item.matchday == matchdayFilter)
-                && (!dateRangeOn || dateInRange(item.kickoff))
+                && (!dateRangeOn || dateInRange(FixtureFormat.kickoffDate(item.kickoff)))
                 && teamMatches(item)
         }
         if sortAZ {
             return result.sorted { name($0.homeTeamId).localizedCaseInsensitiveCompare(name($1.homeTeamId)) == .orderedAscending }
         }
-        return result.sorted(by: ScoreItem.byKickoffThenId)
+        return result.sorted(by: MatchDTO.byKickoffThenId)
     }
 
     private var filtersActive: Bool {
@@ -91,23 +92,23 @@ struct ScoresView: View {
         NavigationStack {
             Group {
                 if isLoading && items.isEmpty {
-                    ProgressView("Loading scores…")
+                    ProgressView("Loading matches…")
                 } else if let errorMessage, items.isEmpty {
-                    ContentUnavailableView("Couldn't load scores", systemImage: "wifi.slash", description: Text(errorMessage))
+                    ContentUnavailableView("Couldn't load matches", systemImage: "wifi.slash", description: Text(errorMessage))
                 } else if filtered.isEmpty {
                     ContentUnavailableView(
-                        "No fixtures",
+                        "No matches",
                         systemImage: "sportscourt",
-                        description: Text(items.isEmpty ? "No fixtures available right now." : "No fixtures match your search.")
+                        description: Text(items.isEmpty ? "No matches available right now." : "No matches match your search.")
                     )
                 } else {
                     List(filtered) { item in
-                        ScoreRow(item: item, teamsById: teamsById)
+                        MatchRow(item: item, teamsById: teamsById)
                     }
                 }
             }
             .appBackground()
-            .navigationTitle("Scores")
+            .navigationTitle("Matches")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showSearch = true } label: {
@@ -124,7 +125,7 @@ struct ScoresView: View {
                 }
             }
             .sheet(isPresented: $showSearch) {
-                ScoresSearchSheet(
+                MatchesSearchSheet(
                     leagues: enabled.leagues,
                     matchdays: matchdays,
                     selectedLeagueIds: $selectedLeagueIds,
@@ -138,10 +139,17 @@ struct ScoresView: View {
                 )
             }
             // Load every enabled league once; pills filter client-side so toggling
-            // them is instant and never re-hits the network.
+            // them is instant and never re-hits the network. Reconciled against
+            // the CURRENT enabled set every time it changes, not just when
+            // empty — otherwise switching leagues leaves `selectedLeagueIds`
+            // pointing at a league that's no longer enabled, and every fetched
+            // item gets filtered out (looks like matches "failed", but it's a
+            // stale filter, not a fetch problem).
             .task(id: enabled.leagues.map(\.id)) {
-                if selectedLeagueIds.isEmpty { selectedLeagueIds = Set(enabled.leagues.map(\.id)) }
-                await load(force: false)
+                let validIds = Set(enabled.leagues.map(\.id))
+                selectedLeagueIds.formIntersection(validIds)
+                if selectedLeagueIds.isEmpty { selectedLeagueIds = validIds }
+                await load()
             }
             // Only advance the clock while throttled, so we don't re-render (and
             // re-sort the list) every second once the button is live again. The
@@ -187,22 +195,21 @@ struct ScoresView: View {
     /// - any corrupt cache → recover with a **free** fetch (our bad data) — the bad
     ///   files have already been deleted by `read`;
     /// - otherwise (any stale / empty) → the normal ad-gated fetch.
-    /// The throttle deadline comes from the shared live-pull clock (see
-    /// `LeagueDataCache.sharedLiveThrottleUntil`), not this screen's own cache —
-    /// Results entry's "Pull results from server" does the same job (via
-    /// /fixtures) and shares the same 120s cooldown, so pulling in one screen
-    /// also throttles the other.
-    private func scoresThrottleUntil() -> Date? {
-        LeagueDataCache.sharedLiveThrottleUntil(for: enabled.leagues.map(\.id))
+    /// The throttle deadline comes from the shared Matches-cache clock (see
+    /// `LeagueDataCache.sharedMatchesThrottleUntil`), not a separate tracker —
+    /// Results entry's "Pull results from server" reads/writes the same per-league
+    /// Matches cache, so pulling in one screen also throttles the other.
+    private func matchesThrottleUntil() -> Date? {
+        LeagueDataCache.sharedMatchesThrottleUntil(for: enabled.leagues.map(\.id))
     }
 
     private func refresh() {
         var anyCorrupt = false
         var allFresh = true
         for league in enabled.leagues {
-            switch LeagueDataCache.read(LeagueDataCache.Scores.self, key: LeagueDataCache.scoresKey(league.id)) {
+            switch LeagueDataCache.read(LeagueDataCache.Matches.self, key: LeagueDataCache.matchesKey(league.id)) {
             case .hit(let cached):
-                if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.scores) { allFresh = false }
+                if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.matches) { allFresh = false }
             case .empty:
                 allFresh = false
             case .corrupt:
@@ -211,7 +218,7 @@ struct ScoresView: View {
             }
         }
         if allFresh {
-            Task { await load(force: false) }       // re-show cache, no ad, no network
+            Task { await load() }                    // re-show cache, no ad, no network
         } else if anyCorrupt {
             Task { await load(force: true) }         // recover free
         } else {
@@ -219,32 +226,33 @@ struct ScoresView: View {
         }
     }
 
-    /// Loads scores for every enabled league. `force` (the ad-gated refresh)
-    /// always hits the network and overwrites the per-league cache; otherwise each
-    /// league is served from its cache, fetching only the first time (empty/corrupt
-    /// cache). This is what stops a relaunch from being a free refresh.
-    private func load(force: Bool) async {
+    /// Loads matches for every enabled league. `force` (the ad-gated refresh)
+    /// always hits the network and overwrites the per-league cache; otherwise
+    /// each league is served purely from its cache — a never-before-opened
+    /// league just stays empty until an explicit gated refresh populates it.
+    /// The device's one-ever free look at real data is handled once, centrally,
+    /// at launch (`LeagueData.performFirstLaunchFreeFillIfNeeded`) — never
+    /// lazily here, which is what previously let switching/enabling leagues
+    /// bypass the gate repeatedly.
+    private func load(force: Bool = false) async {
         isLoading = true
         errorMessage = nil
-        var allItems: [ScoreItem] = []
-        var allTeams: [Int: TeamDTO] = [:]
+        var allItems: [MatchDTO] = []
         var dates: [Date] = []
         do {
             for league in enabled.leagues {
-                let key = LeagueDataCache.scoresKey(league.id)
-                if !force, let cached = LeagueDataCache.load(LeagueDataCache.Scores.self, key: key) {
+                let key = LeagueDataCache.matchesKey(league.id)
+                if !force, let cached = LeagueDataCache.load(LeagueDataCache.Matches.self, key: key) {
                     allItems += cached.items
-                    for team in cached.teams { allTeams[team.externalId] = team }
                     dates.append(cached.date)
-                } else {
-                    let (leagueItems, teams) = try await LeagueData.pullLiveScores(for: league)
+                } else if force {
+                    let leagueItems = try await LeagueData.pullLiveMatches(for: league)
                     allItems += leagueItems
-                    for team in teams { allTeams[team.externalId] = team }
                     dates.append(Date())
                 }
             }
             items = allItems
-            teamsById = allTeams
+            teamsById = (try? await LeagueData.load(for: enabled.leagues))?.teamsById ?? teamsById
             lastRefreshed = dates.max()
         } catch {
             errorMessage = error.localizedDescription
@@ -254,7 +262,7 @@ struct ScoresView: View {
         // Sync `now` first so the initial countdown render is accurate rather than
         // showing stale view-creation time (which inflates the display by ~load duration).
         now = Date()
-        freshUntil = scoresThrottleUntil()
+        freshUntil = matchesThrottleUntil()
         isLoading = false
     }
 }
@@ -263,7 +271,7 @@ struct ScoresView: View {
 
 enum HomeAwayFilter: Hashable { case all, home, away }
 
-private struct ScoresSearchSheet: View {
+private struct MatchesSearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     let leagues: [LeagueOption]
     let matchdays: [Int]
@@ -372,57 +380,14 @@ private struct ScoresSearchSheet: View {
     }
 }
 
-// MARK: - Merged view model
-
-/// A live score (from /scores) joined with its fixture metadata (kickoff,
-/// matchday from /fixtures), tagged with its league so multi-league views can
-/// filter by league. The fixture may be missing if the two feeds drift.
-struct ScoreItem: Identifiable, Codable {
-    let id: Int
-    let leagueId: String
-    let kickoff: Date?
-    let matchday: Int?
-    let status: String
-    let minute: Int?
-    let homeTeamId: Int
-    let awayTeamId: Int
-    let homeScore: Int?
-    let awayScore: Int?
-
-    init(score: ScoreDTO, fixture: FixtureDTO?, leagueId: String) {
-        self.id = score.id
-        self.leagueId = leagueId
-        // Use the same lenient parser as fixtures — the feed's kickoff has no
-        // fractional seconds, so a stricter formatter would silently drop it.
-        self.kickoff = fixture.flatMap { FixtureFormat.kickoffDate($0.kickoff) }
-        self.matchday = fixture?.matchday
-        self.status = score.status
-        self.minute = score.minute
-        self.homeTeamId = score.homeTeamId
-        self.awayTeamId = score.awayTeamId
-        self.homeScore = score.homeScore
-        self.awayScore = score.awayScore
-    }
-
-    /// Undated fixtures (no kickoff) sort last; otherwise by kickoff then id.
-    nonisolated static func byKickoffThenId(_ a: ScoreItem, _ b: ScoreItem) -> Bool {
-        switch (a.kickoff, b.kickoff) {
-        case let (x?, y?): return x == y ? a.id < b.id : x < y
-        case (nil, _?): return false
-        case (_?, nil): return true
-        case (nil, nil): return a.id < b.id
-        }
-    }
-}
-
 // MARK: - Row
 
-/// Score row — same compact look as a fixture row (home tile/TLA · score · away
-/// TLA/tile) with the kick-off date/time + matchday on the trailing edge. A small
-/// live indicator (FT / 45' / Postp.) sits under the score.
-private struct ScoreRow: View {
+/// Match row — home tile/TLA · score · away TLA/tile, with the kick-off
+/// date/time + matchday on the trailing edge. A small live indicator
+/// (FT / 45' / Postp.) sits under the score.
+private struct MatchRow: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
-    let item: ScoreItem
+    let item: MatchDTO
     let teamsById: [Int: TeamDTO]
     @State private var expanded = false
 
@@ -440,7 +405,7 @@ private struct ScoreRow: View {
         return "v"
     }
 
-    /// Live/finished indicator shown under the score; nil for upcoming fixtures
+    /// Live/finished indicator shown under the score; nil for upcoming matches
     /// (their date/time already shows on the right).
     private var liveStatus: (text: String, color: Color)? {
         switch item.status {
@@ -473,7 +438,7 @@ private struct ScoreRow: View {
 
             // Trailing — date / time / matchday, fixed width on the right edge.
             VStack(alignment: .trailing, spacing: 1) {
-                if let kickoff = item.kickoff {
+                if let kickoff = FixtureFormat.kickoffDate(item.kickoff) {
                     Text(kickoff, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
                         .font(.caption2).foregroundStyle(.secondary)
                     Text(kickoff, format: .dateTime.hour().minute())

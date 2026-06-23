@@ -73,12 +73,12 @@ struct SummaryShareView: View {
         errorMessage = nil
         // Team data drives tiles/names; the fixtures card also needs the round's
         // matches. Degrade gracefully to ids/empty if offline.
-        var roundFixtures: [FixtureDTO] = []
+        var roundFixtures: [MatchDTO] = []
         do {
             let leagueData = try await LeagueData.load(for: game.leagues)
             teamsById = leagueData.teamsById
             let ids = Set(round.fixtureIds)
-            roundFixtures = leagueData.fixtures.filter { ids.contains($0.id) }
+            roundFixtures = leagueData.matches.filter { ids.contains($0.id) }
         } catch {
             // Non-fatal — render with "Team <id>" fallbacks rather than failing.
             teamsById = [:]

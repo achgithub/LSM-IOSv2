@@ -90,7 +90,8 @@ struct SettingsView: View {
                                 let products = try await Product.products(for: ids)
                                 let found = Set(products.map { $0.id })
                                 let missing = ids.subtracting(found)
-                                storeKitDiagnostic = "Found \(products.count)/\(ids.count): \(found.sorted().joined(separator: ", "))\nMissing: \(missing.isEmpty ? "none" : missing.sorted().joined(separator: ", "))"
+                                let missingText = missing.isEmpty ? "none" : missing.sorted().joined(separator: ", ")
+                                storeKitDiagnostic = "Found \(products.count)/\(ids.count): \(found.sorted().joined(separator: ", "))\nMissing: \(missingText)"
                             } catch {
                                 storeKitDiagnostic = "Error: \(error)"
                             }

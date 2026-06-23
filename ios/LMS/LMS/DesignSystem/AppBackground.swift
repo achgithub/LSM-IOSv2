@@ -17,7 +17,7 @@ struct AppBackground: View {
         ZStack {
             Color(.systemBackground)
             LinearGradient(
-                colors: [Brand.masterBlue.opacity(0.12), Color(.systemBackground).opacity(0)],
+                colors: [Brand.sharedBlue.opacity(0.12), Color(.systemBackground).opacity(0)],
                 startPoint: .top,
                 endPoint: UnitPoint(x: 0.5, y: 0.35)
             )
