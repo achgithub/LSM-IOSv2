@@ -111,7 +111,13 @@ final class PurchaseService {
             guard let package = Self.package(for: option, in: offerings) else { return .unavailable }
             let result = try await Purchases.shared.purchase(package: package)
             if result.userCancelled { return .cancelled }
-            let newTier = Self.tier(from: result.customerInfo)
+            // An upgrade that replaces another active subscription in the same
+            // group can lag behind the customerInfo bundled with the purchase
+            // result — force a fresh fetch (what Restore Purchases does under
+            // the hood) so the newly-granted tier always wins, not the one
+            // being replaced.
+            let info = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
+            let newTier = Self.tier(from: info)
             Entitlements.shared.apply(tier: newTier)
             return .success(newTier)
         } catch {
