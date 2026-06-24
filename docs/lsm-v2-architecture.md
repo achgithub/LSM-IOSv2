@@ -89,6 +89,10 @@ Result rung is unreachable for draws — accepted intentionally.
   pattern as the darts React-Native app.)
 - **No public-page ads** (PIN-gated, internal, near-zero traffic — not worth it).
   Free-tier revenue stays the existing in-app ads around the share-card flow.
+- **One paid cloud entitlement gates ALL cloud features** — backup, publish,
+  *and* the PWA links + submission queue. Because these are paid, they have **no
+  ad gate** (ads are only the free-tier path). Free tier = no cloud, ads on
+  share-cards.
 
 ### Submission-queue manager UX (ships with the PWA, last)
 - Submissions are the one game-related thing in the cloud (PWA writes pending
@@ -112,7 +116,16 @@ Result rung is unreachable for draws — accepted intentionally.
   token *and* calls the Worker to upsert-new + revoke-old in `submission_tokens`,
   so the old link stops validating immediately (pending submissions under it can
   be auto-voided). The phone is the admin console; the Worker/D1 is just the
-  token store.
+  token store. **Paid (cloud entitlement) → no ad gate** on sharing.
+- **Share produces a pre-formatted, name-personalized message** through the iOS
+  share sheet (Messages/WhatsApp) — the link plus install instructions and a
+  friendly fallback. Default tone (editable before sending):
+  > Hi {playerName}, click this link, then save it as a bookmark or add it to
+  > your phone's home screen as an icon: {link}. If you're not sure how, just ask
+  > me next time you see me.
+
+  "Add to home screen" is the PWA install — the link behaves like a lightweight
+  app once saved.
 - Per-player rows with status chips (pending / approved / no-submission);
   **swipe right=approve, left=reject, plus "Approve all pending."** LMS submission
   = one team; Predictor submission = a whole slate (a score per selected fixture).
