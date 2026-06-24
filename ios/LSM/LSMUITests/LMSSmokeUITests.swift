@@ -33,4 +33,62 @@ final class LMSSmokeUITests: XCTestCase {
             "Main tab bar (Games) did not appear after launch/onboarding"
         )
     }
+
+    /// Live data test (v2 cut-over): navigates to Standings and Matches and
+    /// confirms real rows load from the v2 regional Workers. Unlike the smoke
+    /// test above this does NOT avoid the network — it's the whole point — but it
+    /// still passes `-uitests` so ad/consent dialogs stay out of the way.
+    @MainActor
+    func testLeaguesLoadFromV2Workers() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let nameField = app.textFields.firstMatch
+        if nameField.waitForExistence(timeout: 15) {
+            nameField.tap()
+            nameField.typeText("UITester")
+            app.buttons["Continue"].firstMatch.tap()
+        }
+
+        XCTAssertTrue(
+            app.tabBars.buttons["Standings"].waitForExistence(timeout: 15),
+            "Standings tab never appeared"
+        )
+
+        // --- Standings: should load a league table from the UK Worker. ---
+        app.tabBars.buttons["Standings"].tap()
+        XCTAssertTrue(
+            app.navigationBars["Standings"].waitForExistence(timeout: 10),
+            "Standings screen did not open"
+        )
+        // Wait for the live fetch to resolve into table rows.
+        let firstStandingCell = app.cells.firstMatch
+        XCTAssertTrue(
+            firstStandingCell.waitForExistence(timeout: 25),
+            "No standings rows loaded from the v2 Worker"
+        )
+        XCTAssertFalse(
+            app.staticTexts["Couldn't load standings"].exists,
+            "Standings showed a load error instead of data"
+        )
+        attachScreenshot(named: "Standings")
+
+        // --- Matches: should load fixtures/scores from the same Worker. ---
+        app.tabBars.buttons["Matches"].tap()
+        let firstMatchCell = app.cells.firstMatch
+        XCTAssertTrue(
+            firstMatchCell.waitForExistence(timeout: 25),
+            "No match rows loaded from the v2 Worker"
+        )
+        attachScreenshot(named: "Matches")
+    }
+
+    private func attachScreenshot(named name: String) {
+        let shot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 }
