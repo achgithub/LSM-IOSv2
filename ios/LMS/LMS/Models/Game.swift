@@ -20,6 +20,12 @@ final class Game {
     /// shareable from the game screen. nil until a tie has been resolved.
     var lastOutcomeRaw: String?
     var createdAt: Date
+    /// True for games created by the interactive "Show Me" demo walkthrough. Marks
+    /// every demo game (and, by cascade, its players/rounds/picks) so demo content
+    /// can be identified and cleared without touching the manager's real games. New
+    /// property defaults to false → existing games migrate as non-demo. See
+    /// `DemoDataService`.
+    var isDemoData: Bool = false
     /// The league(s) this game runs in (chosen at creation from the enabled
     /// leagues). Usually one, but a game can blend several. Rounds draw fixtures
     /// from these. Empty on legacy games → `leagues` resolves to the home league.
@@ -38,7 +44,8 @@ final class Game {
         anonymityMode: AnonymityMode = .named,
         leagueIds: [String] = [Leagues.home.id],
         drawEliminates: Bool = true,
-        postponedEliminates: Bool = false
+        postponedEliminates: Bool = false,
+        isDemoData: Bool = false
     ) {
         self.id = UUID()
         self.name = name
@@ -50,11 +57,15 @@ final class Game {
         self.leagueIdsRaw = leagueIds.isEmpty ? [Leagues.home.id] : leagueIds
         self.drawEliminates = drawEliminates
         self.postponedEliminates = postponedEliminates
+        self.isDemoData = isDemoData
     }
 
-    /// The league(s) this game runs in (legacy empty → home).
+    /// The league(s) this game runs in (legacy empty → home). Resolved through
+    /// `Leagues.lookup` so a demo game's local-only league (never in `Leagues.all`)
+    /// still resolves to itself rather than silently falling back to the home
+    /// league — otherwise the demo would read the real PL cache. See `Leagues.demo`.
     var leagues: [LeagueOption] {
-        let resolved = Leagues.all.filter { leagueIdsRaw.contains($0.id) }
+        let resolved = leagueIdsRaw.compactMap { Leagues.lookup($0) }
         return resolved.isEmpty ? [Leagues.home] : resolved
     }
 

@@ -16,6 +16,10 @@ import Foundation
 enum AdGate {
     /// Runs `action`, showing a rewarded ad first for free users.
     static func run(_ action: @escaping () -> Void) {
+        // The "Show Me" demo never shows ads: it's a guided product tour, not a
+        // real task, and an interstitial/rewarded ad mid-walkthrough would be
+        // jarring and off-message. The single, central bypass for the whole demo.
+        guard !DemoWalkthroughManager.shared.isActive else { action(); return }
         guard Entitlements.shared.shouldShowAds else { action(); return }  // subscriber: no ad
         guard RewardedAdManager.shared.isReady else { action(); return }   // no ad to show: don't block
         // If the ad can't actually be presented (e.g. no host VC), don't swallow

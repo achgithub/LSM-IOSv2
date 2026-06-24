@@ -16,6 +16,25 @@ struct LeagueOption: Identifiable, Hashable, Sendable, Codable {
     /// false since most manifest entries omit the key entirely.
     let devOnly: Bool
 
+    /// Memberwise initializer — needed because the custom `init(from:)` below
+    /// suppresses the synthesized one. Used to construct the code-defined local
+    /// demo league (`Leagues.demo`).
+    init(
+        id: String,
+        name: String,
+        shortName: String,
+        workerBaseURL: String,
+        teamsCount: Int,
+        devOnly: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.shortName = shortName
+        self.workerBaseURL = workerBaseURL
+        self.teamsCount = teamsCount
+        self.devOnly = devOnly
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -103,9 +122,35 @@ enum Leagues {
     /// The user's configured home league (the one a new game defaults to).
     static var home: LeagueOption { byId(manifest.homeLeagueId) ?? all[0] }
 
+    /// Stable id of the local, code-defined demo league used by the "Show Me"
+    /// walkthrough. Deliberately NOT in `leagues.json`/`all`, so it never appears
+    /// in Settings, New Game, or any other user-facing league picker — it only
+    /// ever backs demo games, whose fixtures/teams/standings are seeded straight
+    /// into the on-disk cache locally (no Worker, no network). See `DemoDataService`.
+    static let demoLeagueId = "DEMO_LOCAL"
+
+    /// The local demo league. Its `workerBaseURL` is a placeholder that's never
+    /// hit: the demo seeds fresh caches for all three resources, so cache-first
+    /// reads (`LeagueData`) are always served locally.
+    static let demo = LeagueOption(
+        id: demoLeagueId,
+        name: "Demo League",
+        shortName: "DEMO",
+        workerBaseURL: "https://demo.invalid",
+        teamsCount: 20,
+        devOnly: false
+    )
+
     /// Resolve a league by id (e.g. a round's stored `leagueId`).
     static func byId(_ id: String) -> LeagueOption? {
         all.first { $0.id == id }
+    }
+
+    /// Like `byId`, but also resolves the local demo league (which is intentionally
+    /// absent from `all`). Used by `Game.leagues`/`Round.leagues` so a demo game
+    /// resolves to the demo league instead of falling back to the home league.
+    static func lookup(_ id: String) -> LeagueOption? {
+        id == demoLeagueId ? demo : byId(id)
     }
 
     /// Resolve a league by id, falling back to home for unknown/legacy ids.
