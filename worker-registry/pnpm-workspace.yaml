@@ -1,6 +1,0 @@
-# Build-script allow-list (pnpm 11). Only wrangler's bundler/runtime native
-# binaries are approved to run postinstall, into project-local node_modules.
-allowBuilds:
-  esbuild: true
-  sharp: false
-  workerd: true

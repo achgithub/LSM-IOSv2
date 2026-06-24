@@ -1,7 +1,7 @@
 // D1 access — read queries for the API, write/upsert helpers for the cron sync.
 // Only provider-sourced data lives here (teams, fixtures, standings).
 
-import type { Fixture, FixtureStatus, MatchWinner, Standing, Team } from "./types";
+import type { Fixture, FixtureStatus, MatchWinner, ScoreEntry, Standing, Team } from "./types";
 
 // ── Row shapes as stored in D1 ──────────────────────────────────────────────
 interface TeamRow {
@@ -124,6 +124,69 @@ export async function getTeams(db: D1Database): Promise<Team[]> {
     .prepare("SELECT * FROM teams ORDER BY name ASC")
     .all<TeamRow>();
   return results.map(toTeam);
+}
+
+// ── v2 league-scoped reads (multi-league shard) ──────────────────────────────
+// A v2 shard holds many leagues, so every read is filtered by league_id. These
+// serve the app↔DB data path directly off the seeded shard — NO upstream
+// provider call (the football-data.org sync is a separate, deferred concern).
+
+/** True if `leagueId` is one of the leagues served by this shard. */
+export async function leagueExists(db: D1Database, leagueId: string): Promise<boolean> {
+  const row = await db.prepare("SELECT 1 FROM leagues WHERE id = ?").bind(leagueId).first();
+  return row !== null;
+}
+
+export async function getTeamsByLeague(db: D1Database, leagueId: string): Promise<Team[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM teams WHERE league_id = ? ORDER BY name ASC")
+    .bind(leagueId)
+    .all<TeamRow>();
+  return results.map(toTeam);
+}
+
+export async function getStandingsByLeague(db: D1Database, leagueId: string): Promise<Standing[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM standings WHERE league_id = ? ORDER BY position ASC")
+    .bind(leagueId)
+    .all<StandingRow>();
+  return results.map(toStanding);
+}
+
+export async function getFixturesByLeague(
+  db: D1Database,
+  leagueId: string,
+  q: FixtureQuery = {},
+): Promise<Fixture[]> {
+  const where = ["league_id = ?"];
+  const binds: unknown[] = [leagueId];
+  if (q.dateFrom) { where.push("kickoff >= ?"); binds.push(q.dateFrom); }
+  if (q.dateTo) { where.push("kickoff <= ?"); binds.push(q.dateTo); }
+  if (q.matchday !== undefined) { where.push("matchday = ?"); binds.push(q.matchday); }
+  const { results } = await db
+    .prepare(`SELECT * FROM fixtures WHERE ${where.join(" AND ")} ORDER BY kickoff ASC`)
+    .bind(...binds)
+    .all<FixtureRow>();
+  return results.map(toFixture);
+}
+
+/** Compact live-score view, derived from the fixtures table (no separate live
+ *  feed in v2 yet — `minute` is always null until the upstream sync is built). */
+export async function getScoresByLeague(db: D1Database, leagueId: string): Promise<ScoreEntry[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM fixtures WHERE league_id = ? ORDER BY kickoff ASC")
+    .bind(leagueId)
+    .all<FixtureRow>();
+  return results.map((r) => ({
+    id: r.id,
+    status: r.status as FixtureStatus,
+    minute: null,
+    homeTeamId: r.home_team_id,
+    awayTeamId: r.away_team_id,
+    homeScore: r.home_score,
+    awayScore: r.away_score,
+    winner: r.winner as MatchWinner,
+  }));
 }
 
 // ── Writes (cron sync) ──────────────────────────────────────────────────────

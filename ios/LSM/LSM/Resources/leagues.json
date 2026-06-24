@@ -1,0 +1,59 @@
+{
+  "app": {
+    "name": "Last Stand Manager",
+    "season": "2025/26",
+    "allowRepeatDefault": false
+  },
+  "homeLeagueId": "PL",
+  "leagues": [
+    {
+      "id": "PL",
+      "name": "England — Premier League",
+      "shortName": "PL",
+      "workerBaseURL": "https://lsm-uk-worker.sportsmanager.workers.dev/leagues/PL",
+      "teamsCount": 20
+    },
+    {
+      "id": "ELC",
+      "name": "England — Championship",
+      "shortName": "ELC",
+      "workerBaseURL": "https://lsm-uk-worker.sportsmanager.workers.dev/leagues/ELC",
+      "teamsCount": 24
+    },
+    {
+      "id": "PD",
+      "name": "España — La Liga",
+      "shortName": "PD",
+      "workerBaseURL": "https://lsm-eu-worker.sportsmanager.workers.dev/leagues/PD",
+      "teamsCount": 20
+    },
+    {
+      "id": "BL1",
+      "name": "Deutschland — Bundesliga",
+      "shortName": "BL1",
+      "workerBaseURL": "https://lsm-eu-worker.sportsmanager.workers.dev/leagues/BL1",
+      "teamsCount": 18
+    },
+    {
+      "id": "SA",
+      "name": "Italia — Serie A",
+      "shortName": "SA",
+      "workerBaseURL": "https://lsm-eu-worker.sportsmanager.workers.dev/leagues/SA",
+      "teamsCount": 20
+    },
+    {
+      "id": "FL1",
+      "name": "France — Ligue 1",
+      "shortName": "FL1",
+      "workerBaseURL": "https://lsm-eu-worker.sportsmanager.workers.dev/leagues/FL1",
+      "teamsCount": 18
+    },
+    {
+      "id": "DED",
+      "name": "Nederland — Eredivisie",
+      "shortName": "DED",
+      "workerBaseURL": "https://lsm-eu-worker.sportsmanager.workers.dev/leagues/DED",
+      "teamsCount": 18
+    }
+  ]
+}

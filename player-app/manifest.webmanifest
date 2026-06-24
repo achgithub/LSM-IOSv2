@@ -1,0 +1,10 @@
+{
+  "name": "Last Stand Manager — Submit",
+  "short_name": "LSM Submit",
+  "description": "Submit your pick or score prediction. Reviewed by your game's manager before it goes live.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b1d3a",
+  "theme_color": "#0b1d3a",
+  "icons": []
+}
