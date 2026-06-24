@@ -1,27 +1,137 @@
 # LSM v2 architecture sketch
 
-Status: **design sketch, not yet implemented** (2026-06-24). v1 (Last Man
-Standing, single mode, SwiftData-local) keeps shipping/supported throughout —
-see [Repo strategy](#5-repo-strategy-and-v1-support) below. As of 2026-06-24,
-priority has shifted to v2 — estimated at roughly a week's build given how
-much groundwork (cloud data model, submission flow, league scale decision)
-is already settled here. The only v1 work still planned is the CSV export
-(§6) before attention moves fully to the v2 fork.
+Status: **scaffolded; feature design locked, build not started** (updated
+2026-06-24). The repo, iOS rename/reorg, and the cloud *read* path (regional
+shards live, app repointed) are done — see `V2-SCAFFOLD.md` / `worker/MIGRATION.md`.
+The Predictor / league-publish / backup / submission-queue feature design is now
+settled — see **[§0 Design decisions locked](#0-design-decisions-locked-2026-06-24)**,
+which is the binding record; §§1–6 below are the original sketch kept for
+rationale, and where they predate §0 they are annotated. v1 (Last Man Standing,
+single mode, SwiftData-local) keeps shipping/supported throughout — see
+[Repo strategy](#5-repo-strategy-and-v1-support).
 
 LSM = "Last Stand Manager," the app-level brand. v2 adds a second game mode
 ("Predictor") alongside the existing one (now named "LMS" at the mode level).
-Both modes live in one app, one subscription, one cloud backend.
+Both modes live in one app under one subscription. **Game state stays on-device
+(SwiftData); the cloud is deliberately thin** — see §0.
+
+---
+
+## 0. Design decisions locked (2026-06-24)
+
+These supersede anything below them where they conflict (notably the original
+"cloud-backed game state / source of truth is D1" framing — that was dropped).
+
+### Build order
+1. **Predictor** — fully on-device, no cloud.
+2. **Cloud bundle = publish + backup** — one pay-only feature, shared R2 + a
+   Worker write-route.
+3. **PWA + submission queue** — last; the only piece needing any live
+   server-side game state (a transient submission inbox).
+
+### Game model & gameplay
+- **Game state stays on-device (SwiftData), same as v1** — LMS *and* Predictor.
+  The cloud does NOT hold games/players/picks/predictions. Cloud touches only:
+  the transient PWA submission inbox (D1), backup snapshots (R2), and league
+  publish snapshots (R2).
+- **One `Game` `@Model` + a `mode` discriminator** (`.lms | .predictor`), not a
+  sibling model — driven by wanting both an LMS and a Predictor game visible in
+  the same home-screen Games list. `GameCard` gets a mode badge; the secondary
+  line is mode-aware (LMS "Round N · X active" vs Predictor "Matchday N · X
+  players · leader"). New Game opens with a mode picker, then mode-appropriate
+  settings.
+- **Predictor**: each player predicts a score for every fixture in scope; a new
+  `Prediction` model mirrors `Pick`; **scored client-side at round close** (same
+  trigger as LMS results entry); fixture/round selection **reuses the LMS
+  mechanism**. No elimination.
+- **Settings reuse**: implicit "remember last settings" (UserDefaults prefill of
+  the New Game form). No named/cross-game templates.
+
+### Predictor scoring — configurable, tiered "best enabled rung"
+Each rung is an independent toggle + point value; a prediction earns the **single
+highest enabled rung** it qualifies for (disabled rungs are skipped → cascade
+down). Defaults:
+
+| Rung | Type | Default |
+|---|---|---|
+| Exact score | value | 4 |
+| Goal difference / margin (draws inherit this — no special-case) | toggle + value | on, 3 |
+| Correct result / outcome | toggle + value | on, 2 |
+| **Joker** — one double-points fixture per matchday | toggle | off |
+
+The joker, if on, doubles whatever that fixture scored. A correct non-exact draw
+necessarily lands on the goal-difference rung (a draw *is* GD 0), so the plain
+Result rung is unreachable for draws — accepted intentionally.
+
+### Predictions league
+- **Ranking: standard competition ranking by points only** — ties share a
+  position ("1, 1, 3"); no secondary point tiebreakers; within a tie, list
+  alphabetically.
+- Three render targets off one `LeagueStandingsSnapshot` shape: **on-device
+  table** (reuse `StandingsView` look), **share-card** (reuse
+  `SummaryCardView`/`ImageRenderer`/`ImageSharePresenter`; cap ~top-10; shows
+  names — no PIN possible on an image, accepted), and the **published page**.
+
+### Cloud bundle — publish + backup (one pay-only feature)
+- **Backup**: explicit, user-triggered **R2 blob snapshot** (serialize game(s) →
+  push → restore); doubles as export/import. Sold on durability/continuity
+  (survive a phone change / season archive), NOT "free up space" — the data is
+  small (worst case ~200 players × full Predictor season ≈ tens of thousands of
+  rows ≈ single-digit MB; SwiftData handles it easily).
+- **Publish**: the app uploads a **complete self-contained snapshot** to R2 via a
+  Worker write-route (app never holds R2 creds): the manager-selected fixtures +
+  scores for the recent window, **per-person weekly results**, cumulative league
+  standings, and the next matchday's selected fixtures. One Cloudflare **Pages**
+  site renders `/l/<unguessable-uuid>` from the blob.
+- **Privacy: the ENTIRE published page is PIN-gated and the PIN is required**
+  (weekly results are per-person). PIN is validated **server-side** in the Pages
+  Function and stored hashed; names are never in the openly-served payload. (Same
+  pattern as the darts React-Native app.)
+- **No public-page ads** (PIN-gated, internal, near-zero traffic — not worth it).
+  Free-tier revenue stays the existing in-app ads around the share-card flow.
+
+### Submission-queue manager UX (ships with the PWA, last)
+- Submissions are the one game-related thing in the cloud (PWA writes pending
+  rows to D1; app reads them). **Approval writes the real pick/prediction to local
+  SwiftData** and marks the cloud submission decided; rejection just marks it
+  rejected.
+- The queue is **not a free-floating inbox — it's anchored under "This Round"** in
+  `GameDetailView.roundSection` (a `.submissions` case on the existing `RoundSheet`
+  pattern). A tray icon + total-pending count on the home screen and a per-game
+  count on `GameCard` funnel the manager there.
+- **Player ↔ link token (data-model change):** minting a player's PWA link adds
+  a **separate, revocable `submissionToken: UUID?`** to the on-device `Player`
+  (`Core/Models/Player.swift`) — *distinct from* the player's existing local
+  primary-key `id` (don't expose that as the public credential; the token must be
+  rotatable). The token is what's in the link URL and what the cloud
+  `submission_tokens` / `submissions` carry, so an incoming/approved submission
+  maps back to the right local `Player`. nil until a link is minted; regenerating
+  = new token (old link dies).
+- Per-player rows with status chips (pending / approved / no-submission);
+  **swipe right=approve, left=reject, plus "Approve all pending."** LMS submission
+  = one team; Predictor submission = a whole slate (a score per selected fixture).
+- **Rolling window**: default view is the current round, but a filter exposes the
+  **last N rounds** (read-only history: submission + decision + timestamp) for
+  query handling. **One shared "recent window" constant (default 3)** drives both
+  the queue history and the published page's recent-results section so they never
+  drift; D1 retains that window and prunes older rows.
+
+### Still open
+Exact PIN UX; whether free-tier share-card generation is rewarded-ad-gated vs
+banner-only; recent-window constant 2 vs 3.
 
 ---
 
 ## 1. The two modes
 
 ### LMS (Last Man Standing)
-Existing elimination game, ported to be cloud-backed instead of
-SwiftData-local. One pick per round per player; wrong (or non-)pick
+> **Superseded by §0:** LMS stays **on-device (SwiftData)**, as in v1 — it is
+> *not* re-homed to D1. The text below describing a D1 source of truth is
+> obsolete.
+
+Existing elimination game. One pick per round per player; wrong (or non-)pick
 eliminates; last player standing wins. Round/Pick/Player shape carries over
-largely as-is from v1 — see `ios/LMS/LMS/Models/{Game,Round,Pick,Player}.swift`
-— just re-homed so the source of truth is D1, not on-device.
+largely as-is from v1 — see `ios/LSM/LSM/Core/Models/{Game,Round,Pick,Player}.swift`.
 
 ### Predictor
 New season-long game. Each week, players predict the score of each fixture
@@ -32,9 +142,9 @@ same way league tables are today. Unlike LMS, players are never eliminated —
 they can join/leave mid-season, and the "game" is really a running league
 table rather than a knockout.
 
-Because Predictor only makes sense with season-long durable state survivable
-across a phone change, it's cloud-backed from day one — which is what removes
-the reason LMS needs to stay local-only too.
+> **Superseded by §0:** scoring is the configurable tiered model in §0 (not the
+> 1+1+1 working example above), and Predictor is **on-device like LMS** — season
+> durability comes from the paid R2 backup, not from cloud-backed game state.
 
 ---
 
