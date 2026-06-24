@@ -107,6 +107,12 @@ Result rung is unreachable for draws — accepted intentionally.
   `submission_tokens` / `submissions` carry, so an incoming/approved submission
   maps back to the right local `Player`. nil until a link is minted; regenerating
   = new token (old link dies).
+- **Mint / regenerate / revoke is in-app** (per-player in the roster —
+  `PlayersView`): Cloudflare has no manager UI. "Regenerate" writes a new local
+  token *and* calls the Worker to upsert-new + revoke-old in `submission_tokens`,
+  so the old link stops validating immediately (pending submissions under it can
+  be auto-voided). The phone is the admin console; the Worker/D1 is just the
+  token store.
 - Per-player rows with status chips (pending / approved / no-submission);
   **swipe right=approve, left=reject, plus "Approve all pending."** LMS submission
   = one team; Predictor submission = a whole slate (a score per selected fixture).
