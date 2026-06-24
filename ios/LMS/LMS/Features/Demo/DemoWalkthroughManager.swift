@@ -50,16 +50,26 @@ final class DemoWalkthroughManager {
             DemoDataService.addPlayers(to: game, context: context)
         case .players:
             DemoDataService.openRound1(in: game, context: context)
-        case .roundOpen:
+        case .round1Open:
             if let round = game.currentRound {
                 DemoDataService.assignRound1Picks(game: game, round: round, context: context)
             }
-        case .picks:
+        case .round1Picks:
             if let round = game.currentRound {
                 DemoDataService.closeRound1(game: game, round: round, context: context)
             }
-        case .results:
-            DemoDataService.playFinalRound(game: game, context: context)
+        case .round1Results:
+            break   // purely informational "resume later" tip next — no data added
+        case .resumeTip:
+            DemoDataService.openRound2(in: game, context: context)
+        case .round2Open:
+            if let round = game.currentRound {
+                DemoDataService.assignRound2Picks(game: game, round: round, context: context)
+            }
+        case .round2Picks:
+            if let round = game.currentRound {
+                DemoDataService.closeRound2AndDeclareWinner(game: game, round: round, context: context)
+            }
         case .done:
             finish()
             return

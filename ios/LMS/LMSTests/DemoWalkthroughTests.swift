@@ -26,7 +26,9 @@ struct DemoWalkthroughTests {
         let r1 = DemoDataService.openRound1(in: game, context: context)
         DemoDataService.assignRound1Picks(game: game, round: r1, context: context)
         DemoDataService.closeRound1(game: game, round: r1, context: context)
-        DemoDataService.playFinalRound(game: game, context: context)
+        let r2 = DemoDataService.openRound2(in: game, context: context)
+        DemoDataService.assignRound2Picks(game: game, round: r2, context: context)
+        DemoDataService.closeRound2AndDeclareWinner(game: game, round: r2, context: context)
         return game
     }
 
@@ -130,10 +132,15 @@ struct DemoWalkthroughTests {
 
     @Test func stepsAdvanceInOrderToAFinalStep() {
         #expect(DemoStep.intro.next == .players)
-        #expect(DemoStep.results.next == .done)
+        // The resume tip sits between round 1's results and round 2 opening.
+        #expect(DemoStep.round1Results.next == .resumeTip)
+        #expect(DemoStep.resumeTip.next == .round2Open)
+        #expect(DemoStep.round2Picks.next == .done)
         #expect(DemoStep.done.next == nil)
         #expect(DemoStep.done.isFinal)
         #expect(!DemoStep.intro.isFinal)
+        // Both rounds stepped through, plus the resume tip: 9 stops.
+        #expect(DemoStep.count == 9)
     }
 
     @Test func scriptedPicksReferenceRealFixtureTeams() {

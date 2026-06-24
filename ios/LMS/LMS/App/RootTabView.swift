@@ -17,7 +17,6 @@ struct RootTabView: View {
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var entitlements = Entitlements.shared
-    @State private var demo = DemoWalkthroughManager.shared
     @Environment(EnabledLeagues.self) private var enabled
     // @Environment(\.scenePhase) private var scenePhase  // interstitial dropped 2026-06-15
 
@@ -46,24 +45,10 @@ struct RootTabView: View {
             }
             // App-wide banner at the very bottom; only for ad-supported tiers.
             // Kept OUTSIDE the TabView (not a safeAreaInset on it) so it renders
-            // reliably and never overlaps the tab bar's touch area. Suppressed
-            // during the demo (which is deliberately ad-free).
-            if entitlements.shouldShowAds && !demo.isActive {
+            // reliably and never overlaps the tab bar's touch area.
+            if entitlements.shouldShowAds {
                 AdBannerView()
             }
-        }
-        // The Demo Mode control surface floats above the tab bar while the
-        // walkthrough runs (Next step / Clear / Exit), explaining each step.
-        .safeAreaInset(edge: .bottom) {
-            if demo.isActive {
-                DemoModeBanner(manager: demo)
-            }
-        }
-        .animation(.easeInOut, value: demo.isActive)
-        // The demo builds the game on the Games tab — make sure that's where the
-        // user is looking when it starts.
-        .onChange(of: demo.isActive) { _, active in
-            if active { selection = .games }
         }
         .environment(entitlements)
         .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {

@@ -104,26 +104,33 @@ enum DemoDataService {
         GameLogicService.closeRound(round, game: game, context: context)
     }
 
-    // MARK: - Step 6: the whole of round 2 → one winner
+    // MARK: - Step 6: open round 2 (survivors only)
 
-    /// Open round 2, assign the survivors' picks, set results, close, then declare
-    /// the sole survivor the winner (completing the game). Everything runs through
-    /// `GameLogicService` exactly as the real screens would.
-    static func playFinalRound(game: Game, context: ModelContext) {
+    @discardableResult
+    static func openRound2(in game: Game, context: ModelContext) -> Round {
         let fixtureIds = DemoDataGenerator.round2Fixtures.map(\.matchId)
         let deadline = Date().addingTimeInterval(-2 * 24 * 3600)
-        let round = GameLogicService.openRound(
+        return GameLogicService.openRound(
             in: game, fixtureIds: fixtureIds, deadline: deadline, roundType: .normal, context: context
         )
+    }
+
+    // MARK: - Step 7: assign round 2 picks
+
+    static func assignRound2Picks(game: Game, round: Round, context: ModelContext) {
         assignPicks(DemoDataGenerator.round2Picks, game: game, round: round, context: context)
+    }
+
+    // MARK: - Step 8: round 2 results, close, and declare the winner
+
+    /// Set round 2 results, close, then declare the sole survivor the winner
+    /// (completing the game) — the same `apply(.winners:)` service path
+    /// `DeclareWinnersView` uses. Falls back to whoever's still active if the
+    /// script ever drifts.
+    static func closeRound2AndDeclareWinner(game: Game, round: Round, context: ModelContext) {
         applyResults(DemoDataGenerator.round2Fixtures, to: round)
         GameLogicService.closeRound(round, game: game, context: context)
-
-        // Exactly one player should be left standing; declare them the winner so
-        // the game completes (the same service path DeclareWinnersView uses). Fall
-        // back to whoever's still active if the script ever drifts.
-        let survivors = game.activePlayers
-        let winnerIds = survivors.map(\.id)
+        let winnerIds = game.activePlayers.map(\.id)
         if !winnerIds.isEmpty {
             GameLogicService.apply(.winners(winnerIds), game: game)
         }
