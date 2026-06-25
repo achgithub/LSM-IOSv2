@@ -244,3 +244,25 @@ CREATE TABLE IF NOT EXISTS submissions (
 
 CREATE INDEX IF NOT EXISTS idx_submissions_game   ON submissions (game_id, status);
 CREATE INDEX IF NOT EXISTS idx_submissions_token  ON submissions (token_id);
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  CLOUD BUNDLE (Phase 2; NOT the Layer 2 sync above — see §0) ────────────────
+-- ════════════════════════════════════════════════════════════════════════════
+-- The cloud bundle (backup + publish, one pay-gated entitlement) does NOT use
+-- games/players/picks/predictions above — game state stays on-device per §0.
+-- Backup needs no D1 row at all (R2 key = the client-generated restore code).
+-- Publish needs exactly one lookup row per link: the published blob itself
+-- lives in R2 (r2_key); this row exists only so the Pages Function can
+-- validate a PIN SERVER-SIDE before ever serving that blob.
+CREATE TABLE IF NOT EXISTS publish_links (
+  id            TEXT PRIMARY KEY,          -- uuid in the public /l/<id> URL
+  pin_salt      TEXT NOT NULL,             -- random per-link, mixed into pin_hash
+  pin_hash      TEXT NOT NULL,             -- sha256(salt + pin) — never the raw PIN
+  r2_key        TEXT NOT NULL,             -- e.g. publish/<id>.json
+  owner_key_id  TEXT NOT NULL,             -- creator's App Attest key id — the only
+                                           -- principal this account-free app has;
+                                           -- republishing an existing id requires a
+                                           -- match (see worker/src/routes/publish.ts)
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL              -- bumped on republish (link id stays stable)
+);

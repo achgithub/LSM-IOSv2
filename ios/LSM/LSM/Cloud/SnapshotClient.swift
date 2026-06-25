@@ -38,6 +38,27 @@ actor SnapshotClient {
         return try decoder.decode(BackupBundle.self, from: data)
     }
 
+    /// Publish (or republish, passing the same `existingLinkId`) a Predictor
+    /// predictions-league snapshot, PIN-gated server-side. Returns the link id
+    /// for `/l/<id>` — stable across republishes of the same `existingLinkId`.
+    func publish(_ snapshot: PublishSnapshot, pin: String, existingLinkId: UUID?) async throws -> UUID {
+        struct Body: Encodable {
+            let id: String?
+            let pin: String
+            let snapshot: PublishSnapshot
+        }
+        struct Response: Decodable { let id: String }
+
+        var request = try await request(path: "/publish/", method: "POST")
+        request.httpBody = try encoder.encode(Body(id: existingLinkId?.uuidString, pin: pin, snapshot: snapshot))
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let data = try await send(request)
+        guard let id = UUID(uuidString: try decoder.decode(Response.self, from: data).id) else {
+            throw APIError.badStatus(-1, body: "Worker returned an invalid link id")
+        }
+        return id
+    }
+
     private func request(path: String, method: String) async throws -> URLRequest {
         guard let url = URL(string: path, relativeTo: base) else { throw APIError.badURL }
         var request = URLRequest(url: url)

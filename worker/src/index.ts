@@ -16,6 +16,7 @@ import { Hono } from "hono";
 import { backup } from "./routes/backup";
 import { data } from "./routes/data";
 import { games } from "./routes/games";
+import { publish } from "./routes/publish";
 import { submissions } from "./routes/submissions";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -36,6 +37,7 @@ app.route("/", submissions); // /s/:token (player PWA) + /submissions/* (manager
 
 // Cloud bundle (Phase 2) — R2 blob snapshots, not Layer-2 D1 state.
 app.route("/backup", backup);
+app.route("/publish", publish);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {

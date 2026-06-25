@@ -21,8 +21,14 @@ import {
 } from "../attest-config";
 import { getDevice, updateSignCount } from "../attest-store";
 
-export async function requireAttestation(c: Context<{ Bindings: Env }>, next: Next) {
-  if (attestBypassed(c.env)) return next();
+export async function requireAttestation(
+  c: Context<{ Bindings: Env; Variables: { attestKeyId?: string } }>,
+  next: Next,
+) {
+  if (attestBypassed(c.env)) {
+    c.set("attestKeyId", "dev-bypass");
+    return next();
+  }
 
   const keyId = c.req.header("X-Attest-Key-Id");
   const challenge = c.req.header("X-Attest-Challenge");
@@ -55,6 +61,11 @@ export async function requireAttestation(c: Context<{ Bindings: Env }>, next: Ne
     console.error(JSON.stringify({ msg: "assertion rejected", error: String(err) }));
     return c.json({ error: "assertion rejected" }, 403);
   }
+
+  // The verified per-device key id — the closest thing to a "principal" this
+  // app has (no accounts). Routes that need to scope a write to "whoever
+  // created this" (e.g. Cloud Publish ownership) read it back via this key.
+  c.set("attestKeyId", keyId);
 
   return next();
 }

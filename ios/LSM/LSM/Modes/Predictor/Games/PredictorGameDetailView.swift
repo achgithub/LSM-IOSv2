@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum PredictorSheet: String, Identifiable {
-    case open, predictions, results, standings
+    case open, predictions, results, standings, publish
     var id: String { rawValue }
 }
 
@@ -11,6 +11,7 @@ private enum PredictorSheet: String, Identifiable {
 /// every player just accumulates points round over round, indefinitely.
 struct PredictorGameDetailView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     @Bindable var game: Game
     @State private var showingAddPlayers = false
     @State private var sheet: PredictorSheet?
@@ -49,6 +50,8 @@ struct PredictorGameDetailView: View {
                 if let round = openRound { PredictorResultsEntryView(game: game, round: round) }
             case .standings:
                 NavigationStack { PredictorStandingsView(game: game) }
+            case .publish:
+                PublishPredictorView(game: game)
             }
         }
         .confirmationDialog(
@@ -80,6 +83,11 @@ struct PredictorGameDetailView: View {
             LabeledContent("Matchday", value: "\(currentRound?.roundNumber ?? 0)")
             Button { sheet = .standings } label: {
                 Label("Standings", systemImage: "list.number")
+            }
+            if entitlements.canUseCloud {
+                Button { sheet = .publish } label: {
+                    Label("Publish League…", systemImage: "globe")
+                }
             }
         }
     }
