@@ -41,11 +41,16 @@ struct GamesListView: View {
                             NavigationLink(value: game) { GameCard(game: game) }
                                 // Swipe a game right to (re)open its guided wizard —
                                 // it resumes at the game's current phase and loops on.
+                                // LMS-only: the wizard's phases (picks/results/tie
+                                // resolution) are built around Pick/elimination and
+                                // have no Predictor equivalent yet.
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button { wizardGame = game } label: {
-                                        Label("Wizard", systemImage: "wand.and.stars")
+                                    if game.mode == .lms {
+                                        Button { wizardGame = game } label: {
+                                            Label("Wizard", systemImage: "wand.and.stars")
+                                        }
+                                        .tint(.purple)
                                     }
-                                    .tint(.purple)
                                 }
                         }
                         .onDelete(perform: delete)
