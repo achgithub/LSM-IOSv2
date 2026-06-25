@@ -56,6 +56,13 @@ final class Game {
     var predictorPublishPin: String?
     /// The stable `/l/<id>` link id, nil until first published.
     var predictorPublishLinkIdRaw: String?
+    /// High-entropy republish credential, minted server-side on first publish
+    /// and required on every later one — the PIN above is viewer-only and
+    /// deliberately NOT accepted as proof of ownership (a security review
+    /// flagged the earlier draft that did: brute-forcing a 6-digit PIN would
+    /// have let anyone steal/relock someone else's link, not just view it).
+    /// See worker/src/routes/publish.ts.
+    var predictorPublishOwnerToken: String?
 
     @Relationship(deleteRule: .cascade, inverse: \Player.game)
     var players: [Player] = []

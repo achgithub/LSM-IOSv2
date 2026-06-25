@@ -261,9 +261,16 @@ CREATE TABLE IF NOT EXISTS publish_links (
   r2_key        TEXT NOT NULL,             -- e.g. publish/<id>.json
   owner_key_id  TEXT NOT NULL,             -- creator's App Attest key id, or '' while
                                            -- attestation is off (current state, 2026-06)
-                                           -- — republishing then falls back to proving
-                                           -- knowledge of the current PIN instead (see
-                                           -- worker/src/routes/publish.ts)
+  owner_token   TEXT,                      -- high-entropy uuid, minted on first publish,
+                                           -- returned to the app once and stored on Game —
+                                           -- the actual republish credential while
+                                           -- attestation is off. NULL only on rows minted
+                                           -- before this column existed (none real yet).
+                                           -- The viewer PIN is intentionally NOT this
+                                           -- token's equivalent: it's short, brute-
+                                           -- forceable in seconds, and was briefly (and
+                                           -- wrongly) accepted as republish proof too —
+                                           -- see worker/src/routes/publish.ts.
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL              -- bumped on republish (link id stays stable)
 );

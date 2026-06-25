@@ -89,29 +89,40 @@ struct PublishPredictorView: View {
         }
     }
 
-    /// `newPin`, when given (the Reset PIN flow), replaces the game's PIN —
-    /// but only AFTER capturing the OLD one as `currentPin` proof for the
-    /// Worker (see `SnapshotClient.publish`); applying it before the call
-    /// would destroy the only proof of ownership the server can check while
-    /// attestation is off.
-    private func publish(newPin: String? = nil) async {
+    /// `newPin`, when given (the Reset PIN flow), replaces the game's PIN.
+    /// The republish credential is `predictorPublishOwnerToken` — NOT the
+    /// PIN (see `SnapshotClient.publish`'s doc comment for why that changed).
+    ///
+    /// `allowFreshRetry` lets a republish that's rejected for lacking a valid
+    /// owner token (e.g. a link published before that column existed, from
+    /// pre-launch testing) self-heal by minting a brand-new link instead of
+    /// leaving the manager stuck — there's no real ownership to recover for
+    /// a link republished from this exact app, so starting fresh is correct,
+    /// not a workaround. Only ever retries once.
+    private func publish(newPin: String? = nil, allowFreshRetry: Bool = true) async {
         isPublishing = true
         errorMessage = nil
         didPublish = false
         defer { isPublishing = false }
 
-        let currentPin = game.predictorPublishPin
-        let pinToSet = newPin ?? currentPin ?? Game.generatePublishPin()
+        let pinToSet = newPin ?? game.predictorPublishPin ?? Game.generatePublishPin()
 
         do {
             let data = try await LeagueData.load(for: game.leagues)
             let snapshot = PublishSnapshotBuilder.build(for: game, data: data)
-            let id = try await SnapshotClient.shared.publish(
-                snapshot, pin: pinToSet, currentPin: currentPin, existingLinkId: game.predictorPublishLinkId
+            let result = try await SnapshotClient.shared.publish(
+                snapshot, pin: pinToSet,
+                existingLinkId: game.predictorPublishLinkId,
+                ownerToken: game.predictorPublishOwnerToken
             )
             game.predictorPublishPin = pinToSet
-            game.predictorPublishLinkId = id
+            game.predictorPublishLinkId = result.id
+            game.predictorPublishOwnerToken = result.ownerToken
             didPublish = true
+        } catch APIError.badStatus(401, _) where allowFreshRetry && game.predictorPublishLinkId != nil {
+            game.predictorPublishLinkId = nil
+            game.predictorPublishOwnerToken = nil
+            await publish(newPin: newPin, allowFreshRetry: false)
         } catch {
             // Include the id we attempted, so a "not found" can be cross-checked
             // against the server's publish_links table directly if needed.

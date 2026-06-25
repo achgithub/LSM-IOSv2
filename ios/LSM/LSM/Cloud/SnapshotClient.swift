@@ -44,36 +44,41 @@ actor SnapshotClient {
         return try decoder.decode(BackupBundle.self, from: data)
     }
 
-    /// Publish (or republish, passing the same `existingLinkId`) a Predictor
-    /// predictions-league snapshot, PIN-gated server-side. Returns the link id
-    /// for `/l/<id>` — stable across republishes of the same `existingLinkId`.
+    /// Publish (or republish, passing the same `existingLinkId`/`ownerToken`)
+    /// a Predictor predictions-league snapshot, PIN-gated server-side for
+    /// viewers. Returns the link id for `/l/<id>` (stable across republishes)
+    /// and the owner token to store on `Game` and pass back next time.
     ///
-    /// `currentPin` is the link's PIN as it stands BEFORE this call (required
-    /// to republish an existing link while attestation is off — see
-    /// worker/src/routes/publish.ts; the app always has this on `Game`).
-    /// `pin` is the PIN to set going forward (same value unless resetting).
-    func publish(_ snapshot: PublishSnapshot, pin: String, currentPin: String?, existingLinkId: UUID?) async throws -> UUID {
+    /// `ownerToken` — NOT the PIN — is the republish credential while
+    /// attestation is off (see worker/src/routes/publish.ts): the PIN is
+    /// short and viewer-facing, brute-forceable in seconds, and was
+    /// deliberately removed from this role after a security review flagged
+    /// it as a takeover vector. `pin` is the PIN to set going forward.
+    func publish(
+        _ snapshot: PublishSnapshot, pin: String, existingLinkId: UUID?, ownerToken: String?
+    ) async throws -> (id: UUID, ownerToken: String) {
         struct Body: Encodable {
             let id: String?
-            let currentPin: String?
+            let ownerToken: String?
             let pin: String
             let snapshot: PublishSnapshot
         }
-        struct Response: Decodable { let id: String }
+        struct Response: Decodable { let id: String; let ownerToken: String }
 
         // No trailing slash — Hono's sub-router mounted at "/publish" matches
         // the bare path "/publish", not "/publish/" (confirmed live: the
         // trailing-slash form 404s). Verified against production 2026-06-25.
         var request = try await request(path: "/publish", method: "POST")
         request.httpBody = try encoder.encode(
-            Body(id: existingLinkId?.uuidString, currentPin: currentPin, pin: pin, snapshot: snapshot)
+            Body(id: existingLinkId?.uuidString, ownerToken: ownerToken, pin: pin, snapshot: snapshot)
         )
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(request)
-        guard let id = UUID(uuidString: try decoder.decode(Response.self, from: data).id) else {
+        let response = try decoder.decode(Response.self, from: data)
+        guard let id = UUID(uuidString: response.id) else {
             throw APIError.badStatus(-1, body: "Worker returned an invalid link id")
         }
-        return id
+        return (id, response.ownerToken)
     }
 
     private func request(path: String, method: String) async throws -> URLRequest {

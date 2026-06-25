@@ -24,26 +24,26 @@ interface PublishLinkRow {
 // POST /publish — NOT attest-gated for now (Andrew, 2026-06-25: same as v1,
 // attestation isn't enforced anywhere live yet — it's deferred until App
 // Store release, not added piecemeal per-route ahead of that). Body: {
-// id?: string, currentPin?: string, pin: string, snapshot: <PublishSnapshot
-// JSON> }. Omit `id` to mint a new link. To republish an EXISTING id, pass
-// `currentPin` — the PIN it's currently locked with (the app always has this,
-// since it's stored on the Game and shown back to the manager) — `pin` is
-// the (possibly new, e.g. on Reset PIN) PIN to set going forward.
+// id?: string, ownerToken?: string, pin: string, snapshot: <PublishSnapshot
+// JSON> }. Omit `id` to mint a new link — the response then includes a fresh
+// `ownerToken` the app must store (on `Game`) and send back on every future
+// republish of that id. `pin` is the (possibly new, e.g. on Reset PIN) PIN
+// to set going forward.
 //
-// Ownership: without attestation there's no caller identity, so proof of
-// knowing the link's CURRENT pin is the substitute credential — equivalent in
-// spirit to the unguessable-uuid model `submission_tokens`/backup restore
-// codes use elsewhere. A request with an existing `id` but no/wrong
-// `currentPin` is rejected outright (never silently allowed through) — this
-// closes a real hijack: an earlier draft fell through with neither an
-// ownership check nor a fresh id when attestation was removed. If
-// `requireAttestation` is wired back in later (see `../middleware/attest`),
-// a matching `attestKeyId` is checked FIRST and skips the currentPin
-// requirement — both checks key off the same `owner_key_id` column.
+// Ownership: a security review correctly flagged an earlier draft that used
+// the 6-digit viewer PIN itself as republish proof — brute-forceable in
+// seconds, turning "guess the PIN" into "steal/relock someone else's
+// published link", not just "view it" (the latter is an accepted tradeoff
+// per §0; the former is not). `ownerToken` is a separate, high-entropy
+// (128-bit) secret, same pattern as `submission_tokens` elsewhere, minted
+// once and never brute-forceable in practice. A request with an existing
+// `id` but no/wrong `ownerToken` (and no matching `attestKeyId`, for when
+// `requireAttestation` is wired back in at release — see
+// `../middleware/attest`) is rejected outright.
 publish.post("/", async (c) => {
   const callerKeyId = c.get("attestKeyId") ?? null;
 
-  const body = await c.req.json<{ id?: string; currentPin?: string; pin?: string; snapshot?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ id?: string; ownerToken?: string; pin?: string; snapshot?: unknown }>().catch(() => null);
   if (!body?.pin || !body.snapshot) {
     return c.json({ error: "pin and snapshot are required" }, 400);
   }
@@ -56,11 +56,12 @@ publish.post("/", async (c) => {
   // 404s. Confirmed live 2026-06-25 — the published link itself had the
   // wrong-case id baked in, so even viewers hit this.
   let id = body.id?.toLowerCase();
+  let ownerToken = body.ownerToken;
   if (id) {
     const existing = await c.env.DB
-      .prepare("SELECT pin_salt, pin_hash, owner_key_id FROM publish_links WHERE id = ?1")
+      .prepare("SELECT owner_key_id, owner_token FROM publish_links WHERE id = ?1")
       .bind(id)
-      .first<{ pin_salt: string; pin_hash: string; owner_key_id: string }>();
+      .first<{ owner_key_id: string; owner_token: string | null }>();
     if (!existing) {
       return c.json({ error: "not found" }, 404);
     }
@@ -68,13 +69,14 @@ publish.post("/", async (c) => {
     // never "" itself, so this never accidentally matches an unattested row
     // against another unattested caller.
     const ownerMatches = callerKeyId != null && existing.owner_key_id === callerKeyId;
-    const pinMatches = !ownerMatches && body.currentPin != null
-      && (await verifyPin(body.currentPin, existing.pin_salt, existing.pin_hash));
-    if (!ownerMatches && !pinMatches) {
+    const tokenMatches = !ownerMatches && existing.owner_token != null && ownerToken === existing.owner_token;
+    if (!ownerMatches && !tokenMatches) {
       return c.json({ error: "ownership cannot be verified" }, 401);
     }
+    ownerToken = existing.owner_token ?? ownerToken; // keep the existing token stable
   } else {
     id = crypto.randomUUID();
+    ownerToken = crypto.randomUUID();
   }
 
   const salt = makeSalt();
@@ -87,14 +89,14 @@ publish.post("/", async (c) => {
   });
   await c.env.DB
     .prepare(
-      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
-       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?6`,
+      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, owner_token, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?7`,
     )
-    .bind(id, salt, hash, r2Key, callerKeyId ?? "", now)
+    .bind(id, salt, hash, r2Key, callerKeyId ?? "", ownerToken, now)
     .run();
 
-  return c.json({ id });
+  return c.json({ id, ownerToken });
 });
 
 // POST /publish/:id/unlock — PUBLIC (no attest: called by the Pages page

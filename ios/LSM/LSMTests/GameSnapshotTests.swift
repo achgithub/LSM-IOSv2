@@ -118,8 +118,10 @@ struct GameSnapshotTests {
         context.insert(game)
         let pin = Game.generatePublishPin()
         let linkId = UUID()
+        let ownerToken = UUID().uuidString
         game.predictorPublishPin = pin
         game.predictorPublishLinkId = linkId
+        game.predictorPublishOwnerToken = ownerToken
 
         let snapshot = GameSnapshotBuilder.snapshot(of: game)
         let data = try JSONEncoder().encode(snapshot)
@@ -127,11 +129,13 @@ struct GameSnapshotTests {
 
         #expect(decoded.predictorPublishPin == pin)
         #expect(decoded.predictorPublishLinkIdRaw == linkId.uuidString)
+        #expect(decoded.predictorPublishOwnerToken == ownerToken)
 
         let restoreContext = try makeContext()
         let restored = GameSnapshotBuilder.restore(decoded, into: restoreContext)
         #expect(restored.predictorPublishPin == pin)
         #expect(restored.predictorPublishLinkId == linkId)
+        #expect(restored.predictorPublishOwnerToken == ownerToken)
     }
 
     @Test func generatedPublishPinIsAlwaysSixDigits() {
