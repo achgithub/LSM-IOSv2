@@ -22,6 +22,9 @@ final class Player {
     @Relationship(deleteRule: .cascade, inverse: \Pick.player)
     var picks: [Pick] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \Prediction.player)
+    var predictions: [Prediction] = []
+
     init(name: String, game: Game? = nil, isManager: Bool = false, entryNumber: Int = 0) {
         self.id = UUID()
         self.name = name

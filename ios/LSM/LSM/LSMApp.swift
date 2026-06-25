@@ -12,6 +12,6 @@ struct LSMApp: App {
         WindowGroup {
             AppRootView()
         }
-        .modelContainer(for: [Game.self, Player.self, Round.self, Pick.self, RosterMember.self, PlayerGroup.self])
+        .modelContainer(for: [Game.self, Player.self, Round.self, Pick.self, Prediction.self, RosterMember.self, PlayerGroup.self])
     }
 }

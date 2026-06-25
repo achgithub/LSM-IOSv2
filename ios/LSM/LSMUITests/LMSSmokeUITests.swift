@@ -84,6 +84,60 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "Matches")
     }
 
+    /// Phase-1 Predictor smoke: create a Predictor game via the New Game mode
+    /// picker, confirm it lands on the Games list with the "Predictor" badge,
+    /// and that its detail screen opens with the Standings entry point —
+    /// covers the mode discriminator + new-game flow + routing end-to-end,
+    /// without touching the network.
+    @MainActor
+    func testCreatePredictorGame() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let nameField = app.textFields.firstMatch
+        if nameField.waitForExistence(timeout: 15) {
+            nameField.tap()
+            nameField.typeText("UITester")
+            app.buttons["Continue"].firstMatch.tap()
+        }
+
+        XCTAssertTrue(
+            app.tabBars.buttons["Games"].waitForExistence(timeout: 15),
+            "Games tab never appeared"
+        )
+        app.tabBars.buttons["Games"].tap()
+
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Predictor"].waitForExistence(timeout: 10),
+            "Predictor mode option never appeared in the New Game picker"
+        )
+        app.staticTexts["Predictor"].tap()
+
+        let nameTextField = app.textFields["Game name"]
+        XCTAssertTrue(nameTextField.waitForExistence(timeout: 10), "Predictor form never appeared")
+        nameTextField.tap()
+        nameTextField.typeText("Predictor Test")
+
+        app.navigationBars.buttons["Create"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Predictor Test"].waitForExistence(timeout: 10),
+            "New Predictor game never appeared on the Games list"
+        )
+        XCTAssertTrue(app.staticTexts["Predictor"].waitForExistence(timeout: 5), "Predictor mode badge missing on GameCard")
+        attachScreenshot(named: "PredictorGameCard")
+
+        app.staticTexts["Predictor Test"].tap()
+        XCTAssertTrue(
+            app.buttons["Standings"].waitForExistence(timeout: 10),
+            "Predictor game detail screen never opened"
+        )
+        attachScreenshot(named: "PredictorGameDetail")
+    }
+
     private func attachScreenshot(named name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)

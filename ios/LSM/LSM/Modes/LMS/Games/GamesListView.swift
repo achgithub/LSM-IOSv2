@@ -60,9 +60,15 @@ struct GamesListView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingNew = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("New Game")
                 }
             }
-            .navigationDestination(for: Game.self) { GameDetailView(game: $0) }
+            .navigationDestination(for: Game.self) { game in
+                switch game.mode {
+                case .lms: GameDetailView(game: game)
+                case .predictor: PredictorGameDetailView(game: game)
+                }
+            }
             .sheet(isPresented: $showingNew) { NewGameView() }
             .fullScreenCover(isPresented: $showingWizard) { GameWizardView() }
             .fullScreenCover(item: $wizardGame) { GameWizardView(game: $0) }
@@ -82,17 +88,46 @@ private struct GameCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(game.name).font(.headline)
+                ModeBadge(mode: game.mode)
                 Spacer()
                 StatusBadge(status: game.status)
             }
+            secondaryLine
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var secondaryLine: some View {
+        switch game.mode {
+        case .lms:
             HStack(spacing: 12) {
                 Label("Round \(game.currentRound?.roundNumber ?? 0)", systemImage: "calendar")
                 Label("\(game.activePlayers.count) active", systemImage: "person.fill")
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        case .predictor:
+            HStack(spacing: 12) {
+                Label("Matchday \(game.currentRound?.roundNumber ?? 0)", systemImage: "calendar")
+                Label("\(game.players.count) players", systemImage: "person.fill")
+                if let leader = PredictorStandings.leaderName(for: game) {
+                    Label(leader, systemImage: "crown.fill")
+                }
+            }
         }
-        .padding(.vertical, 4)
+    }
+}
+
+private struct ModeBadge: View {
+    let mode: GameMode
+    var body: some View {
+        Text(mode == .lms ? "LMS" : "Predictor")
+            .font(.caption2.bold())
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.blue.opacity(0.15), in: Capsule())
+            .foregroundStyle(.blue)
     }
 }
 

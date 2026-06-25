@@ -30,6 +30,22 @@ final class Game {
     /// leagues). Usually one, but a game can blend several. Rounds draw fixtures
     /// from these. Empty on legacy games → `leagues` resolves to the home league.
     var leagueIdsRaw: [String] = []
+    /// Discriminates LMS (elimination) vs Predictor (score prediction) games
+    /// sharing this one model — see `GameMode`. Defaults to `.lms` so existing
+    /// games migrate unchanged.
+    var modeRaw: String = GameMode.lms.rawValue
+
+    // Predictor scoring config (§0 "best enabled rung" model) — set once at
+    // creation, prefilled from the manager's last-used settings. Unused by
+    // LMS games. Each rung is independently toggleable; a prediction earns
+    // the single highest enabled rung it qualifies for.
+    var predictorExactPoints: Int = 4
+    var predictorGDEnabled: Bool = true
+    var predictorGDPoints: Int = 3
+    var predictorResultEnabled: Bool = true
+    var predictorResultPoints: Int = 2
+    /// One double-points fixture per matchday per player, off by default.
+    var predictorJokerEnabled: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \Player.game)
     var players: [Player] = []
@@ -45,7 +61,14 @@ final class Game {
         leagueIds: [String] = [Leagues.home.id],
         drawEliminates: Bool = true,
         postponedEliminates: Bool = false,
-        isDemoData: Bool = false
+        isDemoData: Bool = false,
+        mode: GameMode = .lms,
+        predictorExactPoints: Int = 4,
+        predictorGDEnabled: Bool = true,
+        predictorGDPoints: Int = 3,
+        predictorResultEnabled: Bool = true,
+        predictorResultPoints: Int = 2,
+        predictorJokerEnabled: Bool = false
     ) {
         self.id = UUID()
         self.name = name
@@ -58,6 +81,13 @@ final class Game {
         self.drawEliminates = drawEliminates
         self.postponedEliminates = postponedEliminates
         self.isDemoData = isDemoData
+        self.modeRaw = mode.rawValue
+        self.predictorExactPoints = predictorExactPoints
+        self.predictorGDEnabled = predictorGDEnabled
+        self.predictorGDPoints = predictorGDPoints
+        self.predictorResultEnabled = predictorResultEnabled
+        self.predictorResultPoints = predictorResultPoints
+        self.predictorJokerEnabled = predictorJokerEnabled
     }
 
     /// The league(s) this game runs in (legacy empty → home). Resolved through
@@ -87,6 +117,10 @@ final class Game {
     var lastOutcome: OutcomeEnding? {
         get { lastOutcomeRaw.flatMap(OutcomeEnding.init(rawValue:)) }
         set { lastOutcomeRaw = newValue?.rawValue }
+    }
+    var mode: GameMode {
+        get { GameMode(rawValue: modeRaw) ?? .lms }
+        set { modeRaw = newValue.rawValue }
     }
 
     var activePlayers: [Player] { players.filter { $0.status == .active } }

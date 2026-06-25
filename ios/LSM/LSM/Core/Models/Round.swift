@@ -15,6 +15,9 @@ final class Round {
     @Relationship(deleteRule: .cascade, inverse: \Pick.round)
     var picks: [Pick] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \Prediction.round)
+    var predictions: [Prediction] = []
+
     init(
         roundNumber: Int,
         deadline: Date,
