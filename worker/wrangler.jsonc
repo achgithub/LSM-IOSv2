@@ -58,6 +58,15 @@
         }
       ],
 
+      // Cloud bundle (Phase 2) — backup/publish blobs. ONE bucket, bound into
+      // both shards: a backup/publish blob is self-contained (it isn't scoped
+      // to a league), so either shard can serve it regardless of which
+      // league(s) the game uses. Bucket itself isn't provisioned yet — create
+      // it on Cloudflare before deploying this config.
+      "r2_buckets": [
+        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
+      ],
+
       // No KV yet — the v2 read path serves scores from D1. KV (live-score cache)
       // comes back when the deferred upstream sync is built.
 
@@ -94,6 +103,11 @@
           "database_name": "lsm-eu-db",
           "database_id": "384ffb93-13af-43ac-b400-d4e1b0266264"
         }
+      ],
+
+      // Same shared cloud-bundle bucket as the uk shard — see that block's note.
+      "r2_buckets": [
+        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
       ],
 
       // No KV yet — see the uk block.

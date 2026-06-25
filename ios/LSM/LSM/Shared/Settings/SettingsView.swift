@@ -103,6 +103,8 @@ struct SettingsView: View {
                 }
                 #endif
 
+                CloudBackupSection()
+
                 leagueSection
 
                 Section {

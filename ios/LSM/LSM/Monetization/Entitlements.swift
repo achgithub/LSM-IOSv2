@@ -49,13 +49,23 @@ final class Entitlements {
     /// True once a tier has been resolved (RevenueCat or a dev override).
     private(set) var verified = false
 
+    /// The cloud bundle (backup + publish, PWA later) — a standalone
+    /// RevenueCat entitlement, independent of the league-count tier ladder
+    /// above (a Free or No-Ads user can still buy cloud; a 7-leagues user
+    /// doesn't get it for free). See docs/lsm-v2-architecture.md §0.
+    private(set) var hasCloudBundle = false
+
     // RevenueCat entitlement identifiers (match the dashboard + Tier raw values).
     static let entitlementNoAds = Tier.noAds.rawValue
     static let entitlementLeagues3 = Tier.leagues3.rawValue
     static let entitlementLeagues5 = Tier.leagues5.rawValue
     static let entitlementLeagues7 = Tier.leagues7.rawValue
+    /// Placeholder identifier — set the real RevenueCat entitlement id here
+    /// once it's created in the dashboard (mirrors the Tier identifiers above).
+    static let entitlementCloudBundle = "cloud_bundle"
 
     private static let devTierKey = "devTierOverride"
+    private static let devCloudBundleKey = "devCloudBundleOverride"
 
     private init() {
         // Pre-release: restore a dev tier override so a rebuild/reinstall doesn't
@@ -65,6 +75,9 @@ final class Entitlements {
            let saved = Tier(rawValue: raw) {
             tier = saved
             verified = true
+        }
+        if UserDefaults.standard.object(forKey: Self.devCloudBundleKey) != nil {
+            hasCloudBundle = UserDefaults.standard.bool(forKey: Self.devCloudBundleKey)
         }
         #endif
     }
@@ -92,6 +105,10 @@ final class Entitlements {
     /// checklist and in-game league chooser are worth showing as multi-select).
     var canHaveMultipleLeagues: Bool { leagueAllowance > 1 }
 
+    /// The single gate the Cloud Backup / Publish UI uses (Phase 2). Paid,
+    /// independent of league tier — see `hasCloudBundle`.
+    var canUseCloud: Bool { hasCloudBundle }
+
     /// Local testing override — flips the tier with no purchase. DEBUG-only: a
     /// no-op in release builds so it can never bypass the RevenueCat entitlement
     /// (production always resolves the tier via PurchaseService).
@@ -103,10 +120,24 @@ final class Entitlements {
         #endif
     }
 
+    /// Local testing override for the cloud bundle — independent of `setDevTier`
+    /// since it's a separate purchase. DEBUG-only.
+    func setDevCloudBundle(_ on: Bool) {
+        #if DEBUG
+        hasCloudBundle = on
+        UserDefaults.standard.set(on, forKey: Self.devCloudBundleKey)
+        #endif
+    }
+
     /// Applied by `PurchaseService` once it resolves the live entitlements.
     func apply(tier: Tier) {
         self.tier = tier
         self.verified = true
+    }
+
+    /// Applied by `PurchaseService` once it resolves the cloud bundle entitlement.
+    func apply(hasCloudBundle: Bool) {
+        self.hasCloudBundle = hasCloudBundle
     }
 
     func refresh() async {

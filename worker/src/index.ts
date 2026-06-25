@@ -13,6 +13,7 @@
 // See docs/lsm-v2-architecture.md.
 
 import { Hono } from "hono";
+import { backup } from "./routes/backup";
 import { data } from "./routes/data";
 import { games } from "./routes/games";
 import { submissions } from "./routes/submissions";
@@ -32,6 +33,9 @@ app.route("/", data);
 // Layer 2 — cloud-backed game state + the anonymous submission queue.
 app.route("/games", games); // manager-facing (LSM app)
 app.route("/", submissions); // /s/:token (player PWA) + /submissions/* (manager)
+
+// Cloud bundle (Phase 2) — R2 blob snapshots, not Layer-2 D1 state.
+app.route("/backup", backup);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {
