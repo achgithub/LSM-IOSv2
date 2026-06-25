@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { requireAttestation } from "../middleware/attest";
 import { hashPin, makeSalt, verifyPin } from "../pin";
 
 // ── Cloud Publish (Phase 2, Predictor only) ───────────────────────────────────
@@ -22,35 +21,57 @@ interface PublishLinkRow {
   owner_key_id: string;
 }
 
-// POST /publish — app-only (attest-gated). Body: { id?: string, pin: string,
-// snapshot: <PublishSnapshot JSON> }. Omit `id` to mint a new link; pass the
-// existing one back to republish to the same stable URL (this also lets the
-// manager change the PIN, since a fresh salt+hash is written every call).
+// POST /publish — NOT attest-gated for now (Andrew, 2026-06-25: same as v1,
+// attestation isn't enforced anywhere live yet — it's deferred until App
+// Store release, not added piecemeal per-route ahead of that). Body: {
+// id?: string, currentPin?: string, pin: string, snapshot: <PublishSnapshot
+// JSON> }. Omit `id` to mint a new link. To republish an EXISTING id, pass
+// `currentPin` — the PIN it's currently locked with (the app always has this,
+// since it's stored on the Game and shown back to the manager) — `pin` is
+// the (possibly new, e.g. on Reset PIN) PIN to set going forward.
 //
-// Ownership: `owner_key_id` is the caller's verified App Attest key id (set
-// by `requireAttestation`) — the closest thing to a principal this
-// account-free app has. Republishing an EXISTING id is only allowed if the
-// caller's key id matches the link's original owner; otherwise any attested
-// app instance could hijack/overwrite someone else's published link just by
-// guessing its uuid. A brand-new id has no prior owner, so it always succeeds.
-publish.use("/", requireAttestation);
+// Ownership: without attestation there's no caller identity, so proof of
+// knowing the link's CURRENT pin is the substitute credential — equivalent in
+// spirit to the unguessable-uuid model `submission_tokens`/backup restore
+// codes use elsewhere. A request with an existing `id` but no/wrong
+// `currentPin` is rejected outright (never silently allowed through) — this
+// closes a real hijack: an earlier draft fell through with neither an
+// ownership check nor a fresh id when attestation was removed. If
+// `requireAttestation` is wired back in later (see `../middleware/attest`),
+// a matching `attestKeyId` is checked FIRST and skips the currentPin
+// requirement — both checks key off the same `owner_key_id` column.
 publish.post("/", async (c) => {
-  const callerKeyId = c.get("attestKeyId");
-  if (!callerKeyId) return c.json({ error: "attestation required" }, 401);
+  const callerKeyId = c.get("attestKeyId") ?? null;
 
-  const body = await c.req.json<{ id?: string; pin?: string; snapshot?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ id?: string; currentPin?: string; pin?: string; snapshot?: unknown }>().catch(() => null);
   if (!body?.pin || !body.snapshot) {
     return c.json({ error: "pin and snapshot are required" }, 400);
   }
 
-  let id = body.id;
+  // Lowercase, always — `crypto.randomUUID()` mints lowercase, but Swift's
+  // `UUID.uuidString` always renders UPPERCASE, and the id round-trips
+  // through the client (returned here, put in the share link, sent back on
+  // republish/unlock). SQLite TEXT comparison is case-sensitive, so without
+  // normalizing, every iOS-originated lookup of a server-minted id silently
+  // 404s. Confirmed live 2026-06-25 — the published link itself had the
+  // wrong-case id baked in, so even viewers hit this.
+  let id = body.id?.toLowerCase();
   if (id) {
     const existing = await c.env.DB
-      .prepare("SELECT owner_key_id FROM publish_links WHERE id = ?1")
+      .prepare("SELECT pin_salt, pin_hash, owner_key_id FROM publish_links WHERE id = ?1")
       .bind(id)
-      .first<{ owner_key_id: string }>();
-    if (existing && existing.owner_key_id !== callerKeyId) {
-      return c.json({ error: "not the owner of this link" }, 403);
+      .first<{ pin_salt: string; pin_hash: string; owner_key_id: string }>();
+    if (!existing) {
+      return c.json({ error: "not found" }, 404);
+    }
+    // "" is the no-attestation sentinel (column is NOT NULL) — callerKeyId is
+    // never "" itself, so this never accidentally matches an unattested row
+    // against another unattested caller.
+    const ownerMatches = callerKeyId != null && existing.owner_key_id === callerKeyId;
+    const pinMatches = !ownerMatches && body.currentPin != null
+      && (await verifyPin(body.currentPin, existing.pin_salt, existing.pin_hash));
+    if (!ownerMatches && !pinMatches) {
+      return c.json({ error: "ownership cannot be verified" }, 401);
     }
   } else {
     id = crypto.randomUUID();
@@ -70,18 +91,25 @@ publish.post("/", async (c) => {
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
        ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?6`,
     )
-    .bind(id, salt, hash, r2Key, callerKeyId, now)
+    .bind(id, salt, hash, r2Key, callerKeyId ?? "", now)
     .run();
 
   return c.json({ id });
 });
 
 // POST /publish/:id/unlock — PUBLIC (no attest: called by the Pages page
-// itself, not the app). Body: { pin: string }. Returns the snapshot JSON only
+// itself, not the app). NOT RATE-LIMITED: a short numeric PIN (4-6 digits)
+// is brute-forceable in seconds without one. Conscious tradeoff for now,
+// not an oversight — §0 frames this as a near-zero-traffic, PIN-gated
+// convenience (sharing weekly results with a known friend group), not a
+// security boundary protecting sensitive data. Revisit with Cloudflare's
+// rate-limiting rules (or a per-id attempt counter in this same D1 row)
+// before this is exposed more broadly than "link shared with the league".
+// Body: { pin: string }. Returns the snapshot JSON only
 // if the PIN matches; otherwise 401. This is the one place the blob is ever
 // served to a viewer.
 publish.post("/:id/unlock", async (c) => {
-  const id = c.req.param("id");
+  const id = c.req.param("id").toLowerCase(); // see the case-normalization note above
   const body = await c.req.json<{ pin?: string }>().catch(() => null);
   if (!body?.pin) return c.json({ error: "pin is required" }, 400);
 

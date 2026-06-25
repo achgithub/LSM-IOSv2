@@ -47,6 +47,16 @@ final class Game {
     /// One double-points fixture per matchday per player, off by default.
     var predictorJokerEnabled: Bool = false
 
+    // Cloud Publish (Phase 2, Predictor only) — set at GAME level, not typed in
+    // on every publish: a 6-digit PIN, generated once on first Publish and
+    // reused on every republish until the manager explicitly resets it. The
+    // manager shares it however they like (it's going on share cards
+    // alongside the link, per Andrew 2026-06-25 — not meant to be retyped).
+    /// nil until the game has been published for the first time.
+    var predictorPublishPin: String?
+    /// The stable `/l/<id>` link id, nil until first published.
+    var predictorPublishLinkIdRaw: String?
+
     @Relationship(deleteRule: .cascade, inverse: \Player.game)
     var players: [Player] = []
 
@@ -121,6 +131,17 @@ final class Game {
     var mode: GameMode {
         get { GameMode(rawValue: modeRaw) ?? .lms }
         set { modeRaw = newValue.rawValue }
+    }
+    var predictorPublishLinkId: UUID? {
+        get { predictorPublishLinkIdRaw.flatMap(UUID.init(uuidString:)) }
+        set { predictorPublishLinkIdRaw = newValue?.uuidString }
+    }
+
+    /// Generates a fresh 6-digit publish PIN (e.g. for "Reset PIN") — not
+    /// auto-applied; the caller decides when to overwrite
+    /// `predictorPublishPin` (first publish, or an explicit reset).
+    static func generatePublishPin() -> String {
+        String(format: "%06d", Int.random(in: 0...999_999))
     }
 
     var activePlayers: [Player] { players.filter { $0.status == .active } }

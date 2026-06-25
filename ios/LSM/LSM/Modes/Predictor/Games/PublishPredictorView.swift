@@ -1,46 +1,57 @@
 import SwiftUI
 
 /// Publish a Predictor game's predictions league to a PIN-gated page (§0).
-/// Predictor-only — LMS has no predictions league to publish. The manager
-/// sets/changes the PIN on every publish (a fresh salt+hash is written
-/// server-side each call — see worker/src/routes/publish.ts); the link id is
-/// stable across republishes so the same `/l/<id>` keeps working.
+/// Predictor-only — LMS has no predictions league to publish.
+///
+/// The PIN lives on the GAME (`Game.predictorPublishPin`), not retyped on
+/// every publish — generated automatically the first time, reused on every
+/// republish, and only changes if the manager explicitly resets it (Andrew,
+/// 2026-06-25: it's going on share cards alongside the link, so re-entering
+/// it each time would be friction with no security upside). The link id is
+/// likewise stored on the game (`predictorPublishLinkId`), so it survives a
+/// Cloud Backup/restore too.
 struct PublishPredictorView: View {
     @Environment(\.dismiss) private var dismiss
-    let game: Game
+    @Bindable var game: Game
 
-    @AppStorage private var linkIdRaw: String
-    @State private var pin = ""
     @State private var isPublishing = false
     @State private var errorMessage: String?
-    @State private var publishedLink: String?
+    @State private var didPublish = false
+    @State private var pendingResetConfirm = false
 
-    init(game: Game) {
-        self.game = game
-        _linkIdRaw = AppStorage(wrappedValue: "", "publishLinkId.\(game.id.uuidString)")
+    /// The live Cloudflare Pages project for published Predictor leagues
+    /// (deployed 2026-06-25; see pages/README.md).
+    static let pagesBaseURL = "https://lsm-publish.pages.dev"
+
+    private var hasPublishedBefore: Bool { game.predictorPublishLinkId != nil }
+    private var publishedLink: String? {
+        // Lowercase for display/sharing — Swift's UUID.uuidString is always
+        // uppercase, but the id is server-minted lowercase (crypto.randomUUID())
+        // and a lowercase URL just reads more like a normal link. The server
+        // lowercases on lookup regardless, so this is cosmetic, not load-bearing.
+        game.predictorPublishLinkId.map { "\(PublishPredictorView.pagesBaseURL)/l/\($0.uuidString.lowercased())" }
     }
-
-    private var existingLinkId: UUID? { UUID(uuidString: linkIdRaw) }
-    private var canPublish: Bool { pin.trimmingCharacters(in: .whitespaces).count >= 4 }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    SecureField("PIN (4+ digits)", text: $pin)
-                        .keyboardType(.numberPad)
-                } header: {
-                    Text("PIN")
-                } footer: {
-                    Text("Anyone with the link needs this PIN to see results — weekly scores are per-person. Republishing lets you change it.")
-                }
-
-                if let publishedLink {
-                    Section("Link") {
-                        Text(publishedLink)
-                            .textSelection(.enabled)
-                            .font(.callout.monospaced())
-                        ShareLink(item: publishedLink)
+                if let pin = game.predictorPublishPin, let link = publishedLink {
+                    Section {
+                        Text(link).textSelection(.enabled).font(.callout.monospaced())
+                        LabeledContent("PIN", value: pin).font(.callout.monospaced())
+                        ShareLink(item: "\(link)\nPIN: \(pin)")
+                        Button("Reset PIN", role: .destructive) { pendingResetConfirm = true }
+                    } header: {
+                        Text("Link & PIN")
+                    } footer: {
+                        Text(didPublish
+                             ? "Published just now."
+                             : "Share this link and PIN together (e.g. on a share card) — anyone with both can see results.")
+                    }
+                } else {
+                    Section {
+                        Text("Publishing generates a link and a 6-digit PIN, both yours to share with the group.")
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -50,7 +61,7 @@ struct PublishPredictorView: View {
                     }
                 }
             }
-            .navigationTitle(existingLinkId == nil ? "Publish League" : "Republish League")
+            .navigationTitle(hasPublishedBefore ? "Republish League" : "Publish League")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
@@ -58,26 +69,54 @@ struct PublishPredictorView: View {
                     Button {
                         Task { await publish() }
                     } label: {
-                        if isPublishing { ProgressView() } else { Text(existingLinkId == nil ? "Publish" : "Republish") }
+                        if isPublishing { ProgressView() } else { Text(hasPublishedBefore ? "Republish" : "Publish") }
                     }
-                    .disabled(!canPublish || isPublishing)
+                    .disabled(isPublishing)
                 }
+            }
+            .confirmationDialog(
+                "Reset the PIN?",
+                isPresented: $pendingResetConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Reset & Republish", role: .destructive) {
+                    Task { await publish(newPin: Game.generatePublishPin()) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Generates a new PIN and republishes immediately. Anyone using the old PIN will need the new one.")
             }
         }
     }
 
-    private func publish() async {
+    /// `newPin`, when given (the Reset PIN flow), replaces the game's PIN —
+    /// but only AFTER capturing the OLD one as `currentPin` proof for the
+    /// Worker (see `SnapshotClient.publish`); applying it before the call
+    /// would destroy the only proof of ownership the server can check while
+    /// attestation is off.
+    private func publish(newPin: String? = nil) async {
         isPublishing = true
         errorMessage = nil
+        didPublish = false
         defer { isPublishing = false }
+
+        let currentPin = game.predictorPublishPin
+        let pinToSet = newPin ?? currentPin ?? Game.generatePublishPin()
+
         do {
             let data = try await LeagueData.load(for: game.leagues)
             let snapshot = PublishSnapshotBuilder.build(for: game, data: data)
-            let id = try await SnapshotClient.shared.publish(snapshot, pin: pin, existingLinkId: existingLinkId)
-            linkIdRaw = id.uuidString
-            publishedLink = "https://lsm.pages.dev/l/\(id.uuidString)"
+            let id = try await SnapshotClient.shared.publish(
+                snapshot, pin: pinToSet, currentPin: currentPin, existingLinkId: game.predictorPublishLinkId
+            )
+            game.predictorPublishPin = pinToSet
+            game.predictorPublishLinkId = id
+            didPublish = true
         } catch {
-            errorMessage = "Couldn't publish: \(error.localizedDescription)"
+            // Include the id we attempted, so a "not found" can be cross-checked
+            // against the server's publish_links table directly if needed.
+            let attemptedId = game.predictorPublishLinkId?.uuidString ?? "(new)"
+            errorMessage = "Couldn't publish (id: \(attemptedId)): \(error.localizedDescription)"
         }
     }
 }

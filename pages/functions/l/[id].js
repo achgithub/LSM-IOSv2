@@ -34,20 +34,24 @@ ${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}
 }
 
 function resultsPage(snapshot) {
+  // The blob came from R2 as untyped JSON (the Worker stores whatever the
+  // attested app posted to /publish without validating shape) — escape EVERY
+  // interpolated field, not just the ones expected to be strings. A "number"
+  // field is just as attacker-controllable as a name field.
   const fixtureRow = (f) =>
     `<tr><td>${escapeHtml(f.homeTeamName)} v ${escapeHtml(f.awayTeamName)}</td><td>${
-      f.homeScore != null ? `${f.homeScore}-${f.awayScore}` : "—"
+      f.homeScore != null ? `${escapeHtml(f.homeScore)}-${escapeHtml(f.awayScore)}` : "—"
     }</td></tr>`;
 
   const roundSection = (r) => `
-    <h3>Matchday ${r.roundNumber}</h3>
+    <h3>Matchday ${escapeHtml(r.roundNumber)}</h3>
     <table><tbody>${r.fixtures.map(fixtureRow).join("")}</tbody></table>
     <table><tbody>${r.results
-      .map((res) => `<tr><td>${escapeHtml(res.playerName)}</td><td>${res.points} pts</td></tr>`)
+      .map((res) => `<tr><td>${escapeHtml(res.playerName)}</td><td>${escapeHtml(res.points)} pts</td></tr>`)
       .join("")}</tbody></table>`;
 
   const standingsRows = snapshot.standings
-    .map((s) => `<tr><td>${s.position}</td><td>${escapeHtml(s.playerName)}</td><td>${s.points}</td></tr>`)
+    .map((s) => `<tr><td>${escapeHtml(s.position)}</td><td>${escapeHtml(s.playerName)}</td><td>${escapeHtml(s.points)}</td></tr>`)
     .join("");
 
   const nextFixtures = snapshot.nextFixtures.map(fixtureRow).join("");
@@ -74,7 +78,15 @@ ${snapshot.nextFixtures.length ? `<h2>Next Matchday</h2><table><tbody>${nextFixt
 }
 
 function html(body, status = 200) {
-  return new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
+  return new Response(body, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      // Belt-and-suspenders alongside escapeHtml above: no inline/external
+      // scripts can run even if a field escapes unescaped.
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+    },
+  });
 }
 
 export async function onRequestGet() {

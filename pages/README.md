@@ -16,12 +16,14 @@ no secrets stored here.
 
 ## Status
 
-**Code only — not yet deployed.** Provisioning this as an actual Cloudflare
-Pages project (and setting its `WORKER_BASE_URL` env var to a deployed
-shard's URL, e.g. `https://lsm-uk-worker.<account>.workers.dev`) is a
-deploy-affecting action to confirm with Andrew first, same as the R2
-bucket/D1 migration this depends on (see `worker/wrangler.jsonc`,
-`worker/schema.sql`'s `publish_links` table).
+**Live** — deployed 2026-06-25 as the Cloudflare Pages project `lsm-publish`
+(`https://lsm-publish.pages.dev`), `WORKER_BASE_URL` set to the UK shard
+(`https://lsm-uk-worker.sportsmanager.workers.dev`). The R2 bucket
+(`lsm-cloud-bundle`) and the `publish_links` D1 table (both shards) are also
+live. Redeploy with:
+```
+npx wrangler pages deploy public --project-name lsm-publish --branch main
+```
 
 ## Local preview
 

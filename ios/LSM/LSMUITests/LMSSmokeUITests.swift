@@ -138,6 +138,60 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "PredictorGameDetail")
     }
 
+    /// Phase-2 Cloud Backup/Publish render smoke: flips the DEBUG-only cloud
+    /// entitlement toggle in Settings (no network/purchase needed), confirms
+    /// the gated UI actually renders both there and inside a Predictor game's
+    /// detail screen — i.e. `@Environment(Entitlements.self)` really is
+    /// injected at both call sites and the views don't crash on appear.
+    @MainActor
+    func testCloudBundleUIRendersWhenEntitled() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let nameField = app.textFields.firstMatch
+        if nameField.waitForExistence(timeout: 15) {
+            nameField.tap()
+            nameField.typeText("UITester")
+            app.buttons["Continue"].firstMatch.tap()
+        }
+
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["Settings"].tap()
+
+        // Not entitled yet — the upsell row should be showing.
+        XCTAssertTrue(app.buttons["Unlock Cloud Backup"].waitForExistence(timeout: 10))
+
+        let toggle = app.switches["Simulate Cloud Backup entitlement"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Dev cloud-entitlement toggle never appeared")
+        toggle.tap()
+
+        XCTAssertTrue(app.buttons["Back Up Now"].waitForExistence(timeout: 10), "Cloud Backup section didn't switch to the entitled state")
+        XCTAssertTrue(app.buttons["Restore…"].exists)
+        attachScreenshot(named: "CloudBackupEntitled")
+
+        // Now confirm the gate also renders inside a Predictor game.
+        app.tabBars.buttons["Games"].tap()
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Predictor"].waitForExistence(timeout: 10))
+        app.staticTexts["Predictor"].tap()
+        let nameTextField = app.textFields["Game name"]
+        XCTAssertTrue(nameTextField.waitForExistence(timeout: 10))
+        nameTextField.tap()
+        nameTextField.typeText("Publish Test")
+        app.navigationBars.buttons["Create"].tap()
+
+        XCTAssertTrue(app.staticTexts["Publish Test"].waitForExistence(timeout: 10))
+        app.staticTexts["Publish Test"].tap()
+
+        let publishButton = app.buttons["Publish League…"]
+        XCTAssertTrue(publishButton.waitForExistence(timeout: 10), "Publish action never appeared on an entitled Predictor game")
+        publishButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Publish League"].waitForExistence(timeout: 10), "PublishPredictorView never opened")
+        attachScreenshot(named: "PublishPredictorView")
+    }
+
     private func attachScreenshot(named name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)

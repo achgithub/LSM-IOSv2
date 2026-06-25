@@ -259,10 +259,11 @@ CREATE TABLE IF NOT EXISTS publish_links (
   pin_salt      TEXT NOT NULL,             -- random per-link, mixed into pin_hash
   pin_hash      TEXT NOT NULL,             -- sha256(salt + pin) — never the raw PIN
   r2_key        TEXT NOT NULL,             -- e.g. publish/<id>.json
-  owner_key_id  TEXT NOT NULL,             -- creator's App Attest key id — the only
-                                           -- principal this account-free app has;
-                                           -- republishing an existing id requires a
-                                           -- match (see worker/src/routes/publish.ts)
+  owner_key_id  TEXT NOT NULL,             -- creator's App Attest key id, or '' while
+                                           -- attestation is off (current state, 2026-06)
+                                           -- — republishing then falls back to proving
+                                           -- knowledge of the current PIN instead (see
+                                           -- worker/src/routes/publish.ts)
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL              -- bumped on republish (link id stays stable)
 );

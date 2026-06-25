@@ -18,6 +18,7 @@ struct RootTabView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var entitlements = Entitlements.shared
     @Environment(EnabledLeagues.self) private var enabled
+    @Environment(\.modelContext) private var context
     // @Environment(\.scenePhase) private var scenePhase  // interstitial dropped 2026-06-15
 
     /// True when more leagues are enabled than the (possibly downgraded)
@@ -61,6 +62,10 @@ struct RootTabView: View {
                 .environment(entitlements)
         }
         .task {
+            #if DEBUG
+            DemoRosterSeeder.seedIfNeeded(context: context)
+            DemoPredictorSeeder.seedIfNeeded(context: context)
+            #endif
             PurchaseService.shared.configure()
             // Skip ad bootstrap under UI tests so the ATT / UMP consent dialogs
             // never appear and make the launch flow flaky.

@@ -33,6 +33,8 @@ struct GameSnapshot: Codable {
     let predictorResultEnabled: Bool
     let predictorResultPoints: Int
     let predictorJokerEnabled: Bool
+    let predictorPublishPin: String?
+    let predictorPublishLinkIdRaw: String?
     let players: [PlayerSnapshot]
     let rounds: [RoundSnapshot]
 
@@ -106,6 +108,8 @@ enum GameSnapshotBuilder {
             predictorResultEnabled: game.predictorResultEnabled,
             predictorResultPoints: game.predictorResultPoints,
             predictorJokerEnabled: game.predictorJokerEnabled,
+            predictorPublishPin: game.predictorPublishPin,
+            predictorPublishLinkIdRaw: game.predictorPublishLinkIdRaw,
             players: game.players.map { player in
                 GameSnapshot.PlayerSnapshot(
                     id: player.id,
@@ -174,6 +178,8 @@ enum GameSnapshotBuilder {
         game.anonymityModeRaw = snapshot.anonymityModeRaw
         game.lastOutcomeRaw = snapshot.lastOutcomeRaw
         game.createdAt = snapshot.createdAt
+        game.predictorPublishPin = snapshot.predictorPublishPin
+        game.predictorPublishLinkIdRaw = snapshot.predictorPublishLinkIdRaw
         context.insert(game)
 
         var newPlayerId: [UUID: Player] = [:]

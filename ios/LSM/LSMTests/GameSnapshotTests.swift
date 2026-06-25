@@ -112,6 +112,36 @@ struct GameSnapshotTests {
         #expect(restoredPrediction.player?.name == "Alice")
     }
 
+    @Test func publishPinAndLinkIdSurviveBackupRestoreRoundTrip() throws {
+        let context = try makeContext()
+        let game = Game(name: "Predictor", season: "2025/26", allowRepeats: true, mode: .predictor)
+        context.insert(game)
+        let pin = Game.generatePublishPin()
+        let linkId = UUID()
+        game.predictorPublishPin = pin
+        game.predictorPublishLinkId = linkId
+
+        let snapshot = GameSnapshotBuilder.snapshot(of: game)
+        let data = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(GameSnapshot.self, from: data)
+
+        #expect(decoded.predictorPublishPin == pin)
+        #expect(decoded.predictorPublishLinkIdRaw == linkId.uuidString)
+
+        let restoreContext = try makeContext()
+        let restored = GameSnapshotBuilder.restore(decoded, into: restoreContext)
+        #expect(restored.predictorPublishPin == pin)
+        #expect(restored.predictorPublishLinkId == linkId)
+    }
+
+    @Test func generatedPublishPinIsAlwaysSixDigits() {
+        for _ in 0..<50 {
+            let pin = Game.generatePublishPin()
+            #expect(pin.count == 6)
+            #expect(pin.allSatisfy { $0.isNumber })
+        }
+    }
+
     @Test func backupBundleHoldsBothModesTogether() throws {
         let context = try makeContext()
         let lms = Game(name: "LMS", season: "2025/26", allowRepeats: false, mode: .lms)

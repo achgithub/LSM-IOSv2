@@ -6,13 +6,19 @@ import Foundation
 /// `APIError`-style errors) but for a single shared write/read route rather
 /// than a per-league read-only one.
 ///
-/// Backup/restore is region-agnostic (the blob is self-contained, not scoped
-/// to a league), so this always talks to the home league's shard — either
-/// shard would do, same rationale as `Leagues.registryURL`.
+/// Always talks to one CANONICAL shard, never `Leagues.home` — backup's R2
+/// blob genuinely is region-agnostic (no D1 involved), but Publish's
+/// `publish_links` lookup lives in ONE shard's D1 (`uk`'s). If this pointed
+/// at whichever shard happens to be the user's home league, a manager whose
+/// home league is on the `eu` shard would publish a link the Pages Function
+/// (wired to a fixed `WORKER_BASE_URL`) could never find — a permanent 404,
+/// not a "either shard works" situation. Same hardcoded-canonical-shard
+/// rationale as `Leagues.registryURL`; keep both pointed at the same shard.
 actor SnapshotClient {
     static let shared = SnapshotClient()
 
-    private let base = Leagues.home.workerURL
+    private static let canonicalBase = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
+    private let base = SnapshotClient.canonicalBase
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -41,16 +47,27 @@ actor SnapshotClient {
     /// Publish (or republish, passing the same `existingLinkId`) a Predictor
     /// predictions-league snapshot, PIN-gated server-side. Returns the link id
     /// for `/l/<id>` — stable across republishes of the same `existingLinkId`.
-    func publish(_ snapshot: PublishSnapshot, pin: String, existingLinkId: UUID?) async throws -> UUID {
+    ///
+    /// `currentPin` is the link's PIN as it stands BEFORE this call (required
+    /// to republish an existing link while attestation is off — see
+    /// worker/src/routes/publish.ts; the app always has this on `Game`).
+    /// `pin` is the PIN to set going forward (same value unless resetting).
+    func publish(_ snapshot: PublishSnapshot, pin: String, currentPin: String?, existingLinkId: UUID?) async throws -> UUID {
         struct Body: Encodable {
             let id: String?
+            let currentPin: String?
             let pin: String
             let snapshot: PublishSnapshot
         }
         struct Response: Decodable { let id: String }
 
-        var request = try await request(path: "/publish/", method: "POST")
-        request.httpBody = try encoder.encode(Body(id: existingLinkId?.uuidString, pin: pin, snapshot: snapshot))
+        // No trailing slash — Hono's sub-router mounted at "/publish" matches
+        // the bare path "/publish", not "/publish/" (confirmed live: the
+        // trailing-slash form 404s). Verified against production 2026-06-25.
+        var request = try await request(path: "/publish", method: "POST")
+        request.httpBody = try encoder.encode(
+            Body(id: existingLinkId?.uuidString, currentPin: currentPin, pin: pin, snapshot: snapshot)
+        )
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(request)
         guard let id = UUID(uuidString: try decoder.decode(Response.self, from: data).id) else {

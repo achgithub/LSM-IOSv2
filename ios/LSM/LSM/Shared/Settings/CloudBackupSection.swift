@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// Cloud Backup (Phase 2) — explicit, user-triggered R2 snapshot of every
 /// on-device game, mode-agnostic (LMS + Predictor together). Lives in
@@ -34,6 +35,20 @@ struct CloudBackupSection: View {
 
                 if let restoreCode {
                     LabeledContent("Restore Code", value: restoreCode.uuidString)
+                        .textSelection(.enabled)
+                    HStack {
+                        Button {
+                            UIPasteboard.general.string = restoreCode.uuidString
+                            statusMessage = "Restore code copied."
+                        } label: {
+                            Label("Copy Code", systemImage: "doc.on.doc")
+                        }
+                        Spacer()
+                        ShareLink(item: restoreCode.uuidString) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    .font(.caption)
                 }
                 if let statusMessage {
                     Text(statusMessage).font(.caption).foregroundStyle(.secondary)
@@ -45,7 +60,7 @@ struct CloudBackupSection: View {
             Text("Cloud Backup")
         } footer: {
             Text(entitlements.canUseCloud
-                 ? "Backs up every game on this device. Note your restore code somewhere safe — it's the only way to restore on a new phone."
+                 ? "Backs up every game on this device. Save your restore code somewhere safe (or share it) — it's the only way to restore, on this phone or any other. No account, so anyone with the code can use it."
                  : "Back up all your games to the cloud and restore them on a new phone. One-time setup, no account needed.")
         }
         .alert("Restore from code", isPresented: $showRestorePrompt) {
