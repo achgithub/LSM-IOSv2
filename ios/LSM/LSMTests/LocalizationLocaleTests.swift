@@ -56,6 +56,7 @@ struct LocalizationLocaleTests {
     /// string. Positional specifiers are reordered by their index so a translation
     /// may legitimately move them (e.g. "%2$@ … %1$lld") and still match.
     private static func specifierTypes(_ s: String) -> [String] {
+        // swiftlint:disable:next force_try
         let re = try! NSRegularExpression(pattern: "%(?:(\\d+)\\$)?(@|lld|ld|d|lf|f|i|u)")
         let ns = s as NSString
         var items: [(pos: Int?, type: String)] = []

@@ -36,6 +36,7 @@ struct PlayersView: View {
                     Text("PWA Submissions")
                 } footer: {
                     Text(entitlements.canUseCloud
+                         // swiftlint:disable:next line_length
                          ? "When on, you can share a personal link with each player so they can submit picks themselves. You review and approve before anything goes live."
                          : "Share a personal link with each player so they can submit picks from their phone. Requires the Cloud Bundle.")
                 }

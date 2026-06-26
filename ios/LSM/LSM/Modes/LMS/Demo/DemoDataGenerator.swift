@@ -35,7 +35,7 @@ enum DemoDataGenerator {
     /// only — no real clubs — so there's no trademark or "is this live data?"
     /// confusion. Only the first 14 are used by the scripted fixtures; the rest
     /// round out the standings table.
-    private static let teamNames: [(name: String, short: String, tla: String)] = [
+    private static let teamNames: [(name: String, short: String, tla: String)] = [ // swiftlint:disable:this large_tuple
         ("Riverside Rovers", "Riverside", "RIV"),
         ("Hilltop Harriers", "Hilltop", "HIL"),
         ("Coastline City", "Coastline", "COA"),

@@ -16,7 +16,9 @@ struct PlayerLinkShareItem: Identifiable {
     var id: String { url.absoluteString }
 
     var shareItems: [Any] {
-        let message = "Hi \(playerName), here's your personal link to submit your pick. Save it as a bookmark or add it to your home screen so you can find it each week:\n\(url.absoluteString)"
+        let message = "Hi \(playerName), here's your personal link to submit your pick. "
+            + "Save it as a bookmark or add it to your home screen so you can find it each week:"
+            + "\n\(url.absoluteString)"
         return [message]
     }
 }

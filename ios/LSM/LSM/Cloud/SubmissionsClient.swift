@@ -96,6 +96,7 @@ actor SubmissionsClient {
         _ = try await send(req)
     }
 
+    // swiftlint:disable:next function_parameter_count
     func pushRound(
         gameToken: UUID,
         mode: String,

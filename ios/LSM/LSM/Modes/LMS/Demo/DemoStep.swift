@@ -66,6 +66,7 @@ enum DemoStep: Int, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .intro:
+            // swiftlint:disable:next line_length
             return AppString("Demo Mode just created a brand-new game — no players, no rounds yet, exactly like starting for real. We'll build it up one step at a time.")
         case .players:
             return AppString("Four sample players joined the game. In the real app you'd pull these from your reusable player list.")
@@ -74,14 +75,17 @@ enum DemoStep: Int, CaseIterable, Identifiable {
         case .round1Picks:
             return AppString("Every player has been assigned a team for round 1. Now we set the results and see who survives.")
         case .round1Results:
+            // swiftlint:disable:next line_length
             return AppString("Results set: a win, a win, a draw and a postponed match. The draw is eliminated, but the postponed pick survives — a handy edge case. Three players go through.")
         case .resumeTip:
+            // swiftlint:disable:next line_length
             return AppString("You don't have to finish in one go — your game is saved automatically. To pick it up later, go to the Games tab, swipe the game right, and tap the wizard to resume where you left off.")
         case .round2Open:
             return AppString("The three survivors carry forward into round 2, opened on a fresh set of fixtures.")
         case .round2Picks:
             return AppString("Each survivor has a team for round 2. One more set of results decides the game.")
         case .done:
+            // swiftlint:disable:next line_length
             return AppString("Round 2 narrowed it to a single survivor — Sam is the last player standing. That's a full game, two rounds, start to finish. Clear the demo, or keep exploring.")
         }
     }

@@ -391,6 +391,7 @@ enum PredictorSettings {
         defaults.object(forKey: Key.jokerEnabled) as? Bool ?? false
     }
 
+    // swiftlint:disable:next function_parameter_count
     static func saveLastUsed(
         exactPoints: Int,
         gdEnabled: Bool,

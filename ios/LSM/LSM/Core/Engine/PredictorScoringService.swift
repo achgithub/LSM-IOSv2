@@ -21,7 +21,7 @@ enum PredictorScoringService {
     /// Mirrors `GameLogicService.setPick`'s delete-and-recreate approach —
     /// inserting a fresh `Prediction` updates synchronously, where mutating an
     /// existing one's properties in place doesn't reliably propagate at once.
-    static func setPrediction(
+    static func setPrediction( // swiftlint:disable:this function_parameter_count
         player: Player,
         round: Round,
         fixtureId: Int,

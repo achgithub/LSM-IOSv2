@@ -62,6 +62,7 @@ struct CloudBackupSection: View {
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entitlements.canUseCloud
+                     // swiftlint:disable:next line_length
                      ? "Backs up every game on this device. Save your restore code somewhere safe (or share it) — it's the only way to restore, on this phone or any other. No account, so anyone with the code can use it."
                      : "Back up all your games to the cloud and restore them on a new phone. One-time setup, no account needed.")
                 if let banner = lifecycleStatus?.bannerMessage {
