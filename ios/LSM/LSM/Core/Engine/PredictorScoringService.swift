@@ -79,6 +79,17 @@ enum PredictorScoringService {
         return .draw
     }
 
+    /// Write actual scores to predictions without awarding points or closing the
+    /// round. Lets managers save partial results as they come in, then close
+    /// later. Only touches predictions whose fixture appears in `finalScores`.
+    static func saveScores(_ round: Round, finalScores: [Int: (home: Int, away: Int)]) {
+        for prediction in round.predictions {
+            guard let final = finalScores[prediction.fixtureId] else { continue }
+            prediction.actualHome = final.home
+            prediction.actualAway = final.away
+        }
+    }
+
     /// Apply final scores to every `Prediction` in the round, score them, and
     /// close the round. `finalScores` maps fixture id → (home, away) goals for
     /// every fixture the manager entered a result for.

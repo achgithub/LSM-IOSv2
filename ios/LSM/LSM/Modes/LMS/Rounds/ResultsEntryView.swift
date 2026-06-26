@@ -18,20 +18,9 @@ struct ResultsEntryView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var outcomes: [Int: FixtureOutcome] = [:]
-    @State private var lastPulled: Date?
-
-    // Refresh throttle — shared with Matches via the same 120s live-pull clock
-    // (see `LeagueDataCache.sharedMatchesThrottleUntil`): this action pulls the
-    // same live data, the same underlying fetch as the Matches tab. Without
-    // sharing the clock, a manager could pull here, then immediately pull
-    // again on the Matches tab (two independent cooldowns).
-    @State private var now = Date()
-    @State private var freshUntil: Date?
-    private var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
-
-    private func fixturesThrottleUntil() -> Date? {
-        LeagueDataCache.sharedMatchesThrottleUntil(for: game.leagues.map(\.id))
-    }
+    // Shared pull-from-server state — throttle clock is shared with Matches tab
+    // (see `LeagueDataCache.sharedMatchesThrottleUntil`): one cooldown for both.
+    @State private var refresh = LiveMatchRefreshState()
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -60,31 +49,21 @@ struct ResultsEntryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    // Free users watch a rewarded ad to pull fresh results;
-                    // subscribers pull instantly (see AdGate). Greyed while
-                    // throttled, matching Matches.
-                    Button {
-                        AdGate.run { Task { await pullFromServer() } }
-                    } label: {
-                        Label("Pull results from server", systemImage: "arrow.down.circle")
-                    }
-                    .disabled(isLoading || isThrottled)
+                    LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
                 }
             }
-            // Only advance the clock while throttled, so we don't re-render every
-            // second once the button is live again (see Matches).
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-                if isThrottled { now = tick }
+                if refresh.isThrottled { refresh.now = tick }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 4) {
-                    if let lastPulled {
+                    if let lastPulled = refresh.lastPulled {
                         Text("Updated \(lastPulled.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    if isThrottled, let freshUntil {
-                        let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(now)))
+                    if refresh.isThrottled, let freshUntil = refresh.freshUntil {
+                        let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(refresh.now)))
                         Text("Refresh available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -109,6 +88,7 @@ struct ResultsEntryView: View {
                 .background(.bar)
             }
             .task { await load() }
+            .task { refresh.rearm(for: game.leagues) }
         }
     }
 
@@ -139,14 +119,8 @@ struct ResultsEntryView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
-        // Seed any results already sitting in the (possibly already-fresh) cache —
-        // e.g. the manager refreshed Matches moments ago and the cache already
-        // has FINISHED results. Without this, opening Results looked empty
-        // even though no further fetch/ad was actually needed.
         seedOutcomesFromCache()
-        // Re-arm the throttle from the now-current caches (greyed if all fresh).
-        now = Date()
-        freshUntil = fixturesThrottleUntil()
+        refresh.rearm(for: game.leagues)
         isLoading = false
     }
 
@@ -163,20 +137,8 @@ struct ResultsEntryView: View {
     }
 
     private func pullFromServer() async {
-        // Same shared pull as the Matches tab's refresh (LeagueData.pullLiveMatches)
-        // — one fetch, one cooldown, no separate ad for the same underlying data.
-        // It writes the single Matches cache directly; reloading from cache below
-        // picks that up without a second network call. Falls back to current
-        // data on failure.
-        for league in game.leagues { _ = try? await LeagueData.pullLiveMatches(for: league) }
-        if let fresh = try? await LeagueData.load(for: game.leagues) {
-            data = fresh
-            lastPulled = Date()
-        }
+        if let fresh = await refresh.pull(for: game.leagues) { data = fresh }
         seedOutcomesFromCache()
-        // Re-arm the throttle from the now-current caches (greyed if all fresh).
-        now = Date()
-        freshUntil = fixturesThrottleUntil()
     }
 
     private func close() {
