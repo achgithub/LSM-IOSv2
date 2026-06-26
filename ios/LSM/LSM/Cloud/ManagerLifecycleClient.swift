@@ -43,10 +43,11 @@ actor ManagerLifecycleClient {
 
     /// Fetch lifecycle status — call when Cloud Settings is opened.
     func status() async -> ManagerLifecycleStatus? {
-        let token = ManagerToken.current
-        guard let url = URL(string: "/manager/\(token)/status", relativeTo: Self.base) else { return nil }
+        guard let url = URL(string: "/manager/status", relativeTo: Self.base) else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: req)
             return try decoder.decode(ManagerLifecycleStatus.self, from: data)
         } catch {
             return nil
@@ -56,19 +57,19 @@ actor ManagerLifecycleClient {
     /// Signal that the cloud bundle subscription has lapsed.
     /// Idempotent — safe to call every time Settings opens while unsubscribed.
     func unsubscribe() async {
-        let token = ManagerToken.current
-        guard let url = URL(string: "/manager/\(token)/unsubscribe", relativeTo: Self.base) else { return }
+        guard let url = URL(string: "/manager/unsubscribe", relativeTo: Self.base) else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
     }
 
     /// Clear the pending deletion if the manager re-subscribes.
     func resubscribe() async {
-        let token = ManagerToken.current
-        guard let url = URL(string: "/manager/\(token)/resubscribe", relativeTo: Self.base) else { return }
+        guard let url = URL(string: "/manager/resubscribe", relativeTo: Self.base) else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
     }
 }
