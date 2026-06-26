@@ -58,6 +58,14 @@ actor SubmissionsClient {
 
     private static let canonicalBase = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
     private let base = SubmissionsClient.canonicalBase
+
+    /// Base URL for player-facing PWA links (Cloudflare Pages, not the Worker).
+    static let playerBase = URL(string: "https://submit.sportsmanager.site")!
+
+    /// Build the shareable /s/:token URL a player taps to open the PWA.
+    static func playerLinkURL(token: String) -> URL {
+        playerBase.appending(path: "s/\(token.lowercased())")
+    }
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 

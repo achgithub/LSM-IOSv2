@@ -418,7 +418,7 @@ struct GameDetailView: View {
 
     private func playerLinkURL(for player: Player) -> URL? {
         guard let token = player.submissionToken else { return nil }
-        return URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev/s/\(token.uuidString.lowercased())")
+        return SubmissionsClient.playerLinkURL(token: token.uuidString)
     }
 
     private func shareLink(for player: Player) {
@@ -444,10 +444,10 @@ struct GameDetailView: View {
                     playerName: name
                 )
                 player.submissionTokenRaw = token.lowercased()
-                let url = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev/s/\(token.lowercased())")
+                let url = SubmissionsClient.playerLinkURL(token: token)
                 await MainActor.run {
                     isMintingLink = false
-                    if let url { linkShareItem = PlayerLinkShareItem(playerName: name, url: url) }
+                    linkShareItem = PlayerLinkShareItem(playerName: name, url: url)
                 }
             } catch {
                 await MainActor.run { isMintingLink = false }
