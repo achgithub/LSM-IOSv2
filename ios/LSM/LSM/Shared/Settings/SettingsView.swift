@@ -84,7 +84,7 @@ struct SettingsView: View {
                     Text("Flips ad-on / ad-off + league allowance without a purchase. Free/No Ads = 1, then 3 / 5 / 7 leagues by tier.")
                         .font(.caption).foregroundStyle(.secondary)
                     Toggle("Simulate Cloud Backup entitlement", isOn: Binding(
-                        get: { entitlements.hasCloudBundle },
+                        get: { entitlements.cloudEntitlement == .active },
                         set: { entitlements.setDevCloudBundle($0) }
                     ))
                     Text("Standalone from the tier above — flips the Cloud Backup/Publish gate without a purchase.")

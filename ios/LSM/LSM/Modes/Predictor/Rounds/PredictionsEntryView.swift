@@ -80,6 +80,14 @@ struct PredictionsEntryView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
             .task { await load() }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Enter your prediction",
+                        detail: "Other players are pre-filled. Enter a score for the first fixture (try 2–0), then tap Done ↑."
+                    )
+                }
+            }
         }
     }
 
@@ -92,6 +100,30 @@ struct PredictionsEntryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+        if game.isDemoData { seedTutorialPredictions() }
+    }
+
+    /// Pre-fills all scripted predictions except Alex's fixture 8008, which
+    /// the user enters themselves. Alex's other 3 fixtures are pre-filled too.
+    private func seedTutorialPredictions() {
+        let userFixtureId = TutorialDataGenerator.predictorFirstMatchId
+        for player in game.players {
+            guard let script = TutorialDataGenerator.predictorScriptedPredictions[player.name] else { continue }
+            for fixture in TutorialDataGenerator.predictorFixtures {
+                // Leave Alex's first fixture blank for the user to enter
+                if player.name == "Alex" && fixture.matchId == userFixtureId { continue }
+                // Skip if already set
+                let existing = PredictorScoringService.predictions(for: player, in: round)
+                if existing.contains(where: { $0.fixtureId == fixture.matchId }) { continue }
+                guard let pred = script[fixture.matchId] else { continue }
+                PredictorScoringService.setPrediction(
+                    player: player, round: round,
+                    fixtureId: fixture.matchId, home: pred.home, away: pred.away,
+                    context: context
+                )
+            }
+        }
+        try? context.save()
     }
 }
 

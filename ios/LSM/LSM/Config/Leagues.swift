@@ -125,11 +125,10 @@ enum Leagues {
     /// The user's configured home league (the one a new game defaults to).
     static var home: LeagueOption { byId(manifest.homeLeagueId) ?? all[0] }
 
-    /// Stable id of the local, code-defined demo league used by the "Show Me"
-    /// walkthrough. Deliberately NOT in `leagues.json`/`all`, so it never appears
-    /// in Settings, New Game, or any other user-facing league picker — it only
-    /// ever backs demo games, whose fixtures/teams/standings are seeded straight
-    /// into the on-disk cache locally (no Worker, no network). See `DemoDataService`.
+    /// Stable id of the local, code-defined demo league used by the tutorial.
+    /// Deliberately NOT in `leagues.json`/`all`, so it never appears in Settings,
+    /// New Game, or any other user-facing league picker — it only ever backs tutorial
+    /// games, whose fixtures/teams/standings are seeded locally (no Worker, no network).
     static let demoLeagueId = "DEMO_LOCAL"
 
     /// The local demo league. Its `workerBaseURL` is a placeholder that's never

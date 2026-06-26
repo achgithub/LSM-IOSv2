@@ -1,10 +1,12 @@
 import SwiftUI
+import SwiftData
 
 /// Manager override (spec §13c.8): declare winner(s) at any round close. Selected
 /// players become winners, everyone else is eliminated, and the game completes —
 /// regardless of the configured tie rule.
 struct DeclareWinnersView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     let game: Game
     let onDone: () -> Void
 
@@ -58,6 +60,7 @@ struct DeclareWinnersView: View {
 
     private func apply() {
         GameLogicService.apply(.winners(Array(selection)), game: game)
+        try? context.save()
         onDone()
         dismiss()
     }

@@ -20,11 +20,9 @@ final class Game {
     /// shareable from the game screen. nil until a tie has been resolved.
     var lastOutcomeRaw: String?
     var createdAt: Date
-    /// True for games created by the interactive "Show Me" demo walkthrough. Marks
-    /// every demo game (and, by cascade, its players/rounds/picks) so demo content
-    /// can be identified and cleared without touching the manager's real games. New
-    /// property defaults to false → existing games migrate as non-demo. See
-    /// `DemoDataService`.
+    /// True for games created by the tutorial ("See How It Works"). Marks every
+    /// tutorial game so its content can be identified and cleared without touching
+    /// the manager's real games. Defaults to false → existing games migrate as non-tutorial.
     var isDemoData: Bool = false
     /// The league(s) this game runs in (chosen at creation from the enabled
     /// leagues). Usually one, but a game can blend several. Rounds draw fixtures

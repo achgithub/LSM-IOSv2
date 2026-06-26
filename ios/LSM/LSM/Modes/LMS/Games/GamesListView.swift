@@ -8,7 +8,7 @@ struct GamesListView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNew = false
     @State private var showingWizard = false
-    @State private var showingDemo = false   // Show Me — hidden for now, plumbing kept
+    @State private var showingTutorial = false
     @State private var wizardGame: Game?
 
     var body: some View {
@@ -25,6 +25,10 @@ struct GamesListView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         Button("New Game") { showingNew = true }
+                        Button { showingTutorial = true } label: {
+                            Label("See How It Works", systemImage: "play.circle")
+                        }
+                        .tint(.secondary)
                     }
                 } else {
                     List {
@@ -66,7 +70,7 @@ struct GamesListView: View {
             .sheet(isPresented: $showingNew) { NewGameView() }
             .fullScreenCover(isPresented: $showingWizard) { GameWizardView() }
             .fullScreenCover(item: $wizardGame) { GameWizardView(game: $0) }
-            .fullScreenCover(isPresented: $showingDemo) { DemoWizardView() }
+            .fullScreenCover(isPresented: $showingTutorial) { TutorialContainerView() }
         }
     }
 

@@ -1,6 +1,14 @@
 import Foundation
 import SwiftData
 
+enum PredictorScoringError: LocalizedError {
+    case incompleteScores
+
+    var errorDescription: String? {
+        "Every fixture must have a result entered before the round can be closed."
+    }
+}
+
 /// Predictor scoring: a "best enabled rung" cascade (§0 of the architecture
 /// doc). Kept separate from `GameLogicService`/`GameEngine` — Predictor has no
 /// elimination, ties or tie-resolution, so threading it through that LMS
@@ -93,12 +101,17 @@ enum PredictorScoringService {
     /// Apply final scores to every `Prediction` in the round, score them, and
     /// close the round. `finalScores` maps fixture id → (home, away) goals for
     /// every fixture the manager entered a result for.
+    /// - Throws: `PredictorScoringError.incompleteScores` if any fixture in the
+    ///   round has no score in `finalScores`.
     static func closeRound(
         _ round: Round,
         game: Game,
         finalScores: [Int: (home: Int, away: Int)],
         context: ModelContext
-    ) {
+    ) throws {
+        guard round.fixtureIds.allSatisfy({ finalScores[$0] != nil }) else {
+            throw PredictorScoringError.incompleteScores
+        }
         for prediction in round.predictions {
             guard let final = finalScores[prediction.fixtureId] else { continue }
             prediction.actualHome = final.home

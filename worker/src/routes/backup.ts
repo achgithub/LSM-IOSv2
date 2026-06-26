@@ -12,15 +12,13 @@ import { Hono } from "hono";
 // Either regional shard can serve a backup (it isn't scoped to a league), so
 // the BACKUPS R2 bucket is bound identically into both `uk` and `eu` envs.
 //
-// NOT attest-gated (Andrew, 2026-06-25): same as v1 — attestation isn't
-// enforced anywhere live yet, deferred until App Store release rather than
-// added piecemeal per-route ahead of that. The restore-code uuid being
-// unguessable is this route's actual access control, same model as
-// `submission_tokens` elsewhere. Re-add `import { requireAttestation } from
-// "../middleware/attest"` + `backup.use("*", requireAttestation)` at release.
+// Attest-gated via `app.use("/backup/*", requireAttestation)` in index.ts —
+// only the genuine iOS app can write or read backups.
 export const backup = new Hono<{ Bindings: Env }>();
 
 const keyFor = (id: string) => `backups/${id}.json`;
+
+const MAX_BACKUP_BYTES = 5 * 1024 * 1024; // 5 MB — generous for any realistic game state
 
 // PUT /backup/:id — body is the app's BackupBundle JSON. Overwrites any
 // existing blob at this id (the manager just re-backs-up onto the same code).
@@ -31,6 +29,7 @@ backup.put("/:id", async (c) => {
   const managerToken = c.req.header("X-Manager-Token")?.toLowerCase() ?? null;
   const body = await c.req.text();
   if (!body) return c.json({ error: "empty body" }, 400);
+  if (body.length > MAX_BACKUP_BYTES) return c.json({ error: "payload too large" }, 413);
   await c.env.BACKUPS.put(keyFor(id), body, {
     httpMetadata: { contentType: "application/json" },
   });

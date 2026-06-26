@@ -102,6 +102,14 @@ struct PicksEntryView: View {
                 }
             }
             .task { await load() }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Tutorial picks pre-assigned",
+                        detail: "Each player's pick is set for the tutorial. Tap Done ↑ to save and continue."
+                    )
+                }
+            }
             .sheet(isPresented: $showShare) {
                 SummaryShareView(game: game, round: round, type: .picks)
             }
@@ -145,6 +153,19 @@ struct PicksEntryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+        if game.isDemoData { assignTutorialPicks() }
+    }
+
+    private func assignTutorialPicks() {
+        let picks: [String: Int] = round.roundNumber == 1
+            ? TutorialDataGenerator.lmsRound1Picks
+            : TutorialDataGenerator.lmsRound2Picks
+        for player in game.activePlayers {
+            guard GameLogicService.pick(for: player, in: round) == nil,
+                  let teamId = picks[player.name] else { continue }
+            GameLogicService.setPick(player: player, round: round, teamId: teamId, context: context)
+        }
+        try? context.save()
     }
 
     /// Confirmed auto-assign. If the held table is over the staleness threshold,

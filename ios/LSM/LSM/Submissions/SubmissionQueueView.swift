@@ -167,6 +167,7 @@ struct SubmissionQueueView: View {
                 PredictorScoringService.setJoker(player: player, round: round, fixtureId: jokerScore.fixtureId)
             }
         }
+        try? context.save()
     }
 }
 

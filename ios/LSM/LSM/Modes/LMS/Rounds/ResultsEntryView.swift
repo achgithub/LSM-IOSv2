@@ -82,6 +82,7 @@ struct ResultsEntryView: View {
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 8)
                     .disabled(round.status == .closed || !allResultsSet)
+                    .tutorialHighlight(when: game.isDemoData && allResultsSet)
                 }
                 .padding(.bottom, 6)
                 .padding(.horizontal)
@@ -89,6 +90,14 @@ struct ResultsEntryView: View {
             }
             .task { await load() }
             .task { refresh.rearm(for: game.leagues) }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Tutorial results loaded",
+                        detail: "Scores are pre-filled. Tap Close Round ↓ to eliminate and advance."
+                    )
+                }
+            }
         }
     }
 
@@ -156,6 +165,7 @@ struct ResultsEntryView: View {
         }
 
         let result = GameLogicService.closeRound(round, game: game, context: context)
+        try? context.save()
 
         if result.allEliminated {
             // Hand off to the parent to present the resolution at the top level
@@ -165,6 +175,7 @@ struct ResultsEntryView: View {
         } else if result.remainingActive == 1,
                   let winner = game.players.first(where: { $0.status == .active }) {
             GameLogicService.apply(.winners([winner.id]), game: game)
+            try? context.save()
             dismiss()
         } else {
             dismiss()

@@ -14,12 +14,14 @@
 
 import { Hono } from "hono";
 import { backup } from "./routes/backup";
+import { attest } from "./routes/attest";
 import { runDailyCleanup } from "./cron";
 import { data } from "./routes/data";
 import { games } from "./routes/games";
 import { manager } from "./routes/manager";
 import { publish } from "./routes/publish";
 import { submissions } from "./routes/submissions";
+import { requireAttestation } from "./middleware/attest";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -31,17 +33,28 @@ app.get("/health", async (c) => {
 });
 
 // Layer 1 — read path + league discovery (/leagues.json, /leagues/:id/*).
+// Attestation is enforced inside data.ts for /leagues/:id/scores and /leagues/:id/fixtures;
+// /leagues.json, /leagues/:id/teams, and /leagues/:id/standings remain public.
 app.route("/", data);
 
 // Layer 2 — cloud-backed game state + the anonymous submission queue.
 app.route("/games", games); // manager-facing (LSM app)
 app.route("/", submissions); // /s/:token (player PWA) + /submissions/* (manager)
 
-// Cloud bundle (Phase 2) — R2 blob snapshots, not Layer-2 D1 state.
+// Attest enrolment — public (no assertion required; this is how clients register).
+app.route("/attest", attest);
+
+// Cloud bundle (Phase 2) — R2 blob snapshots. Attest-gated; /publish/:id/unlock
+// (viewer PIN check) stays public and is NOT covered by the wildcard below.
+app.use("/backup/*", requireAttestation);
 app.route("/backup", backup);
+
+app.use("/publish", requireAttestation); // POST /publish only; /publish/:id/unlock is public
 app.route("/publish", publish);
 
-// Phase 6 — manager lifecycle (status, unsubscribe, resubscribe).
+// Phase 6 — manager lifecycle. Attest-gated so only the genuine app can
+// trigger subscription events or schedule data deletion.
+app.use("/manager/*", requireAttestation);
 app.route("/manager", manager);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));

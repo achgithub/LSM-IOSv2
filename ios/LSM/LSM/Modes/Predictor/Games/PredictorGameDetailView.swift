@@ -139,7 +139,9 @@ struct PredictorGameDetailView: View {
                     Label("Edit Fixtures", systemImage: "pencil")
                 }
                 Button { sheet = .predictions } label: { Label("Enter Predictions", systemImage: "checklist") }
+                    .tutorialAnchor(id: "pred.enterPredictions")
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
+                    .tutorialAnchor(id: "pred.enterResults")
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button { sheet = .submissions } label: {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
@@ -150,6 +152,7 @@ struct PredictorGameDetailView: View {
             } else {
                 Button { sheet = .open } label: { Label("Open Matchday", systemImage: "calendar.badge.plus") }
                     .disabled(game.players.isEmpty)
+                    .tutorialAnchor(id: "pred.openRound")
             }
         }
     }
@@ -159,6 +162,7 @@ struct PredictorGameDetailView: View {
         if latestClosedRound != nil {
             Section("Share") {
                 shareCardButton("Share Weekly Results", .shareWeeklyResults, enabled: true)
+                    .tutorialAnchor(id: "pred.shareResults")
                 shareCardButton("Share League Table", .shareLeague, enabled: true)
                 shareCardButton("Share Final Standings", .shareWinner, enabled: true)
             }
@@ -190,6 +194,7 @@ struct PredictorGameDetailView: View {
             Button { showingAddPlayers = true } label: {
                 Label("Add Players", systemImage: "person.badge.plus")
             }
+            .tutorialAnchor(id: "pred.addPlayers")
         }
     }
 

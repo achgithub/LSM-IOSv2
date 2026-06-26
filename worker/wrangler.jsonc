@@ -37,11 +37,9 @@
 
       "vars": {
         "SHARD_REGION": "uk",
-        // App Attest (Phase 2) — bundle id is now v2's own id, distinct from v1.
-        // FLIP APP_ATTEST_ENV TO "production" AT RELEASE.
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
         "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LSM",
-        "APP_ATTEST_ENV": "development",
+        "APP_ATTEST_ENV": "production",
         // Region-wide maintenance window (UK leagues cluster around the same hours).
         "MAINTENANCE_WINDOW_UTC": "04:00"
       },
@@ -88,7 +86,7 @@
         "SHARD_REGION": "eu",
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
         "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LSM",
-        "APP_ATTEST_ENV": "development",
+        "APP_ATTEST_ENV": "production",
         // CET-cluster window (most of these leagues are CET); a single regional
         // value is a deliberate simplification of v1's per-league windows.
         "MAINTENANCE_WINDOW_UTC": "02:00"

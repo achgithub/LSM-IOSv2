@@ -39,7 +39,7 @@ struct PurchaseOption: Identifiable, Hashable {
 
 /// The cloud bundle's RevenueCat package id — a standalone purchase, not a
 /// `Tier`/`PurchaseOption` (it isn't part of the league-count cascade).
-/// Placeholder — confirm against the real RevenueCat dashboard identifier.
+/// Verify this matches the package identifier in the RevenueCat dashboard.
 private let cloudBundlePackageId = "cloud_bundle_monthly"
 
 /// Outcome of buying/restoring the cloud bundle. Mirrors
@@ -96,7 +96,9 @@ final class PurchaseService {
     func configure() {
         #if canImport(RevenueCat)
         guard !isConfigured, !Self.apiKey.contains("REPLACE_ME") else { return }
+        #if DEBUG
         Purchases.logLevel = .debug
+        #endif
         Purchases.configure(withAPIKey: Self.apiKey)
         isConfigured = true
         Task { await refreshTier() }
@@ -109,7 +111,7 @@ final class PurchaseService {
         do {
             let info = try await Purchases.shared.customerInfo()
             Entitlements.shared.apply(tier: Self.tier(from: info))
-            Entitlements.shared.apply(hasCloudBundle: Self.hasCloudBundle(from: info))
+            Entitlements.shared.apply(cloudEntitlement: Self.hasCloudBundle(from: info) ? .active : .inactive)
         } catch {
             // Leave the current tier; a later refresh (foreground) can retry.
         }
@@ -125,7 +127,7 @@ final class PurchaseService {
             let info = try await Purchases.shared.restorePurchases()
             let tier = Self.tier(from: info)
             Entitlements.shared.apply(tier: tier)
-            Entitlements.shared.apply(hasCloudBundle: Self.hasCloudBundle(from: info))
+            Entitlements.shared.apply(cloudEntitlement: Self.hasCloudBundle(from: info) ? .active : .inactive)
             return .success(tier)
         } catch {
             return .failed(error.localizedDescription)
@@ -149,7 +151,7 @@ final class PurchaseService {
             if result.userCancelled { return .cancelled }
             let info = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
             let active = Self.hasCloudBundle(from: info)
-            Entitlements.shared.apply(hasCloudBundle: active)
+            Entitlements.shared.apply(cloudEntitlement: active ? .active : .inactive)
             return active ? .success : .unavailable
         } catch {
             return .failed(error.localizedDescription)
@@ -168,7 +170,7 @@ final class PurchaseService {
         do {
             let info = try await Purchases.shared.restorePurchases()
             let active = Self.hasCloudBundle(from: info)
-            Entitlements.shared.apply(hasCloudBundle: active)
+            Entitlements.shared.apply(cloudEntitlement: active ? .active : .inactive)
             return active ? .success : .unavailable
         } catch {
             return .failed(error.localizedDescription)
@@ -219,10 +221,9 @@ final class PurchaseService {
         info.entitlements[Entitlements.entitlementCloudBundle]?.isActive == true
     }
 
-    /// Maps a purchase option to its RevenueCat package by `packageId`. TODO:
-    /// confirm these identifiers in the RevenueCat dashboard match
-    /// `PurchaseOption.packageId` (e.g. "no_ads", "leagues_3_monthly",
-    /// "leagues_5_monthly", "leagues_7_monthly").
+    /// Maps a purchase option to its RevenueCat package by `packageId`.
+    /// Verify that the dashboard package identifiers match `PurchaseOption.packageId`
+    /// (e.g. "no_ads", "leagues_3_monthly", "leagues_5_monthly", "leagues_7_monthly").
     private static func package(for option: PurchaseOption, in offerings: Offerings) -> Package? {
         let packages = offerings.current?.availablePackages ?? []
         return packages.first { $0.identifier == option.packageId }

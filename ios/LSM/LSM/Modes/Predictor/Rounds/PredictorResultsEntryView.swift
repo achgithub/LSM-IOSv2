@@ -17,11 +17,16 @@ struct PredictorResultsEntryView: View {
     @State private var errorMessage: String?
     @State private var scores: [Int: (home: Int, away: Int)] = [:]
     @State private var refresh = LiveMatchRefreshState()
+    @State private var closeError: String?
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
         let ids = Set(round.fixtureIds)
         return data.matches.filter { ids.contains($0.id) }.sorted(by: MatchDTO.byKickoffThenId)
+    }
+
+    private var allScoresSet: Bool {
+        !roundFixtures.isEmpty && roundFixtures.allSatisfy { scores[$0.id] != nil }
     }
 
     var body: some View {
@@ -47,6 +52,14 @@ struct PredictorResultsEntryView: View {
                 if refresh.isThrottled { refresh.now = tick }
             }
             .safeAreaInset(edge: .bottom) { bottomBar }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Tutorial scores loaded",
+                        detail: "Final scores are pre-filled. Tap Close Round ↓ to calculate points."
+                    )
+                }
+            }
             .task { await load() }
             .task { refresh.rearm(for: game.leagues) }
         }
@@ -118,6 +131,7 @@ struct PredictorResultsEntryView: View {
             HStack(spacing: 12) {
                 Button {
                     PredictorScoringService.saveScores(round, finalScores: scores)
+                    try? context.save()
                 } label: {
                     Text("Save Scores").frame(maxWidth: .infinity)
                 }
@@ -128,13 +142,22 @@ struct PredictorResultsEntryView: View {
                     Text("Close Round").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(round.status == .closed)
+                .disabled(round.status == .closed || !allScoresSet)
+                .tutorialHighlight(when: game.isDemoData && allScoresSet)
             }
             .padding(.top, 4)
         }
         .padding(.bottom, 6)
         .padding(.horizontal)
         .background(.bar)
+        .alert("Cannot close round", isPresented: Binding(
+            get: { closeError != nil },
+            set: { if !$0 { closeError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(closeError ?? "")
+        }
     }
 
     private func adjust(_ fixtureId: Int, isHome: Bool, by delta: Int) {
@@ -187,7 +210,12 @@ struct PredictorResultsEntryView: View {
     }
 
     private func close() {
-        PredictorScoringService.closeRound(round, game: game, finalScores: scores, context: context)
-        dismiss()
+        do {
+            try PredictorScoringService.closeRound(round, game: game, finalScores: scores, context: context)
+            try context.save()
+            dismiss()
+        } catch {
+            closeError = error.localizedDescription
+        }
     }
 }

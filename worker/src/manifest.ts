@@ -35,13 +35,17 @@ const LEAGUES: Record<string, LeagueMeta> = {
 /** Build the app-shaped manifest. Each league's workerBaseURL points at its
  *  shard's `/leagues/<id>` base, so the app's APIClient appends `/fixtures` etc. */
 export function buildManifest() {
-  const leagues = Object.entries(LEAGUES).map(([id, m]) => ({
-    id,
-    name: m.name,
-    shortName: m.shortName,
-    workerBaseURL: `${SHARD_BASE[LEAGUE_SHARD[id]]}/leagues/${id}`,
-    teamsCount: m.teamsCount,
-  }));
+  const leagues = Object.entries(LEAGUES).map(([id, m]) => {
+    const shard = LEAGUE_SHARD[id];
+    if (!shard) throw new Error(`No shard configured for league ${id}`);
+    return {
+      id,
+      name: m.name,
+      shortName: m.shortName,
+      workerBaseURL: `${SHARD_BASE[shard]}/leagues/${id}`,
+      teamsCount: m.teamsCount,
+    };
+  });
   return {
     app: { name: "Last Stand Manager", season: "2025/26", allowRepeatDefault: false },
     homeLeagueId: "PL",

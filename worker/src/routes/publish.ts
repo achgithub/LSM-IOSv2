@@ -19,16 +19,16 @@ interface PublishLinkRow {
   pin_hash: string;
   r2_key: string;
   owner_key_id: string;
+  unlock_attempts: number;
+  unlock_locked_until: string | null;
 }
 
-// POST /publish — NOT attest-gated for now (Andrew, 2026-06-25: same as v1,
-// attestation isn't enforced anywhere live yet — it's deferred until App
-// Store release, not added piecemeal per-route ahead of that). Body: {
-// id?: string, ownerToken?: string, pin: string, snapshot: <PublishSnapshot
-// JSON> }. Omit `id` to mint a new link — the response then includes a fresh
-// `ownerToken` the app must store (on `Game`) and send back on every future
-// republish of that id. `pin` is the (possibly new, e.g. on Reset PIN) PIN
-// to set going forward.
+// POST /publish — attest-gated via `app.use("/publish", requireAttestation)` in
+// index.ts. Body: { id?: string, ownerToken?: string, pin: string, snapshot:
+// <PublishSnapshot JSON> }. Omit `id` to mint a new link — the response then
+// includes a fresh `ownerToken` the app must store (on `Game`) and send back on
+// every future republish of that id. `pin` is the (possibly new, e.g. on Reset
+// PIN) PIN to set going forward.
 //
 // Ownership: a security review correctly flagged an earlier draft that used
 // the 6-digit viewer PIN itself as republish proof — brute-forceable in
@@ -99,31 +99,50 @@ publish.post("/", async (c) => {
   return c.json({ id, ownerToken });
 });
 
+const UNLOCK_MAX_ATTEMPTS = 10;
+const UNLOCK_LOCKOUT_MINUTES = 30;
+
 // POST /publish/:id/unlock — PUBLIC (no attest: called by the Pages page
-// itself, not the app). NOT RATE-LIMITED: a short numeric PIN (4-6 digits)
-// is brute-forceable in seconds without one. Conscious tradeoff for now,
-// not an oversight — §0 frames this as a near-zero-traffic, PIN-gated
-// convenience (sharing weekly results with a known friend group), not a
-// security boundary protecting sensitive data. Revisit with Cloudflare's
-// rate-limiting rules (or a per-id attempt counter in this same D1 row)
-// before this is exposed more broadly than "link shared with the league".
-// Body: { pin: string }. Returns the snapshot JSON only
-// if the PIN matches; otherwise 401. This is the one place the blob is ever
-// served to a viewer.
+// itself, not the app). Rate-limited: 10 failed attempts per link triggers a
+// 30-minute per-link lockout tracked in D1. Body: { pin: string }. Returns
+// the snapshot JSON only if the PIN matches; otherwise 401 or 429.
+// This is the one place the blob is ever served to a viewer.
 publish.post("/:id/unlock", async (c) => {
   const id = c.req.param("id").toLowerCase(); // see the case-normalization note above
   const body = await c.req.json<{ pin?: string }>().catch(() => null);
   if (!body?.pin) return c.json({ error: "pin is required" }, 400);
 
   const link = await c.env.DB
-    .prepare("SELECT id, pin_salt, pin_hash, r2_key FROM publish_links WHERE id = ?1")
+    .prepare("SELECT id, pin_salt, pin_hash, r2_key, unlock_attempts, unlock_locked_until FROM publish_links WHERE id = ?1")
     .bind(id)
     .first<PublishLinkRow>();
   if (!link) return c.json({ error: "not found" }, 404);
 
+  // Per-link lockout check.
+  if (link.unlock_locked_until && new Date(link.unlock_locked_until) > new Date()) {
+    return c.json({ error: "too many attempts — try again later" }, 429);
+  }
+
   if (!(await verifyPin(body.pin, link.pin_salt, link.pin_hash))) {
+    const newAttempts = (link.unlock_attempts ?? 0) + 1;
+    const lockedUntil = newAttempts >= UNLOCK_MAX_ATTEMPTS
+      ? new Date(Date.now() + UNLOCK_LOCKOUT_MINUTES * 60_000).toISOString()
+      : null;
+    await c.env.DB
+      .prepare("UPDATE publish_links SET unlock_attempts = ?1, unlock_locked_until = ?2 WHERE id = ?3")
+      .bind(newAttempts, lockedUntil, id)
+      .run();
+    if (lockedUntil) {
+      return c.json({ error: "too many attempts — try again later" }, 429);
+    }
     return c.json({ error: "invalid pin" }, 401);
   }
+
+  // Successful unlock — reset the attempt counter.
+  await c.env.DB
+    .prepare("UPDATE publish_links SET unlock_attempts = 0, unlock_locked_until = NULL WHERE id = ?1")
+    .bind(id)
+    .run();
 
   const object = await c.env.BACKUPS.get(link.r2_key);
   if (!object) return c.json({ error: "not found" }, 404);

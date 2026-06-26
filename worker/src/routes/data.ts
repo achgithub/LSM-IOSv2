@@ -8,6 +8,7 @@ import {
   type FixtureQuery,
 } from "../db";
 import { buildManifest } from "../manifest";
+import { requireAttestation } from "../middleware/attest";
 
 // ── v2 app↔DB read path (Layer 1, multi-league shard) ────────────────────────
 // Replaces v1's single-league /fixtures /scores /standings /teams. A shard holds
@@ -36,10 +37,12 @@ data.get("/leagues/:leagueId/standings", async (c) =>
   c.json(await getStandingsByLeague(c.env.DB, c.req.param("leagueId"))),
 );
 
+data.use("/leagues/:leagueId/scores", requireAttestation);
 data.get("/leagues/:leagueId/scores", async (c) =>
   c.json(await getScoresByLeague(c.env.DB, c.req.param("leagueId"))),
 );
 
+data.use("/leagues/:leagueId/fixtures", requireAttestation);
 data.get("/leagues/:leagueId/fixtures", async (c) => {
   const q: FixtureQuery = {};
   const md = c.req.query("matchday");

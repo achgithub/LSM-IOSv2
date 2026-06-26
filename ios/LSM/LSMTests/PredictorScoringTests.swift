@@ -112,7 +112,7 @@ struct PredictorScoringTests {
         context.insert(prediction)
         round.predictions = [prediction]
 
-        PredictorScoringService.closeRound(
+        try PredictorScoringService.closeRound(
             round, game: g, finalScores: [101: (home: 2, away: 1)], context: context
         )
 
@@ -134,10 +134,74 @@ struct PredictorScoringTests {
         context.insert(prediction)
         round.predictions = [prediction]
 
-        PredictorScoringService.closeRound(
+        try PredictorScoringService.closeRound(
             round, game: g, finalScores: [101: (home: 2, away: 1)], context: context
         )
 
         #expect(prediction.pointsAwarded == 4) // not doubled — joker is off
+    }
+
+    @Test func saveScoresDoesNotCloseRound() throws {
+        let context = try makeContext()
+        let g = game()
+        context.insert(g)
+        let round = Round(roundNumber: 1, deadline: .now, fixtureIds: [101, 102], game: g)
+        context.insert(round)
+        let player = Player(name: "Alice", game: g)
+        context.insert(player)
+        let p1 = Prediction(fixtureId: 101, predictedHome: 1, predictedAway: 0, isJoker: false, player: player, round: round)
+        let p2 = Prediction(fixtureId: 102, predictedHome: 0, predictedAway: 0, isJoker: false, player: player, round: round)
+        context.insert(p1); context.insert(p2)
+        round.predictions = [p1, p2]
+
+        // Save only one fixture's score.
+        PredictorScoringService.saveScores(round, finalScores: [101: (home: 2, away: 1)])
+
+        #expect(round.status == .open)
+        #expect(p1.actualHome == 2 && p1.actualAway == 1)
+        #expect(p1.pointsAwarded == nil)
+        #expect(p2.actualHome == nil)
+    }
+
+    @Test func closeRoundRequiresEveryFixtureScore() throws {
+        let context = try makeContext()
+        let g = game()
+        context.insert(g)
+        // Two fixtures, but only one score provided.
+        let round = Round(roundNumber: 1, deadline: .now, fixtureIds: [101, 102], game: g)
+        context.insert(round)
+        let player = Player(name: "Alice", game: g)
+        context.insert(player)
+        let p1 = Prediction(fixtureId: 101, predictedHome: 1, predictedAway: 0, isJoker: false, player: player, round: round)
+        context.insert(p1)
+        round.predictions = [p1]
+
+        #expect(throws: PredictorScoringError.incompleteScores) {
+            try PredictorScoringService.closeRound(
+                round, game: g, finalScores: [101: (home: 2, away: 1)], context: context
+            )
+        }
+        #expect(round.status == .open)
+    }
+
+    @Test func zeroZeroCountsAsEnteredScore() throws {
+        let context = try makeContext()
+        let g = game()
+        context.insert(g)
+        let round = Round(roundNumber: 1, deadline: .now, fixtureIds: [101], game: g)
+        context.insert(round)
+        let player = Player(name: "Alice", game: g)
+        context.insert(player)
+        let p = Prediction(fixtureId: 101, predictedHome: 0, predictedAway: 0, isJoker: false, player: player, round: round)
+        context.insert(p)
+        round.predictions = [p]
+
+        // 0-0 is a valid entered result — must NOT throw incompleteScores.
+        try PredictorScoringService.closeRound(
+            round, game: g, finalScores: [101: (home: 0, away: 0)], context: context
+        )
+
+        #expect(round.status == .closed)
+        #expect(p.pointsAwarded == g.predictorExactPoints) // exact match (0-0 predicted, 0-0 actual)
     }
 }

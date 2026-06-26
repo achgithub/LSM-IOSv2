@@ -44,7 +44,7 @@ actor ManagerLifecycleClient {
     /// Fetch lifecycle status — call when Cloud Settings is opened.
     func status() async -> ManagerLifecycleStatus? {
         guard let url = URL(string: "/manager/status", relativeTo: Self.base) else { return nil }
-        var req = URLRequest(url: url)
+        var req = await request(url: url, method: "GET")
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         do {
             let (data, _) = try await URLSession.shared.data(for: req)
@@ -58,8 +58,7 @@ actor ManagerLifecycleClient {
     /// Idempotent — safe to call every time Settings opens while unsubscribed.
     func unsubscribe() async {
         guard let url = URL(string: "/manager/unsubscribe", relativeTo: Self.base) else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
+        var req = await request(url: url, method: "POST")
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
     }
@@ -67,9 +66,17 @@ actor ManagerLifecycleClient {
     /// Clear the pending deletion if the manager re-subscribes.
     func resubscribe() async {
         guard let url = URL(string: "/manager/resubscribe", relativeTo: Self.base) else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
+        var req = await request(url: url, method: "POST")
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
+    }
+
+    private func request(url: URL, method: String) async -> URLRequest {
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        for (field, value) in await AppAttestService.shared.authorizationHeaders(for: Self.base) {
+            req.setValue(value, forHTTPHeaderField: field)
+        }
+        return req
     }
 }

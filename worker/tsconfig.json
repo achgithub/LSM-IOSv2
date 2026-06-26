@@ -17,5 +17,14 @@
     "noEmit": true
   },
   "include": ["src/**/*.ts", "worker-configuration.d.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/routes/admin.ts",
+    "src/routes/fixtures.ts",
+    "src/routes/scores.ts",
+    "src/routes/standings.ts",
+    "src/routes/demo.ts",
+    "src/demo.ts",
+    "src/auth.ts"
+  ]
 }

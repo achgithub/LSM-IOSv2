@@ -1,6 +1,15 @@
 import Foundation
 import Observation
 
+/// Explicit three-state cloud entitlement to prevent false-negative deletions.
+/// `.unknown` is the default — RevenueCat hasn't resolved yet (or isn't configured).
+/// Only `.inactive` (positively confirmed) may trigger the unsubscribe grace flow.
+enum CloudEntitlementState: Equatable {
+    case unknown
+    case active
+    case inactive
+}
+
 /// Subscription tiers (see docs/pricing-model.md for the priced ladder).
 /// RevenueCat entitlement identifiers MUST match the raw values `no_ads` /
 /// `leagues_3` / `leagues_5` / `leagues_7`.
@@ -49,19 +58,18 @@ final class Entitlements {
     /// True once a tier has been resolved (RevenueCat or a dev override).
     private(set) var verified = false
 
-    /// The cloud bundle (backup + publish, PWA later) — a standalone
-    /// RevenueCat entitlement, independent of the league-count tier ladder
-    /// above (a Free or No-Ads user can still buy cloud; a 7-leagues user
-    /// doesn't get it for free). See docs/lsm-v2-architecture.md §0.
-    private(set) var hasCloudBundle = false
+    /// Cloud bundle entitlement state — starts `.unknown` until RevenueCat resolves.
+    /// Only transitions to `.active` or `.inactive` on a confirmed RevenueCat response.
+    /// Stays `.unknown` when RevenueCat is not configured or the refresh fails.
+    private(set) var cloudEntitlement: CloudEntitlementState = .unknown
 
     // RevenueCat entitlement identifiers (match the dashboard + Tier raw values).
     static let entitlementNoAds = Tier.noAds.rawValue
     static let entitlementLeagues3 = Tier.leagues3.rawValue
     static let entitlementLeagues5 = Tier.leagues5.rawValue
     static let entitlementLeagues7 = Tier.leagues7.rawValue
-    /// Placeholder identifier — set the real RevenueCat entitlement id here
-    /// once it's created in the dashboard (mirrors the Tier identifiers above).
+    /// RevenueCat entitlement identifier for the cloud bundle. Must match the
+    /// entitlement key in the RevenueCat dashboard exactly — verify before release.
     static let entitlementCloudBundle = "cloud_bundle"
 
     private static let devTierKey = "devTierOverride"
@@ -77,7 +85,7 @@ final class Entitlements {
             verified = true
         }
         if UserDefaults.standard.object(forKey: Self.devCloudBundleKey) != nil {
-            hasCloudBundle = UserDefaults.standard.bool(forKey: Self.devCloudBundleKey)
+            cloudEntitlement = UserDefaults.standard.bool(forKey: Self.devCloudBundleKey) ? .active : .inactive
         }
         #endif
     }
@@ -106,8 +114,9 @@ final class Entitlements {
     var canHaveMultipleLeagues: Bool { leagueAllowance > 1 }
 
     /// The single gate the Cloud Backup / Publish UI uses (Phase 2). Paid,
-    /// independent of league tier — see `hasCloudBundle`.
-    var canUseCloud: Bool { hasCloudBundle }
+    /// independent of league tier. Only true when RevenueCat has positively
+    /// confirmed the entitlement — `.unknown` never grants access.
+    var canUseCloud: Bool { cloudEntitlement == .active }
 
     /// Local testing override — flips the tier with no purchase. DEBUG-only: a
     /// no-op in release builds so it can never bypass the RevenueCat entitlement
@@ -124,7 +133,7 @@ final class Entitlements {
     /// since it's a separate purchase. DEBUG-only.
     func setDevCloudBundle(_ on: Bool) {
         #if DEBUG
-        hasCloudBundle = on
+        cloudEntitlement = on ? .active : .inactive
         UserDefaults.standard.set(on, forKey: Self.devCloudBundleKey)
         #endif
     }
@@ -135,9 +144,11 @@ final class Entitlements {
         self.verified = true
     }
 
-    /// Applied by `PurchaseService` once it resolves the cloud bundle entitlement.
-    func apply(hasCloudBundle: Bool) {
-        self.hasCloudBundle = hasCloudBundle
+    /// Applied by `PurchaseService` once it receives a confirmed RevenueCat response.
+    /// Pass `.active` or `.inactive` only — never `.unknown`; unknown is the default
+    /// before any resolution and must never overwrite a previously confirmed state.
+    func apply(cloudEntitlement: CloudEntitlementState) {
+        self.cloudEntitlement = cloudEntitlement
     }
 
     func refresh() async {

@@ -85,6 +85,14 @@ struct OpenRoundView: View {
                 }
             }
             .task { await load() }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Tutorial fixtures loaded",
+                        detail: "All fixtures are pre-selected. Tap Open ↑ to continue."
+                    )
+                }
+            }
         }
     }
 
@@ -264,6 +272,22 @@ struct OpenRoundView: View {
         if selectedLeagueIds.isEmpty {
             selectedLeagueIds = Set(gameLeagues.map(\.id))
         }
+        if game.isDemoData { setupForTutorial() }
+    }
+
+    private func setupForTutorial() {
+        unplayedOnly = false
+        dateFilterOn = false
+        let closedCount = game.rounds.filter { $0.status == .closed }.count
+        let fixtures: [TutorialDataGenerator.ScriptedFixture]
+        if game.mode == .predictor {
+            fixtures = TutorialDataGenerator.predictorFixtures
+        } else {
+            fixtures = closedCount == 0
+                ? TutorialDataGenerator.lmsRound1Fixtures
+                : TutorialDataGenerator.lmsRound2Fixtures
+        }
+        selectedFixtureIds = Set(fixtures.map(\.matchId))
     }
 
     /// The Fixtures-view courtesy prompt's "yes" action — goes through the
@@ -286,6 +310,7 @@ struct OpenRoundView: View {
             roundType: roundType,
             context: context
         )
+        try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             pushRound(round)
         }

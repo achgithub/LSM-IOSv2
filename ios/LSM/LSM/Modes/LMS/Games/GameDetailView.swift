@@ -252,6 +252,7 @@ struct GameDetailView: View {
                 LabeledContent(winners.count == 1 ? "Winner" : "Winners",
                                value: winners.map(\.name).joined(separator: ", "))
                 shareCardButton("Share Results Card", .summaryResults, enabled: latestClosedRound != nil)
+                    .tutorialAnchor(id: "lms.shareResults")
                 if let ending = game.lastOutcome {
                     shareCardButton("Share \(ending.headline) Card", .summaryOutcome, enabled: latestClosedRound != nil)
                 }
@@ -269,8 +270,10 @@ struct GameDetailView: View {
                 }
                 shareCardButton("Share Fixtures Card", .summaryFixtures, enabled: true)
                 Button { sheet = .picks } label: { Label("Enter Picks", systemImage: "checklist") }
+                    .tutorialAnchor(id: "lms.enterPicks")
                 shareCardButton("Share Picks Card", .summaryPicks, enabled: openRoundPicksComplete)
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
+                    .tutorialAnchor(id: "lms.enterResults")
                     // Can't close with players unassigned — finish picks first
                     // (Auto-Assign handles any latecomers).
                     .disabled(!openRoundPicksComplete)
@@ -291,9 +294,11 @@ struct GameDetailView: View {
                 // Between rounds — share the result just gone, then open the next.
                 if latestClosedRound != nil {
                     shareCardButton("Share Results Card", .summaryResults, enabled: true)
+                        .tutorialAnchor(id: "lms.shareResults")
                 }
                 Button { sheet = .open } label: { Label("Open Round", systemImage: "calendar.badge.plus") }
                     .disabled(game.activePlayers.count < 2)
+                    .tutorialAnchor(id: "lms.openRound")
             }
         }
     }
@@ -343,6 +348,7 @@ struct GameDetailView: View {
             Button { showingAddPlayers = true } label: {
                 Label("Add Players", systemImage: "person.badge.plus")
             }
+            .tutorialAnchor(id: "lms.addPlayers")
         }
     }
 

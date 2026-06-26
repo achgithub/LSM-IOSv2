@@ -79,8 +79,9 @@ struct CloudBackupSection: View {
                     await ManagerLifecycleClient.shared.resubscribe()
                     lifecycleStatus = await ManagerLifecycleClient.shared.status()
                 }
-            } else {
-                // Idempotent — starts the 14-day grace period on first call.
+            } else if entitlements.cloudEntitlement == .inactive {
+                // Only schedule deletion when the entitlement is positively confirmed
+                // inactive — never on `.unknown` (RevenueCat not yet resolved or failed).
                 await ManagerLifecycleClient.shared.unsubscribe()
                 lifecycleStatus = await ManagerLifecycleClient.shared.status()
             }
