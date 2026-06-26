@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS round_pushes (
   round_number  INTEGER NOT NULL,
   deadline      TEXT,                       -- ISO8601 UTC; nil if unset
   fixtures_json TEXT NOT NULL,              -- JSON array: [{fixtureId,home,away,kickoff}]
+  joker_enabled INTEGER NOT NULL DEFAULT 0, -- 1 if Predictor joker is enabled for this game
   updated_at    TEXT NOT NULL
 );
 

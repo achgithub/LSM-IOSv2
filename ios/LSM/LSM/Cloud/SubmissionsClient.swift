@@ -1,6 +1,6 @@
 import Foundation
 
-/// Wire types for the Phase 4 submission queue Worker routes.
+/// Wire types for the Phase 5 submission queue Worker routes.
 
 struct FixturePushItem: Encodable {
     let fixtureId: Int
@@ -25,6 +25,7 @@ struct SubmissionItem: Decodable, Identifiable {
     let token: String
     let playerName: String
     let localPlayerId: String
+    let managerSuffix: String?
     let roundNumber: Int
     let payload: SubmissionPayload
     let status: String
@@ -43,27 +44,26 @@ struct PredictorScore: Decodable {
     let fixtureId: Int
     let home: Int
     let away: Int
+    let isJoker: Bool?
 }
 
 struct ApproveResult: Decodable {
     let id: String
     let localPlayerId: String
+    let managerSuffix: String?
     let roundNumber: Int
     let payload: SubmissionPayload
 }
 
-/// Client for the Phase 4 submission-queue Worker routes. Follows the same
-/// actor/singleton pattern as `SnapshotClient`.
+/// Client for the Phase 5 submission-queue Worker routes.
 actor SubmissionsClient {
     static let shared = SubmissionsClient()
 
     private static let canonicalBase = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
     private let base = SubmissionsClient.canonicalBase
 
-    /// Base URL for player-facing PWA links (Cloudflare Pages, not the Worker).
     static let playerBase = URL(string: "https://submit.sportsmanager.site")!
 
-    /// Build the shareable /s/:token URL a player taps to open the PWA.
     static func playerLinkURL(token: String) -> URL {
         playerBase.appending(path: "s/\(token.lowercased())")
     }
@@ -78,7 +78,6 @@ actor SubmissionsClient {
 
     // ── Manager-facing ────────────────────────────────────────────────────────
 
-    /// Mint (or retrieve existing) global token for a player name. Idempotent.
     func mintLink(playerName: String) async throws -> String {
         struct Body: Encodable { let playerName: String }
         struct Response: Decodable { let token: String }
@@ -89,7 +88,6 @@ actor SubmissionsClient {
         return try decoder.decode(Response.self, from: data).token
     }
 
-    /// Revoke a player token globally — all game enrollments stop working.
     func revokeLink(token: String) async throws {
         let req = try await request(
             path: "/links/\(token.lowercased())/revoke", method: "POST"
@@ -97,13 +95,14 @@ actor SubmissionsClient {
         _ = try await send(req)
     }
 
-    /// Push the current open round and enroll all players who have tokens.
     func pushRound(
         gameToken: UUID,
         mode: String,
         roundNumber: Int,
         deadline: Date?,
         fixtures: [FixturePushItem],
+        jokerEnabled: Bool,
+        managerSuffix: String?,
         players: [PlayerPushItem]
     ) async throws {
         struct Body: Encodable {
@@ -111,6 +110,8 @@ actor SubmissionsClient {
             let roundNumber: Int
             let deadline: String?
             let fixtures: [FixturePushItem]
+            let jokerEnabled: Bool
+            let managerSuffix: String?
             let players: [PlayerPushItem]
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
@@ -118,13 +119,14 @@ actor SubmissionsClient {
             path: "/games/\(gameToken.uuidString.lowercased())/push", method: "POST"
         )
         req.httpBody = try encoder.encode(
-            Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr, fixtures: fixtures, players: players)
+            Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr,
+                 fixtures: fixtures, jokerEnabled: jokerEnabled,
+                 managerSuffix: managerSuffix, players: players)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)
     }
 
-    /// Fetch the pending queue for a game's round.
     func listSubmissions(gameToken: UUID, round: Int) async throws -> [SubmissionItem] {
         struct Response: Decodable { let submissions: [SubmissionItem] }
         let req = try await request(
@@ -134,7 +136,6 @@ actor SubmissionsClient {
         return try decoder.decode(Response.self, from: data).submissions
     }
 
-    /// Approve a submission.
     func approve(submissionId: String, gameToken: UUID) async throws -> ApproveResult {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/approve"
         let req = try await request(path: path, method: "POST")
@@ -142,7 +143,6 @@ actor SubmissionsClient {
         return try decoder.decode(ApproveResult.self, from: data)
     }
 
-    /// Reject a submission.
     func reject(submissionId: String, gameToken: UUID) async throws {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/reject"
         let req = try await request(path: path, method: "POST")

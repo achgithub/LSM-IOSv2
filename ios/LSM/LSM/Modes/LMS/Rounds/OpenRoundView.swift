@@ -330,19 +330,35 @@ struct OpenRoundView: View {
 
         // Resolve roster-member tokens synchronously before the async task
         // (avoids SwiftData main-actor access from a background context).
+        // Self-heal: players added before rosterMemberId was tracked get it
+        // written here so subsequent pushes use the UUID directly.
         let playerTokenMap: [UUID: String] = {
             var dict: [UUID: String] = [:]
             for player in game.activePlayers where !player.isManager {
-                guard let memberId = player.rosterMemberId else { continue }
-                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
-                if let members = try? context.fetch(fd),
-                   let member = members.first,
-                   let rawToken = member.submissionTokenRaw {
+                let member: RosterMember?
+                if let memberId = player.rosterMemberId {
+                    let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
+                    member = (try? context.fetch(fd))?.first
+                } else {
+                    let name = player.name
+                    let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.name == name })
+                    member = (try? context.fetch(fd))?.first
+                    if let m = member { player.rosterMemberId = m.id }  // self-heal
+                }
+                if let rawToken = member?.submissionTokenRaw {
                     dict[player.id] = rawToken.lowercased()
                 }
             }
             return dict
         }()
+
+        // Last 8 hex chars of the manager's player UUID — used by the PWA to
+        // identify which manager owns each game.
+        let managerSuffix: String? = game.players.first(where: { $0.isManager }).map {
+            $0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8).lowercased()
+        }.map(String.init)
+
+        let jokerEnabled = game.predictorJokerEnabled
         let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
 
         Task {
@@ -376,6 +392,8 @@ struct OpenRoundView: View {
                     roundNumber: roundNumber,
                     deadline: deadline,
                     fixtures: fixtureItems,
+                    jokerEnabled: jokerEnabled,
+                    managerSuffix: managerSuffix,
                     players: playerItems
                 )
             } catch {

@@ -100,7 +100,8 @@ function render(state, token) {
 /**
  * Render one game card. Each game tracks its own submitted state independently.
  * game shape: { gameToken, mode, roundNumber, deadline, fixtures,
- *               eligibleTeams?, priorSubmission?, _submitted?, _submitError? }
+ *               jokerEnabled?, managerSuffix?, eligibleTeams?,
+ *               priorSubmission?, _submitted?, _submitError?, _jokerFixtureId? }
  */
 function renderGame(game, token) {
   const card = el("div", "card");
@@ -110,6 +111,10 @@ function renderGame(game, token) {
   title.style.fontWeight = "600";
   title.style.margin = "0 0 0.25rem";
   card.appendChild(title);
+
+  if (game.managerSuffix) {
+    card.appendChild(el("p", "small muted", `Manager: ${game.managerSuffix}`));
+  }
 
   if (game.deadline) {
     const d = new Date(game.deadline);
@@ -191,23 +196,49 @@ async function submitLMS(token, game, teamId) {
 // ── Predictor renderer ────────────────────────────────────────────────────────
 
 function renderPredictor(container, game, token) {
+  if (game.jokerEnabled) {
+    const hint = el("p", "small muted", "★ Tap a fixture to mark it as your Joker (doubles points for that match).");
+    hint.style.marginBottom = "0.75rem";
+    container.appendChild(hint);
+  }
+
   container.appendChild(el("p", null, "Enter your score predictions:"));
 
   const inputs = [];
 
   for (const f of game.fixtures) {
-    const card = el("div", null);
-    card.style.marginBottom = "0.75rem";
+    const fixtureCard = el("div", null);
+    fixtureCard.style.marginBottom = "0.75rem";
 
-    const label = el("p", null, `${f.home} vs ${f.away}`);
+    // Fixture label row (with joker toggle if enabled)
+    const labelRow = el("div", null);
+    labelRow.style.display = "flex";
+    labelRow.style.alignItems = "center";
+    labelRow.style.gap = "0.5rem";
+    labelRow.style.marginBottom = "0.5rem";
+
+    const label = el("span", null, `${f.home} vs ${f.away}`);
     label.style.fontWeight = "500";
-    label.style.margin = "0 0 0.5rem";
-    card.appendChild(label);
+    labelRow.appendChild(label);
+
+    if (game.jokerEnabled) {
+      const jokerBtn = el("button", "joker-btn", "★ Joker");
+      jokerBtn.dataset.fixtureId = f.fixtureId;
+      const isActive = game._jokerFixtureId === f.fixtureId;
+      jokerBtn.className = isActive ? "joker-btn joker-btn--active" : "joker-btn";
+      jokerBtn.addEventListener("click", () => {
+        const next = game._jokerFixtureId === f.fixtureId ? null : f.fixtureId;
+        updateGameState(game, { _jokerFixtureId: next });
+      });
+      labelRow.appendChild(jokerBtn);
+    }
+
+    fixtureCard.appendChild(labelRow);
 
     if (f.kickoff) {
       const ko = el("p", "small muted", `KO: ${new Date(f.kickoff).toLocaleString()}`);
-      ko.style.margin = "0 0 0.75rem";
-      card.appendChild(ko);
+      ko.style.margin = "0 0 0.5rem";
+      fixtureCard.appendChild(ko);
     }
 
     const row = el("div", null);
@@ -239,8 +270,8 @@ function renderPredictor(container, game, token) {
     row.appendChild(awayInput);
     row.appendChild(el("span", "small", f.away));
 
-    card.appendChild(row);
-    container.appendChild(card);
+    fixtureCard.appendChild(row);
+    container.appendChild(fixtureCard);
     inputs.push({ fixtureId: f.fixtureId, homeInput, awayInput });
   }
 
@@ -254,6 +285,7 @@ async function submitPredictor(token, game, inputs) {
     fixtureId,
     home: parseInt(homeInput.value, 10) || 0,
     away: parseInt(awayInput.value, 10) || 0,
+    isJoker: game.jokerEnabled && game._jokerFixtureId === fixtureId,
   }));
 
   try {

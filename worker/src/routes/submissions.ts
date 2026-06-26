@@ -1,17 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
-// ── Submissions (the anonymous PWA approval queue) — Phase 4 ─────────────────
+// ── Submissions (the anonymous PWA approval queue) — Phase 5 ─────────────────
 //
-// Phase 4 change: one global token per player (was per-game-player).
-// A RosterMember gets one token; game enrollments are created automatically
-// on each round push. This lets players bookmark one link and see all their
-// active games at once.
+// Phase 4: one global token per player (was per-game-player).
+// Phase 5: joker support for Predictor; manager_suffix on enrollments so the
+// PWA can identify which manager owns each game, and the iOS app can validate
+// approvals against the local manager UUID.
 //
 // Two audiences:
 //
-//   PLAYER (PWA, anonymous) — /s/:token. GET returns all active games.
-//   POST /s/:token/games/:gameToken submits for one specific game.
+//   PLAYER (PWA, anonymous) — /s/:token. GET returns all active games with
+//   jokerEnabled and managerSuffix per game. POST /s/:token/games/:gameToken
+//   submits for one specific game (LMS: {teamId}, Predictor: {scores, jokerFixtureId?}).
 //
 //   MANAGER (LSM app) — mints tokens per roster member, pushes rounds,
 //   reviews queues, approves/rejects. Revoke kills the token everywhere.
@@ -34,16 +35,13 @@ function now(): string {
 // ─── Manager-facing ──────────────────────────────────────────────────────────
 
 // POST /links
-// Mint a global player token. If a non-revoked token already exists for this
-// player name it is returned unchanged (idempotent). Returns { token }.
+// Mint a global player token. Returns 409 if a non-revoked token already exists
+// for this player name — prevents credential harvesting by unauthenticated callers.
 submissions.post("/links", async (c) => {
   const body = await c.req.json<{ playerName: string }>();
   const playerName = body?.playerName?.trim();
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
 
-  // If a non-revoked token already exists for this name, refuse to return it —
-  // returning a credential to any unauthenticated caller who knows the name
-  // would let anyone harvest player tokens. The manager must revoke and re-mint.
   const existing = await c.env.DB.prepare(
     `SELECT 1 FROM player_tokens WHERE player_name = ? AND revoked_at IS NULL LIMIT 1`
   ).bind(playerName).first();
@@ -59,7 +57,6 @@ submissions.post("/links", async (c) => {
 });
 
 // POST /links/:token/revoke
-// Revoke a token globally — all game enrollments become unreachable immediately.
 submissions.post("/links/:token/revoke", async (c) => {
   const token = c.req.param("token").toLowerCase();
   const result = await c.env.DB.prepare(
@@ -71,8 +68,7 @@ submissions.post("/links/:token/revoke", async (c) => {
 
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
-// Players without a token are silently skipped.
-// Body: { mode, roundNumber, deadline?, fixtures, players: [{ token, localPlayerId, eligibleTeams? }] }
+// Body: { mode, roundNumber, deadline?, fixtures, jokerEnabled?, managerSuffix?, players }
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   interface EligibleTeam { id: number; name: string }
@@ -86,43 +82,48 @@ submissions.post("/games/:gameToken/push", async (c) => {
     roundNumber: number;
     deadline?: string | null;
     fixtures: unknown[];
+    jokerEnabled?: boolean;
+    managerSuffix?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, fixtures, players } = body ?? {};
+  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, players } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
 
   const ts = now();
   await c.env.DB.prepare(
-    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, fixtures_json, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, fixtures_json, joker_enabled, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
        mode = excluded.mode,
        round_number = excluded.round_number,
        deadline = excluded.deadline,
        fixtures_json = excluded.fixtures_json,
+       joker_enabled = excluded.joker_enabled,
        updated_at = excluded.updated_at`
-  ).bind(gameToken, mode, roundNumber, deadline ?? null, JSON.stringify(fixtures), ts).run();
+  ).bind(gameToken, mode, roundNumber, deadline ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, ts).run();
+
+  const suffix = managerSuffix?.toLowerCase() ?? null;
 
   if (Array.isArray(players)) {
     for (const p of players) {
       const tk = p.token.toLowerCase();
       const pid = p.localPlayerId.toLowerCase();
       const eligJson = p.eligibleTeams != null ? JSON.stringify(p.eligibleTeams) : null;
-      // Only enroll players whose token exists and is not revoked.
       const exists = await c.env.DB.prepare(
         `SELECT 1 FROM player_tokens WHERE token = ? AND revoked_at IS NULL`
       ).bind(tk).first();
       if (!exists) continue;
 
       await c.env.DB.prepare(
-        `INSERT INTO game_enrollments (token, game_token, local_player_id, eligible_team_ids_json)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO game_enrollments (token, game_token, local_player_id, eligible_team_ids_json, manager_suffix)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (token, game_token) DO UPDATE SET
            local_player_id = excluded.local_player_id,
-           eligible_team_ids_json = excluded.eligible_team_ids_json`
-      ).bind(tk, gameToken, pid, eligJson).run();
+           eligible_team_ids_json = excluded.eligible_team_ids_json,
+           manager_suffix = excluded.manager_suffix`
+      ).bind(tk, gameToken, pid, eligJson, suffix).run();
     }
   }
 
@@ -130,7 +131,6 @@ submissions.post("/games/:gameToken/push", async (c) => {
 });
 
 // GET /games/:gameToken/submissions?round=N
-// List submissions for the current (or specified) round.
 submissions.get("/games/:gameToken/submissions", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const round = c.req.query("round");
@@ -139,7 +139,7 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
   if (round) {
     const rn = parseInt(round, 10);
     rows = await c.env.DB.prepare(
-      `SELECT s.id, s.token, pt.player_name, ge.local_player_id,
+      `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
               s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at
        FROM submissions s
        JOIN game_enrollments ge ON ge.token = s.token AND ge.game_token = s.game_token
@@ -149,7 +149,7 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
     ).bind(gameToken, rn).all();
   } else {
     rows = await c.env.DB.prepare(
-      `SELECT s.id, s.token, pt.player_name, ge.local_player_id,
+      `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
               s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at
        FROM submissions s
        JOIN game_enrollments ge ON ge.token = s.token AND ge.game_token = s.game_token
@@ -165,6 +165,7 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
       token: r.token,
       playerName: r.player_name,
       localPlayerId: r.local_player_id,
+      managerSuffix: r.manager_suffix,
       roundNumber: r.round_number,
       payload: JSON.parse(r.payload_json as string),
       status: r.status,
@@ -186,7 +187,7 @@ submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
   if (result.meta.changes === 0) return c.json({ error: "submission not found or already decided" }, 404);
 
   const row = await c.env.DB.prepare(
-    `SELECT s.id, ge.local_player_id, s.round_number, s.payload_json
+    `SELECT s.id, ge.local_player_id, ge.manager_suffix, s.round_number, s.payload_json
      FROM submissions s
      JOIN game_enrollments ge ON ge.token = s.token AND ge.game_token = s.game_token
      WHERE s.id = ? AND s.game_token = ?`
@@ -196,6 +197,7 @@ submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
   return c.json({
     id: row.id,
     localPlayerId: row.local_player_id,
+    managerSuffix: row.manager_suffix,
     roundNumber: row.round_number,
     payload: JSON.parse(row.payload_json),
   });
@@ -217,8 +219,8 @@ submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
 // ─── Player-facing (PWA) ─────────────────────────────────────────────────────
 
 // GET /s/:token
-// Returns all active games for this player. Each game has the open round
-// data (mode, fixtures, eligible teams for LMS) plus any prior submission.
+// Returns all active games for this player. Each game includes jokerEnabled and
+// managerSuffix so the PWA can display identity and render the joker control.
 submissions.get("/s/:token", async (c) => {
   const token = c.req.param("token").toLowerCase();
 
@@ -229,10 +231,9 @@ submissions.get("/s/:token", async (c) => {
   if (!pt) return c.json({ error: "Link not found." }, 404);
   if (pt.revoked_at) return c.json({ error: "This link has been revoked." }, 404);
 
-  // All game enrollments with an active round push.
   const enrollments = await c.env.DB.prepare(
-    `SELECT ge.game_token, ge.eligible_team_ids_json,
-            rp.mode, rp.round_number, rp.deadline, rp.fixtures_json
+    `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix,
+            rp.mode, rp.round_number, rp.deadline, rp.fixtures_json, rp.joker_enabled
      FROM game_enrollments ge
      JOIN round_pushes rp ON rp.game_token = ge.game_token
      WHERE ge.token = ?`
@@ -250,6 +251,8 @@ submissions.get("/s/:token", async (c) => {
       roundNumber: row.round_number,
       deadline: row.deadline,
       fixtures: JSON.parse(row.fixtures_json),
+      jokerEnabled: row.joker_enabled === 1,
+      managerSuffix: row.manager_suffix ?? null,
     };
     if (row.eligible_team_ids_json) {
       game.eligibleTeams = JSON.parse(row.eligible_team_ids_json);
@@ -268,15 +271,14 @@ submissions.get("/s/:token", async (c) => {
 });
 
 // POST /s/:token/games/:gameToken
-// Submit (or resubmit) for one specific game. Resubmitting while pending
-// replaces the existing row (latest wins).
-// Body: LMS { teamId } or Predictor { scores: [{fixtureId, home, away}] }
+// Submit (or resubmit) for one specific game.
+// LMS body: { teamId }
+// Predictor body: { scores: [{fixtureId, home, away, isJoker?}] }
 submissions.post("/s/:token/games/:gameToken", async (c) => {
   const token = c.req.param("token").toLowerCase();
   const gameToken = c.req.param("gameToken").toLowerCase();
   const body = await c.req.json<Record<string, unknown>>();
 
-  // Verify token is valid and enrolled in this game.
   const enrollment = await c.env.DB.prepare(
     `SELECT ge.game_token
      FROM game_enrollments ge

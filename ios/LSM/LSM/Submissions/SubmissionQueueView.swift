@@ -96,7 +96,7 @@ struct SubmissionQueueView: View {
     private func approve(_ item: SubmissionItem) async {
         do {
             let result = try await SubmissionsClient.shared.approve(submissionId: item.id, gameToken: gameToken)
-            await MainActor.run { applyLocally(result) }
+            await MainActor.run { applyLocally(result, playerName: item.playerName) }
             await load()
         } catch {
             subQueueLog.warning("Approve failed: \(error.localizedDescription)")
@@ -117,7 +117,7 @@ struct SubmissionQueueView: View {
         for item in pendingItems {
             do {
                 let result = try await SubmissionsClient.shared.approve(submissionId: item.id, gameToken: gameToken)
-                await MainActor.run { applyLocally(result) }
+                await MainActor.run { applyLocally(result, playerName: item.playerName) }
             } catch {
                 subQueueLog.warning("Approve-all partial failure for \(item.id): \(error.localizedDescription)")
             }
@@ -126,11 +126,29 @@ struct SubmissionQueueView: View {
         await load()
     }
 
+    /// The local manager's suffix — last 8 hex chars of the manager player's UUID.
+    private var localManagerSuffix: String? {
+        game.players.first(where: { $0.isManager }).map {
+            $0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8).lowercased()
+        }.map(String.init)
+    }
+
     @MainActor
-    private func applyLocally(_ result: ApproveResult) {
-        guard let player = game.players.first(where: {
+    private func applyLocally(_ result: ApproveResult, playerName: String) {
+        // Validate that the submission came through an enrollment owned by this manager.
+        if let resultSuffix = result.managerSuffix, let localSuffix = localManagerSuffix,
+           resultSuffix != localSuffix {
+            subQueueLog.warning("Approve skipped: managerSuffix mismatch (\(resultSuffix) ≠ \(localSuffix))")
+            return
+        }
+
+        // Find player by UUID first; fall back to name for pre-Phase-5 enrollments.
+        let player = game.players.first(where: {
             $0.id.uuidString.lowercased() == result.localPlayerId.lowercased()
-        }) else { return }
+        }) ?? game.players.first(where: {
+            $0.name.localizedCaseInsensitiveCompare(playerName) == .orderedSame
+        })
+        guard let player else { return }
 
         if game.mode == .lms, let teamId = result.payload.teamId {
             GameLogicService.setPick(player: player, round: round, teamId: teamId, context: context)
@@ -144,6 +162,10 @@ struct SubmissionQueueView: View {
                     away: score.away,
                     context: context
                 )
+            }
+            // Apply joker if the player designated one.
+            if let jokerScore = scores.first(where: { $0.isJoker == true }) {
+                PredictorScoringService.setJoker(player: player, round: round, fixtureId: jokerScore.fixtureId)
             }
         }
     }
