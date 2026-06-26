@@ -41,12 +41,14 @@ submissions.post("/links", async (c) => {
   const playerName = body?.playerName?.trim();
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
 
-  // Look for an existing active token for this player name.
+  // If a non-revoked token already exists for this name, refuse to return it —
+  // returning a credential to any unauthenticated caller who knows the name
+  // would let anyone harvest player tokens. The manager must revoke and re-mint.
   const existing = await c.env.DB.prepare(
-    `SELECT token FROM player_tokens WHERE player_name = ? AND revoked_at IS NULL LIMIT 1`
-  ).bind(playerName).first<{ token: string }>();
+    `SELECT 1 FROM player_tokens WHERE player_name = ? AND revoked_at IS NULL LIMIT 1`
+  ).bind(playerName).first();
 
-  if (existing) return c.json({ token: existing.token });
+  if (existing) return c.json({ error: "A submission link already exists for this player. Revoke it first, then create a new one." }, 409);
 
   const token = crypto.randomUUID().toLowerCase();
   await c.env.DB.prepare(

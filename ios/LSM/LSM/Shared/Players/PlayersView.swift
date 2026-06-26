@@ -262,6 +262,7 @@ struct MemberGroupsView: View {
     @State private var isMintingLink = false
     @State private var pendingRevoke = false
     @State private var linkShareItem: PlayerLinkShareItem?
+    @State private var mintError: String?
 
     private var linkURL: URL? {
         member.submissionToken.map { SubmissionsClient.playerLinkURL(token: $0.uuidString) }
@@ -308,9 +309,13 @@ struct MemberGroupsView: View {
                         }
                     } else {
                         Button {
+                            mintError = nil
                             mintLink()
                         } label: {
                             Label("Get Submission Link", systemImage: "link.badge.plus")
+                        }
+                        if let mintError {
+                            Text(mintError).font(.caption).foregroundStyle(.red)
                         }
                     }
                 } header: {
@@ -364,8 +369,20 @@ struct MemberGroupsView: View {
                     isMintingLink = false
                     linkShareItem = PlayerLinkShareItem(playerName: name, url: url)
                 }
+            } catch let error as APIError {
+                await MainActor.run {
+                    isMintingLink = false
+                    if case .badStatus(409, _) = error {
+                        mintError = "A link already exists for this player on another device. Revoke it there first, or ask your manager."
+                    } else {
+                        mintError = "Couldn't get a link. Try again."
+                    }
+                }
             } catch {
-                await MainActor.run { isMintingLink = false }
+                await MainActor.run {
+                    isMintingLink = false
+                    mintError = "Couldn't get a link. Try again."
+                }
             }
         }
     }
