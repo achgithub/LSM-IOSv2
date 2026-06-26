@@ -17,6 +17,7 @@ struct CloudBackupSection: View {
     @State private var showRestorePrompt = false
     @State private var restoreCodeInput = ""
     @State private var showPaywall = false
+    @State private var lifecycleStatus: ManagerLifecycleStatus?
 
     private var restoreCode: UUID? { UUID(uuidString: restoreCodeRaw) }
 
@@ -59,9 +60,29 @@ struct CloudBackupSection: View {
         } header: {
             Text("Cloud Backup")
         } footer: {
-            Text(entitlements.canUseCloud
-                 ? "Backs up every game on this device. Save your restore code somewhere safe (or share it) — it's the only way to restore, on this phone or any other. No account, so anyone with the code can use it."
-                 : "Back up all your games to the cloud and restore them on a new phone. One-time setup, no account needed.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entitlements.canUseCloud
+                     ? "Backs up every game on this device. Save your restore code somewhere safe (or share it) — it's the only way to restore, on this phone or any other. No account, so anyone with the code can use it."
+                     : "Back up all your games to the cloud and restore them on a new phone. One-time setup, no account needed.")
+                if let banner = lifecycleStatus?.bannerMessage {
+                    Text(banner)
+                        .foregroundStyle(lifecycleStatus?.isPendingDelete == true ? .red : .orange)
+                }
+            }
+        }
+        .task {
+            if entitlements.canUseCloud {
+                lifecycleStatus = await ManagerLifecycleClient.shared.status()
+                // Re-subscribed during grace period — clear the pending deletion.
+                if lifecycleStatus?.isPendingDelete == true {
+                    await ManagerLifecycleClient.shared.resubscribe()
+                    lifecycleStatus = await ManagerLifecycleClient.shared.status()
+                }
+            } else {
+                // Idempotent — starts the 14-day grace period on first call.
+                await ManagerLifecycleClient.shared.unsubscribe()
+                lifecycleStatus = await ManagerLifecycleClient.shared.status()
+            }
         }
         .alert("Restore from code", isPresented: $showRestorePrompt) {
             TextField("Restore code", text: $restoreCodeInput)

@@ -34,6 +34,7 @@ actor SnapshotClient {
         var request = try await request(path: "/backup/\(id.uuidString)", method: "PUT")
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try await send(request)
     }
 

@@ -80,10 +80,10 @@ actor SubmissionsClient {
     // ── Manager-facing ────────────────────────────────────────────────────────
 
     func mintLink(playerName: String) async throws -> String {
-        struct Body: Encodable { let playerName: String }
+        struct Body: Encodable { let playerName: String; let managerToken: String }
         struct Response: Decodable { let token: String }
         var req = try await request(path: "/links", method: "POST")
-        req.httpBody = try encoder.encode(Body(playerName: playerName))
+        req.httpBody = try encoder.encode(Body(playerName: playerName, managerToken: ManagerToken.current))
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(req)
         return try decoder.decode(Response.self, from: data).token
@@ -113,6 +113,7 @@ actor SubmissionsClient {
             let fixtures: [FixturePushItem]
             let jokerEnabled: Bool
             let managerSuffix: String?
+            let managerToken: String
             let players: [PlayerPushItem]
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
@@ -122,7 +123,8 @@ actor SubmissionsClient {
         req.httpBody = try encoder.encode(
             Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr,
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
-                 managerSuffix: managerSuffix, players: players)
+                 managerSuffix: managerSuffix, managerToken: ManagerToken.current,
+                 players: players)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)

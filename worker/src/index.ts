@@ -14,8 +14,10 @@
 
 import { Hono } from "hono";
 import { backup } from "./routes/backup";
+import { runDailyCleanup } from "./cron";
 import { data } from "./routes/data";
 import { games } from "./routes/games";
+import { manager } from "./routes/manager";
 import { publish } from "./routes/publish";
 import { submissions } from "./routes/submissions";
 
@@ -39,6 +41,9 @@ app.route("/", submissions); // /s/:token (player PWA) + /submissions/* (manager
 app.route("/backup", backup);
 app.route("/publish", publish);
 
+// Phase 6 — manager lifecycle (status, unsubscribe, resubscribe).
+app.route("/manager", manager);
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {
   console.error(JSON.stringify({ msg: "unhandled error", error: String(err) }));
@@ -47,4 +52,9 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
+  // Daily cleanup cron — handler is built but the trigger is NOT active yet.
+  // To activate: add "0 3 * * *" to wrangler.jsonc triggers.crons for each env.
+  scheduled: async (_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) => {
+    await runDailyCleanup(env);
+  },
 } satisfies ExportedHandler<Env>;

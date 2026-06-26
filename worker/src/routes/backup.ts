@@ -24,17 +24,29 @@ const keyFor = (id: string) => `backups/${id}.json`;
 
 // PUT /backup/:id — body is the app's BackupBundle JSON. Overwrites any
 // existing blob at this id (the manager just re-backs-up onto the same code).
+// Send X-Manager-Token header so this backup can be attributed for lifecycle
+// tracking and R2 retention (last 2 per manager).
 backup.put("/:id", async (c) => {
-  // Lowercase defensively (see worker/src/routes/publish.ts for why: Swift's
-  // UUID.uuidString is uppercase, R2 keys are case-sensitive). Self-consistent
-  // today since PUT/GET both come from the same Swift-generated id, but
-  // normalize anyway so it can never depend on that staying true.
   const id = c.req.param("id").toLowerCase();
+  const managerToken = c.req.header("X-Manager-Token")?.toLowerCase() ?? null;
   const body = await c.req.text();
   if (!body) return c.json({ error: "empty body" }, 400);
   await c.env.BACKUPS.put(keyFor(id), body, {
     httpMetadata: { contentType: "application/json" },
   });
+
+  if (managerToken) {
+    const ts = new Date().toISOString();
+    await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO manager_lifecycle (manager_token, created_at) VALUES (?, ?)`
+    ).bind(managerToken, ts).run();
+    await c.env.DB.prepare(
+      `INSERT INTO manager_backups (manager_token, restore_code, backed_up_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (manager_token, restore_code) DO UPDATE SET backed_up_at = excluded.backed_up_at`
+    ).bind(managerToken, id, ts).run();
+  }
+
   return c.json({ ok: true });
 });
 

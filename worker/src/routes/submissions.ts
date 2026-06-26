@@ -32,13 +32,19 @@ function now(): string {
   return new Date().toISOString();
 }
 
+async function ensureManagerLifecycle(env: Env, managerToken: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO manager_lifecycle (manager_token, created_at) VALUES (?, ?)`
+  ).bind(managerToken, new Date().toISOString()).run();
+}
+
 // ─── Manager-facing ──────────────────────────────────────────────────────────
 
 // POST /links
 // Mint a global player token. Returns 409 if a non-revoked token already exists
 // for this player name — prevents credential harvesting by unauthenticated callers.
 submissions.post("/links", async (c) => {
-  const body = await c.req.json<{ playerName: string }>();
+  const body = await c.req.json<{ playerName: string; managerToken?: string }>();
   const playerName = body?.playerName?.trim();
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
 
@@ -49,9 +55,12 @@ submissions.post("/links", async (c) => {
   if (existing) return c.json({ error: "A submission link already exists for this player. Revoke it first, then create a new one." }, 409);
 
   const token = crypto.randomUUID().toLowerCase();
+  const managerToken = body?.managerToken?.toLowerCase() ?? null;
   await c.env.DB.prepare(
-    `INSERT INTO player_tokens (token, player_name, created_at) VALUES (?, ?, ?)`
-  ).bind(token, playerName, now()).run();
+    `INSERT INTO player_tokens (token, player_name, created_at, manager_token) VALUES (?, ?, ?, ?)`
+  ).bind(token, playerName, now(), managerToken).run();
+
+  if (managerToken) await ensureManagerLifecycle(c.env, managerToken);
 
   return c.json({ token });
 });
@@ -84,25 +93,38 @@ submissions.post("/games/:gameToken/push", async (c) => {
     fixtures: unknown[];
     jokerEnabled?: boolean;
     managerSuffix?: string | null;
+    managerToken?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, players } = body ?? {};
+  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, managerToken, players } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
 
   const ts = now();
+  const mgrToken = managerToken?.toLowerCase() ?? null;
+
   await c.env.DB.prepare(
-    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, fixtures_json, joker_enabled, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, fixtures_json, joker_enabled, manager_token, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
        mode = excluded.mode,
        round_number = excluded.round_number,
        deadline = excluded.deadline,
        fixtures_json = excluded.fixtures_json,
        joker_enabled = excluded.joker_enabled,
+       manager_token = COALESCE(round_pushes.manager_token, excluded.manager_token),
        updated_at = excluded.updated_at`
-  ).bind(gameToken, mode, roundNumber, deadline ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, ts).run();
+  ).bind(gameToken, mode, roundNumber, deadline ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts).run();
+
+  if (mgrToken) await ensureManagerLifecycle(c.env, mgrToken);
+
+  // Prune submissions older than 2 rounds (aligned with Predictor publish retention).
+  if (roundNumber > 2) {
+    await c.env.DB.prepare(
+      `DELETE FROM submissions WHERE game_token = ? AND round_number < ?`
+    ).bind(gameToken, roundNumber - 2).run();
+  }
 
   const suffix = managerSuffix?.toLowerCase() ?? null;
 
