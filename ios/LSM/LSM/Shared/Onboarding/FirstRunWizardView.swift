@@ -277,7 +277,7 @@ struct GameWizardView: View {
         case .openMatchday:
             let shares: [Action] = latestClosedRound != nil ? [
                 .init(label: "Share Weekly Results", sheet: .shareWeeklyResults),
-                .init(label: "Share League Table",   sheet: .shareLeagueTable)
+                .init(label: "Share League Table", sheet: .shareLeagueTable)
             ] : []
             return PhaseCard(
                 icon: "calendar.badge.plus",
@@ -313,14 +313,24 @@ struct GameWizardView: View {
     @ViewBuilder
     private func sheetContent(_ which: WizardSheet) -> some View {
         switch which {
-        case .players:
-            PlayersView()
-        case .newGame:
-            NewGameView()
+        case .players:  PlayersView()
+        case .newGame:  NewGameView()
         case .addPlayers:
             if let game { AddPlayersView(game: game) }
         case .openRound:
             if let game { OpenRoundView(game: game) }
+        case .picks, .results, .resolveTie,
+             .shareFixtures, .sharePicks, .shareResults, .shareOutcome:
+            lmsSheetContent(which)
+        case .predictorPredictions, .predictorResults, .submissionQueue,
+             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable:
+            predictorSheetContent(which)
+        }
+    }
+
+    @ViewBuilder
+    private func lmsSheetContent(_ which: WizardSheet) -> some View {
+        switch which {
         case .picks:
             if let game, let round = openRound { PicksEntryView(game: game, round: round) }
         case .results:
@@ -333,24 +343,6 @@ struct GameWizardView: View {
                     pendingAutoOpen = followUp
                 }
             }
-        case .predictorPredictions:
-            if let game, let round = openRound { PredictionsEntryView(game: game, round: round) }
-        case .predictorResults:
-            if let game, let round = openRound { PredictorResultsEntryView(game: game, round: round) }
-        case .submissionQueue:
-            if let game, let round = openRound, let gameToken = game.cloudGameToken {
-                NavigationStack { SubmissionQueueView(game: game, round: round, gameToken: gameToken) }
-            }
-        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome,
-             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable:
-            shareSheetContent(which)
-        }
-    }
-
-    @ViewBuilder
-    private func shareSheetContent(_ which: WizardSheet) -> some View {
-        switch which {
-        // LMS share cards
         case .shareFixtures:
             if let game, let round = openRound {
                 SummaryShareView(game: game, round: round, type: .fixtures)
@@ -367,7 +359,21 @@ struct GameWizardView: View {
             if let game, let ending = game.lastOutcome, let round = latestClosedRound {
                 SummaryShareView(game: game, round: round, type: .outcome(ending))
             }
-        // Predictor share cards
+        default: EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func predictorSheetContent(_ which: WizardSheet) -> some View {
+        switch which {
+        case .predictorPredictions:
+            if let game, let round = openRound { PredictionsEntryView(game: game, round: round) }
+        case .predictorResults:
+            if let game, let round = openRound { PredictorResultsEntryView(game: game, round: round) }
+        case .submissionQueue:
+            if let game, let round = openRound, let gameToken = game.cloudGameToken {
+                NavigationStack { SubmissionQueueView(game: game, round: round, gameToken: gameToken) }
+            }
         case .shareEntryClosed:
             if let game, let round = openRound ?? latestClosedRound {
                 PredictorShareView(game: game, round: round, type: .entryClosed)
@@ -380,8 +386,7 @@ struct GameWizardView: View {
             if let game, let round = latestClosedRound {
                 PredictorShareView(game: game, round: round, type: .league)
             }
-        default:
-            EmptyView()
+        default: EmptyView()
         }
     }
 

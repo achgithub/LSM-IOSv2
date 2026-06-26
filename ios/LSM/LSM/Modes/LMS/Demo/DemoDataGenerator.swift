@@ -120,19 +120,19 @@ enum DemoDataGenerator {
     /// Round 1 fixtures (matchday 1). Kickoffs are placed a few days back so the
     /// round reads as "just played".
     static let round1Fixtures: [ScriptedFixture] = [
-        ScriptedFixture(matchId: firstMatchId,     matchday: 1, homeTeamId: team(1), awayTeamId: team(2),
-                        outcome: .homeWin,   homeScore: 2, awayScore: 0),
+        ScriptedFixture(matchId: firstMatchId, matchday: 1, homeTeamId: team(1), awayTeamId: team(2),
+                        outcome: .homeWin, homeScore: 2, awayScore: 0),
         ScriptedFixture(matchId: firstMatchId + 1, matchday: 1, homeTeamId: team(3), awayTeamId: team(4),
-                        outcome: .awayWin,   homeScore: 0, awayScore: 1),
+                        outcome: .awayWin, homeScore: 0, awayScore: 1),
         ScriptedFixture(matchId: firstMatchId + 2, matchday: 1, homeTeamId: team(5), awayTeamId: team(6),
-                        outcome: .draw,      homeScore: 1, awayScore: 1),
+                        outcome: .draw, homeScore: 1, awayScore: 1),
         ScriptedFixture(matchId: firstMatchId + 3, matchday: 1, homeTeamId: team(7), awayTeamId: team(8),
                         outcome: .postponed, homeScore: nil, awayScore: nil)
     ]
 
     /// Round 2 fixtures (matchday 2).
     static let round2Fixtures: [ScriptedFixture] = [
-        ScriptedFixture(matchId: firstMatchId + 4, matchday: 2, homeTeamId: team(9),  awayTeamId: team(10),
+        ScriptedFixture(matchId: firstMatchId + 4, matchday: 2, homeTeamId: team(9), awayTeamId: team(10),
                         outcome: .homeWin, homeScore: 2, awayScore: 1),
         ScriptedFixture(matchId: firstMatchId + 5, matchday: 2, homeTeamId: team(11), awayTeamId: team(12),
                         outcome: .homeWin, homeScore: 1, awayScore: 0),
@@ -146,10 +146,10 @@ enum DemoDataGenerator {
     ///   Jordan → Bridgeford (draw)    → eliminated (draw counts as a loss)
     ///   Casey  → Parkside (postponed) → survives  (the edge case)
     static let round1Picks: [String: Int] = [
-        "Alex":   team(1),
-        "Sam":    team(4),
+        "Alex": team(1),
+        "Sam": team(4),
         "Jordan": team(5),
-        "Casey":  team(7)
+        "Casey": team(7)
     ]
 
     /// Round 2 picks for the three survivors. Chosen so only Sam comes through:
@@ -157,8 +157,8 @@ enum DemoDataGenerator {
     ///   Sam   → Sunvale (home win)             → survives → winner
     ///   Casey → Eastbrook (lost away match)    → eliminated
     static let round2Picks: [String: Int] = [
-        "Alex":  team(10),
-        "Sam":   team(11),
+        "Alex": team(10),
+        "Sam": team(11),
         "Casey": team(13)
     ]
 

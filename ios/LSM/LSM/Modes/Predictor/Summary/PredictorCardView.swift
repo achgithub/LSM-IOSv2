@@ -271,24 +271,24 @@ private extension PredictorCardData {
                 SummaryFixture(id: 3, homeName: "Man City", awayName: "Spurs", kickoff: .now.addingTimeInterval(86400))
             ],
             weeklyResults: [
-                PredictorWeekResult(id: p1, position: 1, playerName: "Andy",  points: 12),
-                PredictorWeekResult(id: p2, position: 2, playerName: "Dave",  points: 9),
+                PredictorWeekResult(id: p1, position: 1, playerName: "Andy", points: 12),
+                PredictorWeekResult(id: p2, position: 2, playerName: "Dave", points: 9),
                 PredictorWeekResult(id: p3, position: 2, playerName: "Sarah", points: 9),
-                PredictorWeekResult(id: p4, position: 4, playerName: "Pete",  points: 6),
-                PredictorWeekResult(id: p5, position: 5, playerName: "Lucy",  points: 4)
+                PredictorWeekResult(id: p4, position: 4, playerName: "Pete", points: 6),
+                PredictorWeekResult(id: p5, position: 5, playerName: "Lucy", points: 4)
             ],
             standings: [
-                PredictorStandingEntry(id: p1, position: 1, playerName: "Andy",  totalPoints: 45, thisRoundPoints: 12),
+                PredictorStandingEntry(id: p1, position: 1, playerName: "Andy", totalPoints: 45, thisRoundPoints: 12),
                 PredictorStandingEntry(id: p3, position: 2, playerName: "Sarah", totalPoints: 38, thisRoundPoints: 9),
-                PredictorStandingEntry(id: p2, position: 3, playerName: "Dave",  totalPoints: 34, thisRoundPoints: 9),
-                PredictorStandingEntry(id: p4, position: 4, playerName: "Pete",  totalPoints: 29, thisRoundPoints: 6),
-                PredictorStandingEntry(id: p5, position: 5, playerName: "Lucy",  totalPoints: 21, thisRoundPoints: 4)
+                PredictorStandingEntry(id: p2, position: 3, playerName: "Dave", totalPoints: 34, thisRoundPoints: 9),
+                PredictorStandingEntry(id: p4, position: 4, playerName: "Pete", totalPoints: 29, thisRoundPoints: 6),
+                PredictorStandingEntry(id: p5, position: 5, playerName: "Lucy", totalPoints: 21, thisRoundPoints: 4)
             ],
             podium: [
-                PredictorPodiumEntry(id: p1, position: 1, playerName: "Andy",  totalPoints: 45),
+                PredictorPodiumEntry(id: p1, position: 1, playerName: "Andy", totalPoints: 45),
                 PredictorPodiumEntry(id: p3, position: 2, playerName: "Sarah", totalPoints: 38),
-                PredictorPodiumEntry(id: p2, position: 2, playerName: "Dave",  totalPoints: 38),
-                PredictorPodiumEntry(id: p4, position: 3, playerName: "Pete",  totalPoints: 29)  // no 3rd if tied 2nd
+                PredictorPodiumEntry(id: p2, position: 2, playerName: "Dave", totalPoints: 38),
+                PredictorPodiumEntry(id: p4, position: 3, playerName: "Pete", totalPoints: 29)  // no 3rd if tied 2nd
             ]
         )
     }
