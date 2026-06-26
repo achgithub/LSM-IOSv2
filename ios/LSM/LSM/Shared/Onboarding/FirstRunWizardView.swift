@@ -64,14 +64,11 @@ struct GameWizardView: View {
         guard let game, let round = openRound, !round.picks.isEmpty else { return false }
         return !game.activePlayers.contains { p in !round.picks.contains { $0.player?.id == p.id } }
     }
-    /// The last round closed with everyone eliminated and no resolution applied —
-    /// the game needs a tie resolution before it can continue (mirrors GameDetailView).
     private var unresolvedTie: Bool {
         guard let game else { return false }
         return game.status == .active && openRound == nil
             && game.activePlayers.isEmpty && latestClosedRound != nil
     }
-    /// The players who contested that final round — the tied group to resolve over.
     private var lastRoundTied: [Player] {
         guard let game, let round = latestClosedRound else { return [] }
         return game.players.filter { player in round.picks.contains { $0.player?.id == player.id } }
@@ -79,17 +76,29 @@ struct GameWizardView: View {
 
     // MARK: Phase machine
 
-    /// The game's current actionable phase, derived from live state every render —
-    /// the wizard always resumes here, and recomputes (advances) as actions land.
     private var phase: WizardPhase {
-        // Setup prefix (new-game mode): always offer the roster step first — "in
-        // case you want to add anyone" — then create the game.
         guard let game else { return didVisitPlayers ? .createGame : .setupPlayers }
+        switch game.mode {
+        case .lms:       return lmsPhase(for: game)
+        case .predictor: return predictorPhase(for: game)
+        }
+    }
+
+    private func lmsPhase(for game: Game) -> WizardPhase {
         if game.status == .complete { return .complete }
         if unresolvedTie { return .resolveTie }
         if openRound != nil { return picksComplete ? .enterResults : .enterPicks }
         if game.activePlayers.count < 2 && latestClosedRound == nil { return .addPlayers }
         return .openRound
+    }
+
+    private func predictorPhase(for game: Game) -> WizardPhase {
+        if let round = openRound {
+            return (round.status == .results || round.deadline < Date())
+                ? .enterPredictorResults : .enterPredictions
+        }
+        if game.players.count < 2 && latestClosedRound == nil { return .addPlayers }
+        return .openMatchday
     }
 
     var body: some View {
@@ -171,8 +180,9 @@ struct GameWizardView: View {
     /// clear where in the game it picked up.
     private var contextLabel: LocalizedStringKey? {
         guard let game else { return nil }
-        if let round = openRound { return "Round \(round.roundNumber)" }
-        if let last = latestClosedRound, game.status != .complete { return "Round \(last.roundNumber)" }
+        let prefix = game.mode == .predictor ? "Matchday" : "Round"
+        if let round = openRound { return "\(prefix) \(round.roundNumber)" }
+        if let last = latestClosedRound, game.status != .complete { return "\(prefix) \(last.roundNumber)" }
         return nil
     }
 
@@ -251,6 +261,35 @@ struct GameWizardView: View {
                 detail: "The game's done. Share the final result, and you're all set — start a new game whenever you like.",
                 shares: shares,
                 showFinish: true)
+
+        // MARK: Predictor phases
+
+        case .openMatchday:
+            let shares: [Action] = latestClosedRound != nil ? [
+                .init(label: "Share Weekly Results", sheet: .shareWeeklyResults),
+                .init(label: "Share League Table",   sheet: .shareLeagueTable)
+            ] : []
+            return PhaseCard(
+                icon: "calendar.badge.plus",
+                title: "Open the next matchday",
+                detail: "Select fixtures for the matchday and set the predictions deadline.",
+                primary: .init(label: "Open Matchday", sheet: .openRound),
+                shares: shares)
+        case .enterPredictions:
+            return PhaseCard(
+                icon: "checklist",
+                title: "Collect predictions",
+                detail: "Players submit their predicted scores. You can also enter predictions on their behalf.",
+                hint: "Not everyone in yet? Close the wizard and come back any time — swipe the game right to resume here.",
+                primary: .init(label: "Enter Predictions", sheet: .predictorPredictions),
+                shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)])
+        case .enterPredictorResults:
+            return PhaseCard(
+                icon: "flag.checkered",
+                title: "Enter scores & close",
+                detail: "Add the final scores for each fixture, then close the matchday to award points.",
+                primary: .init(label: "Enter Results / Close", sheet: .predictorResults),
+                shares: [.init(label: "Share Entry Closed Card", sheet: .shareEntryClosed)])
         }
     }
 
@@ -279,7 +318,12 @@ struct GameWizardView: View {
                     pendingAutoOpen = followUp
                 }
             }
-        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome:
+        case .predictorPredictions:
+            if let game, let round = openRound { PredictionsEntryView(game: game, round: round) }
+        case .predictorResults:
+            if let game, let round = openRound { PredictorResultsEntryView(game: game, round: round) }
+        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome,
+             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable:
             shareSheetContent(which)
         }
     }
@@ -287,6 +331,7 @@ struct GameWizardView: View {
     @ViewBuilder
     private func shareSheetContent(_ which: WizardSheet) -> some View {
         switch which {
+        // LMS share cards
         case .shareFixtures:
             if let game, let round = openRound {
                 SummaryShareView(game: game, round: round, type: .fixtures)
@@ -302,6 +347,19 @@ struct GameWizardView: View {
         case .shareOutcome:
             if let game, let ending = game.lastOutcome, let round = latestClosedRound {
                 SummaryShareView(game: game, round: round, type: .outcome(ending))
+            }
+        // Predictor share cards
+        case .shareEntryClosed:
+            if let game, let round = openRound ?? latestClosedRound {
+                PredictorShareView(game: game, round: round, type: .entryClosed)
+            }
+        case .shareWeeklyResults:
+            if let game, let round = latestClosedRound {
+                PredictorShareView(game: game, round: round, type: .weeklyResults)
+            }
+        case .shareLeagueTable:
+            if let game, let round = latestClosedRound {
+                PredictorShareView(game: game, round: round, type: .league)
             }
         default:
             EmptyView()
@@ -342,19 +400,29 @@ struct GameWizardView: View {
 }
 
 private enum WizardPhase {
-    case setupPlayers, createGame, addPlayers, openRound
-    case enterPicks, enterResults, resolveTie, complete
+    // Shared setup prefix
+    case setupPlayers, createGame, addPlayers
+    // LMS phases
+    case openRound, enterPicks, enterResults, resolveTie, complete
+    // Predictor phases
+    case openMatchday, enterPredictions, enterPredictorResults
 }
 
 enum WizardSheet: String, Identifiable {
-    case players, newGame, addPlayers, openRound, picks, results, resolveTie
+    // Shared
+    case players, newGame, addPlayers, openRound
+    // LMS
+    case picks, results, resolveTie
     case shareFixtures, sharePicks, shareResults, shareOutcome
+    // Predictor
+    case predictorPredictions, predictorResults
+    case shareEntryClosed, shareWeeklyResults, shareLeagueTable
     var id: String { rawValue }
 
-    /// The steps that open a shareable summary card (rewarded-ad gated for free).
     var isShare: Bool {
         switch self {
-        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome: return true
+        case .shareFixtures, .sharePicks, .shareResults, .shareOutcome,
+             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable: return true
         default: return false
         }
     }

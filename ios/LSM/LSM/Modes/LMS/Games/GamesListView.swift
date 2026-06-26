@@ -8,9 +8,7 @@ struct GamesListView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNew = false
     @State private var showingWizard = false
-    /// Presents the "Show Me" guided demo (a self-contained wizard).
-    @State private var showingDemo = false
-    /// The game whose ongoing wizard is open (launched by swiping a row right).
+    @State private var showingDemo = false   // Show Me — hidden for now, plumbing kept
     @State private var wizardGame: Game?
 
     var body: some View {
@@ -20,20 +18,13 @@ struct GamesListView: View {
                     ContentUnavailableView {
                         Label("No games yet", systemImage: "trophy")
                     } description: {
-                        Text("Create your first Last Man Standing game.")
+                        Text("Create your first game.")
                     } actions: {
-                        // Guided Setup shares the wand icon with the wizard it opens.
                         Button { showingWizard = true } label: {
                             Label("Guided Setup", systemImage: "wand.and.stars")
                         }
                         .buttonStyle(.borderedProminent)
                         Button("New Game") { showingNew = true }
-                        // Interactive product tour: builds a full game step by step
-                        // with sample data (ad-free, cleared on exit). Distinct
-                        // "play" icon so it doesn't read as the wizard.
-                        Button { showingDemo = true } label: {
-                            Label("Show Me", systemImage: "play.circle")
-                        }
                     }
                 } else {
                     List {
@@ -45,12 +36,10 @@ struct GamesListView: View {
                                 // resolution) are built around Pick/elimination and
                                 // have no Predictor equivalent yet.
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    if game.mode == .lms {
-                                        Button { wizardGame = game } label: {
-                                            Label("Wizard", systemImage: "wand.and.stars")
-                                        }
-                                        .tint(.purple)
+                                    Button { wizardGame = game } label: {
+                                        Label("Wizard", systemImage: "wand.and.stars")
                                     }
+                                    .tint(.purple)
                                 }
                         }
                         .onDelete(perform: delete)
