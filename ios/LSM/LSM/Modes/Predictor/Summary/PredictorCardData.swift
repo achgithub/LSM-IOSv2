@@ -69,7 +69,7 @@ struct PredictorCardData {
         PredictorCardData(
             type: type,
             gameName: game.name,
-            appName: Leagues.app.name,
+            appName: "Predictor",
             leagueName: game.leagueLabel,
             matchdayNumber: round.roundNumber,
             entrantCount: game.players.count,

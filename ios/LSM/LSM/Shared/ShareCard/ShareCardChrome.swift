@@ -5,7 +5,6 @@ import SwiftUI
 /// and @ViewBuilder slots so any game mode can drop in its own content/footer.
 struct ShareCardChrome<Content: View, Footer: View>: View {
     let palette: ShareCardPalette
-    let badgeText: String
     let headerLabel: String
     let roundNumber: Int
     let gameName: String
@@ -37,9 +36,12 @@ struct ShareCardChrome<Content: View, Footer: View>: View {
                 .fill(palette.accent)
                 .frame(width: 64, height: 64)
                 .overlay(
-                    Text(badgeText)
-                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    Image("shield")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
                         .foregroundStyle(palette.bg)
+                        .padding(10)
                 )
             VStack(alignment: .leading, spacing: 2) {
                 Text(gameName)

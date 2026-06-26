@@ -12,7 +12,6 @@ struct SummaryCardView: View {
     var body: some View {
         ShareCardChrome(
             palette: .lms,
-            badgeText: "LSM",
             headerLabel: "ROUND",
             roundNumber: data.roundNumber,
             gameName: data.gameName,

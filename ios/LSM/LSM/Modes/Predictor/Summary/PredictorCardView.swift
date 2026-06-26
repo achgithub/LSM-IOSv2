@@ -14,7 +14,6 @@ struct PredictorCardView: View {
     var body: some View {
         ShareCardChrome(
             palette: .predictor,
-            badgeText: "PRED",
             headerLabel: "MATCHDAY",
             roundNumber: data.matchdayNumber,
             gameName: data.gameName,
@@ -260,7 +259,7 @@ private extension PredictorCardData {
         return PredictorCardData(
             type: type,
             gameName: "The Office Pool",
-            appName: "Predictor: Premier League",
+            appName: "Predictor",
             leagueName: "Premier League",
             matchdayNumber: 5,
             entrantCount: 12,
