@@ -13,7 +13,9 @@ import SwiftData
 /// purely an optional on-ramp/companion the manager can pick up and put down.
 struct GameWizardView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(Entitlements.self) private var entitlements
     @AppStorage("hasCompletedFirstRun") private var hasCompletedFirstRun = false
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @Query private var roster: [RosterMember]
 
@@ -145,6 +147,13 @@ struct GameWizardView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.large)
                 }
+                ForEach(card.secondaryActions, id: \.sheet) { action in
+                    Button { open(action.sheet) } label: {
+                        Text(action.label).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                }
                 ForEach(card.shares, id: \.sheet) { share in
                     Button { open(share.sheet) } label: {
                         Label(share.label, systemImage: "square.and.arrow.up")
@@ -196,6 +205,7 @@ struct GameWizardView: View {
         var hint: LocalizedStringKey?
         var primary: Action?
         var shares: [Action] = []
+        var secondaryActions: [Action] = []  // non-ad-gated utility buttons
         var showFinish: Bool = false
     }
 
@@ -276,13 +286,18 @@ struct GameWizardView: View {
                 primary: .init(label: "Open Matchday", sheet: .openRound),
                 shares: shares)
         case .enterPredictions:
+            let canSeeQueue = entitlements.canUseCloud && pwaSubmissionsEnabled
+                && game?.cloudGameToken != nil
+            var predictionsActions: [Action] = []
+            if canSeeQueue { predictionsActions.append(.init(label: "Check Submission Queue", sheet: .submissionQueue)) }
             return PhaseCard(
                 icon: "checklist",
                 title: "Collect predictions",
-                detail: "Players submit their predicted scores. You can also enter predictions on their behalf.",
+                detail: "Players submit their predicted scores via the public link. You can also enter predictions on their behalf.",
                 hint: "Not everyone in yet? Close the wizard and come back any time — swipe the game right to resume here.",
                 primary: .init(label: "Enter Predictions", sheet: .predictorPredictions),
-                shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)])
+                shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)],
+                secondaryActions: predictionsActions)
         case .enterPredictorResults:
             return PhaseCard(
                 icon: "flag.checkered",
@@ -322,6 +337,10 @@ struct GameWizardView: View {
             if let game, let round = openRound { PredictionsEntryView(game: game, round: round) }
         case .predictorResults:
             if let game, let round = openRound { PredictorResultsEntryView(game: game, round: round) }
+        case .submissionQueue:
+            if let game, let round = openRound, let gameToken = game.cloudGameToken {
+                NavigationStack { SubmissionQueueView(game: game, round: round, gameToken: gameToken) }
+            }
         case .shareFixtures, .sharePicks, .shareResults, .shareOutcome,
              .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable:
             shareSheetContent(which)
@@ -415,7 +434,7 @@ enum WizardSheet: String, Identifiable {
     case picks, results, resolveTie
     case shareFixtures, sharePicks, shareResults, shareOutcome
     // Predictor
-    case predictorPredictions, predictorResults
+    case predictorPredictions, predictorResults, submissionQueue
     case shareEntryClosed, shareWeeklyResults, shareLeagueTable
     var id: String { rawValue }
 
