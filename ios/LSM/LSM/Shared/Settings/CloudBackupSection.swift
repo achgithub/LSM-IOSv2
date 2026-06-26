@@ -114,7 +114,7 @@ struct CloudBackupSection: View {
 /// Minimal paywall for the standalone cloud entitlement — separate from
 /// `PaywallView` (the league-tier ladder), since this is a single on/off
 /// purchase, not a tier picker.
-private struct CloudBundlePaywallView: View {
+struct CloudBundlePaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(Entitlements.self) private var entitlements
     @State private var isPurchasing = false

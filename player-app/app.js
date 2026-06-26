@@ -1,10 +1,10 @@
-// LSM Player App — anonymous submission PWA (Phase 3).
+// LSM Player App — anonymous submission PWA (Phase 4).
 //
 // The token in the URL (/s/<uuid>) is the only credential. On load we fetch
-// GET /s/:token to find out what's actionable right now (the open round for
-// the player's game), render it, and POST the player's choice back as a
-// PENDING submission. Nothing here writes a real pick/prediction — the manager
-// approves in the LSM app. See worker/src/routes/submissions.ts.
+// GET /s/:token to get all active games for this player, render them, and
+// POST to /s/:token/games/:gameToken to submit. Nothing here writes a real
+// pick/prediction — the manager approves in the LSM app.
+// See worker/src/routes/submissions.ts.
 //
 // No build step. Plain HTML/JS. textContent only — no innerHTML — so team
 // names and player input from the API can never inject markup.
@@ -22,7 +22,7 @@ function getToken() {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
-async function fetchActionable(token) {
+async function fetchPlayer(token) {
   const res = await fetch(`${API_BASE}/s/${token}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -31,8 +31,8 @@ async function fetchActionable(token) {
   return res.json();
 }
 
-async function postSubmission(token, payload) {
-  const res = await fetch(`${API_BASE}/s/${token}`, {
+async function postSubmission(token, gameToken, payload) {
+  const res = await fetch(`${API_BASE}/s/${token}/games/${gameToken}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -60,11 +60,10 @@ function setContent(root, ...children) {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 /**
- * state shape:
+ * Top-level render. State shape:
  *   { loading: true }
  *   { error: "..." }
- *   { mode, playerName, roundNumber, deadline, fixtures, eligibleTeamIds?,
- *     priorSubmission?, submitted: true, submitError: "..." }
+ *   { playerName, games: [...] }
  */
 function render(state, token) {
   const root = document.getElementById("content");
@@ -81,26 +80,47 @@ function render(state, token) {
 
   const frag = document.createDocumentFragment();
 
-  // Header
   const header = el("h2", null, `Hi ${state.playerName}`);
-  header.style.margin = "0 0 0.5rem";
+  header.style.margin = "0 0 1rem";
   frag.appendChild(header);
 
-  const sub = el("p", "muted", `Round ${state.roundNumber}`);
-  sub.style.margin = "0 0 1rem";
-  frag.appendChild(sub);
+  if (!state.games || state.games.length === 0) {
+    frag.appendChild(el("p", "muted", "No active rounds right now. Check back when your manager opens the next round."));
+    setContent(root, frag);
+    return;
+  }
 
-  if (state.deadline) {
-    const d = new Date(state.deadline);
-    const deadline = el("p", "small muted", `Deadline: ${d.toLocaleString()}`);
-    frag.appendChild(deadline);
+  for (const game of state.games) {
+    frag.appendChild(renderGame(game, token));
+  }
+
+  setContent(root, frag);
+}
+
+/**
+ * Render one game card. Each game tracks its own submitted state independently.
+ * game shape: { gameToken, mode, roundNumber, deadline, fixtures,
+ *               eligibleTeams?, priorSubmission?, _submitted?, _submitError? }
+ */
+function renderGame(game, token) {
+  const card = el("div", "card");
+  card.style.marginBottom = "1.5rem";
+
+  const title = el("p", null, `Round ${game.roundNumber}`);
+  title.style.fontWeight = "600";
+  title.style.margin = "0 0 0.25rem";
+  card.appendChild(title);
+
+  if (game.deadline) {
+    const d = new Date(game.deadline);
+    card.appendChild(el("p", "small muted", `Deadline: ${d.toLocaleString()}`));
   }
 
   // Prior submission banner
-  if (state.priorSubmission && !state.submitted) {
-    const prior = state.priorSubmission;
-    const banner = el("div", "card");
-    banner.style.marginBottom = "1rem";
+  if (game.priorSubmission && !game._submitted) {
+    const prior = game.priorSubmission;
+    const banner = el("div", null);
+    banner.style.marginBottom = "0.75rem";
     const statusText = prior.status === "pending"
       ? "Your pick is pending manager approval."
       : prior.status === "approved"
@@ -110,73 +130,73 @@ function render(state, token) {
     if (prior.status !== "approved") {
       banner.appendChild(el("p", "small", "You can submit again to update it."));
     }
-    frag.appendChild(banner);
+    card.appendChild(banner);
   }
 
-  if (state.submitted) {
+  if (game._submitted) {
     const ok = el("p", null, "✓ Submitted! Your pick is pending manager approval.");
     ok.style.fontWeight = "600";
-    frag.appendChild(ok);
-    if (state.submitError) frag.appendChild(el("p", "error", state.submitError));
-    setContent(root, frag);
-    return;
+    card.appendChild(ok);
+    return card;
+  }
+
+  if (game._submitError) {
+    card.appendChild(el("p", "error", game._submitError));
   }
 
   // Mode-specific input
-  if (state.mode === "lms") {
-    renderLMS(frag, state, token);
-  } else if (state.mode === "predictor") {
-    renderPredictor(frag, state, token);
+  if (game.mode === "lms") {
+    renderLMS(card, game, token);
+  } else if (game.mode === "predictor") {
+    renderPredictor(card, game, token);
   } else {
-    frag.appendChild(el("p", "error", `Unknown game mode: ${state.mode}`));
+    card.appendChild(el("p", "error", `Unknown game mode: ${game.mode}`));
   }
 
-  setContent(root, frag);
+  return card;
 }
 
 // ── LMS renderer ─────────────────────────────────────────────────────────────
 
-function renderLMS(frag, state, token) {
-  // eligibleTeams is [{id, name}], ordered by priority (the server computed this).
-  // If absent (shouldn't happen for LMS), fall back to all fixture teams.
-  const eligibleTeams = state.eligibleTeams ?? [];
+function renderLMS(container, game, token) {
+  const eligibleTeams = game.eligibleTeams ?? [];
 
-  frag.appendChild(el("p", null, "Pick a team for this round:"));
+  container.appendChild(el("p", null, "Pick a team for this round:"));
 
   if (eligibleTeams.length === 0) {
-    frag.appendChild(el("p", "muted", "No eligible teams found. Contact your manager."));
+    container.appendChild(el("p", "muted", "No eligible teams found. Contact your manager."));
     return;
   }
 
-  const card = el("div", "card");
+  const teamList = el("div", null);
+  teamList.style.marginBottom = "0.5rem";
   for (const team of eligibleTeams) {
     const btn = el("button", "pick-btn", team.name);
-    btn.addEventListener("click", () => submitLMS(token, team.id, team.name, state));
-    card.appendChild(btn);
+    btn.addEventListener("click", () => submitLMS(token, game, team.id));
+    teamList.appendChild(btn);
   }
-  frag.appendChild(card);
-
-  frag.appendChild(el("p", "small muted", "Pick the team you think will win (or survive) this round."));
+  container.appendChild(teamList);
+  container.appendChild(el("p", "small muted", "Pick the team you think will win (or survive) this round."));
 }
 
-async function submitLMS(token, teamId, teamName, state) {
+async function submitLMS(token, game, teamId) {
   try {
-    await postSubmission(token, { teamId });
-    updateSubmitState({ ...state, submitted: true }, token);
+    await postSubmission(token, game.gameToken, { teamId });
+    updateGameState(game, { _submitted: true });
   } catch (e) {
-    updateSubmitState({ ...state, submitError: e.message }, token);
+    updateGameState(game, { _submitError: e.message });
   }
 }
 
 // ── Predictor renderer ────────────────────────────────────────────────────────
 
-function renderPredictor(frag, state, token) {
-  frag.appendChild(el("p", null, "Enter your score predictions:"));
+function renderPredictor(container, game, token) {
+  container.appendChild(el("p", null, "Enter your score predictions:"));
 
   const inputs = [];
 
-  for (const f of state.fixtures) {
-    const card = el("div", "card");
+  for (const f of game.fixtures) {
+    const card = el("div", null);
     card.style.marginBottom = "0.75rem";
 
     const label = el("p", null, `${f.home} vs ${f.away}`);
@@ -220,16 +240,16 @@ function renderPredictor(frag, state, token) {
     row.appendChild(el("span", "small", f.away));
 
     card.appendChild(row);
-    frag.appendChild(card);
+    container.appendChild(card);
     inputs.push({ fixtureId: f.fixtureId, homeInput, awayInput });
   }
 
   const submitBtn = el("button", "submit-btn", "Submit Predictions");
-  submitBtn.addEventListener("click", () => submitPredictor(token, inputs, state));
-  frag.appendChild(submitBtn);
+  submitBtn.addEventListener("click", () => submitPredictor(token, game, inputs));
+  container.appendChild(submitBtn);
 }
 
-async function submitPredictor(token, inputs, state) {
+async function submitPredictor(token, game, inputs) {
   const scores = inputs.map(({ fixtureId, homeInput, awayInput }) => ({
     fixtureId,
     home: parseInt(homeInput.value, 10) || 0,
@@ -237,22 +257,21 @@ async function submitPredictor(token, inputs, state) {
   }));
 
   try {
-    await postSubmission(token, { scores });
-    updateSubmitState({ ...state, submitted: true }, token);
+    await postSubmission(token, game.gameToken, { scores });
+    updateGameState(game, { _submitted: true });
   } catch (e) {
-    updateSubmitState({ ...state, submitError: e.message }, token);
+    updateGameState(game, { _submitError: e.message });
   }
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let _currentState = null;
-let _currentToken = null;
+let _state = null;
+let _token = null;
 
-function updateSubmitState(state, token) {
-  _currentState = state;
-  _currentToken = token;
-  render(state, token);
+function updateGameState(game, patch) {
+  Object.assign(game, patch);
+  render(_state, _token);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -264,13 +283,16 @@ async function main() {
     return;
   }
 
-  render({ loading: true }, token);
+  _token = token;
+  _state = { loading: true };
+  render(_state, token);
 
   try {
-    const data = await fetchActionable(token);
-    render(data, token);
+    _state = await fetchPlayer(token);
+    render(_state, token);
   } catch (e) {
-    render({ error: e.message || "Couldn't load your link. It may have expired or been revoked." }, token);
+    _state = { error: e.message || "Couldn't load your link. It may have expired or been revoked." };
+    render(_state, token);
   }
 }
 

@@ -10,6 +10,7 @@ private enum RoundSheet: String, Identifiable {
 /// (open round → picks → results/close), plus the manager declare-winner override.
 struct GameDetailView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     @Bindable var game: Game
     @State private var showingAddPlayers = false
     @State private var sheet: RoundSheet?
@@ -33,10 +34,6 @@ struct GameDetailView: View {
     @State private var exportError: String?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
-    @State private var pendingLinkPlayer: Player?
-    @State private var pendingRevokePlayer: Player?
-    @State private var linkShareItem: PlayerLinkShareItem?
-    @State private var isMintingLink = false
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -148,7 +145,6 @@ struct GameDetailView: View {
                 }
             }
         }
-        .background(linkDialogHost)
         // Tie resolution at the top level — presented only after the Results sheet
         // has fully dismissed, so two sheets never dismiss at once (which blanked
         // the screen). The manual "Resolve Round" button presents it the same way.
@@ -278,7 +274,7 @@ struct GameDetailView: View {
                     // Can't close with players unassigned — finish picks first
                     // (Auto-Assign handles any latecomers).
                     .disabled(!openRoundPicksComplete)
-                if pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button { sheet = .submissions } label: {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
                     }
@@ -334,40 +330,12 @@ struct GameDetailView: View {
                                 .font(.caption)
                                 .foregroundStyle(player.status == .winner ? .green : .red)
                         }
-                        if pwaSubmissionsEnabled, !player.isManager {
-                            Button {
-                                if player.submissionToken != nil {
-                                    pendingLinkPlayer = player
-                                } else {
-                                    mintLink(for: player, regenerate: false)
-                                }
-                            } label: {
-                                Image(systemName: player.submissionToken != nil ? "link" : "link.badge.plus")
-                                    .foregroundStyle(player.submissionToken != nil ? .blue : .secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
                     }
                     // Drop-out removal: swipe to reveal, then confirm — two
                     // deliberate steps so it can't happen by accident mid-game.
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) { pendingRemovePlayer = player } label: {
                             Label("Remove", systemImage: "person.fill.xmark")
-                        }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        if pwaSubmissionsEnabled, !player.isManager {
-                            Button {
-                                if player.submissionToken != nil {
-                                    pendingLinkPlayer = player
-                                } else {
-                                    mintLink(for: player, regenerate: false)
-                                }
-                            } label: {
-                                Label(player.submissionToken != nil ? "Link" : "Get Link",
-                                      systemImage: "link")
-                            }
-                            .tint(.blue)
                         }
                     }
                 }
@@ -378,96 +346,4 @@ struct GameDetailView: View {
         }
     }
 
-    // MARK: - PWA Submissions
-
-    @ViewBuilder
-    private var linkDialogHost: some View {
-        Color.clear
-            .sheet(item: $linkShareItem) { item in
-                ActivityShareView(items: item.shareItems)
-            }
-            .confirmationDialog(
-                "Link for \(pendingLinkPlayer?.name ?? "")",
-                isPresented: Binding(
-                    get: { pendingLinkPlayer != nil },
-                    set: { if !$0 { pendingLinkPlayer = nil } }
-                ),
-                titleVisibility: .visible,
-                presenting: pendingLinkPlayer
-            ) { player in
-                Button("Share Link") { shareLink(for: player) }
-                Button("Regenerate Link", role: .destructive) { mintLink(for: player, regenerate: true) }
-                Button("Revoke Link", role: .destructive) { revokeLink(for: player) }
-                Button("Cancel", role: .cancel) {}
-            }
-            .confirmationDialog(
-                "Revoke link for \(pendingRevokePlayer?.name ?? "")?",
-                isPresented: Binding(
-                    get: { pendingRevokePlayer != nil },
-                    set: { if !$0 { pendingRevokePlayer = nil } }
-                ),
-                titleVisibility: .visible,
-                presenting: pendingRevokePlayer
-            ) { player in
-                Button("Revoke", role: .destructive) { confirmRevokeLink(for: player) }
-                Button("Cancel", role: .cancel) {}
-            } message: { player in
-                Text("\(player.name)'s link stops working immediately. You can mint a new one at any time.")
-            }
-    }
-
-    private func playerLinkURL(for player: Player) -> URL? {
-        guard let token = player.submissionToken else { return nil }
-        return SubmissionsClient.playerLinkURL(token: token.uuidString)
-    }
-
-    private func shareLink(for player: Player) {
-        guard let url = playerLinkURL(for: player) else { return }
-        pendingLinkPlayer = nil
-        linkShareItem = PlayerLinkShareItem(playerName: player.name, url: url)
-    }
-
-    private func mintLink(for player: Player, regenerate: Bool) {
-        guard !isMintingLink else { return }
-        if game.cloudGameTokenRaw == nil {
-            game.cloudGameTokenRaw = UUID().uuidString.lowercased()
-        }
-        guard let gameToken = game.cloudGameToken else { return }
-        pendingLinkPlayer = nil
-        isMintingLink = true
-        let name = player.name
-        Task {
-            do {
-                let token = try await SubmissionsClient.shared.mintLink(
-                    gameToken: gameToken,
-                    localPlayerId: player.id,
-                    playerName: name
-                )
-                player.submissionTokenRaw = token.lowercased()
-                let url = SubmissionsClient.playerLinkURL(token: token)
-                await MainActor.run {
-                    isMintingLink = false
-                    linkShareItem = PlayerLinkShareItem(playerName: name, url: url)
-                }
-            } catch {
-                await MainActor.run { isMintingLink = false }
-            }
-        }
-    }
-
-    private func revokeLink(for player: Player) {
-        pendingLinkPlayer = nil
-        pendingRevokePlayer = player
-    }
-
-    private func confirmRevokeLink(for player: Player) {
-        guard let gameToken = game.cloudGameToken,
-              let token = player.submissionTokenRaw else { return }
-        pendingRevokePlayer = nil
-        let t = token
-        Task {
-            try? await SubmissionsClient.shared.revokeLink(gameToken: gameToken, token: t)
-        }
-        player.submissionTokenRaw = nil
-    }
 }

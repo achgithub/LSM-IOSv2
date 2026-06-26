@@ -47,7 +47,16 @@ struct GameSnapshot: Codable {
         let entryNumber: Int
         let teamPoolResetAfterRound: Int
         let isManager: Bool
+        // submissionTokenRaw was per-player in Phase 3; now lives on RosterMember.
+        // Kept optional here so old backups with this field decode without error.
         let submissionTokenRaw: String?
+
+        init(id: UUID, name: String, statusRaw: String, entryNumber: Int,
+             teamPoolResetAfterRound: Int, isManager: Bool) {
+            self.id = id; self.name = name; self.statusRaw = statusRaw
+            self.entryNumber = entryNumber; self.teamPoolResetAfterRound = teamPoolResetAfterRound
+            self.isManager = isManager; self.submissionTokenRaw = nil
+        }
     }
 
     struct RoundSnapshot: Codable {
@@ -122,8 +131,7 @@ enum GameSnapshotBuilder {
                     statusRaw: player.statusRaw,
                     entryNumber: player.entryNumber,
                     teamPoolResetAfterRound: player.teamPoolResetAfterRound,
-                    isManager: player.isManager,
-                    submissionTokenRaw: player.submissionTokenRaw
+                    isManager: player.isManager
                 )
             },
             rounds: game.rounds.map { round in
@@ -195,7 +203,6 @@ enum GameSnapshotBuilder {
             let player = Player(name: p.name, game: game, isManager: p.isManager, entryNumber: p.entryNumber)
             player.statusRaw = p.statusRaw
             player.teamPoolResetAfterRound = p.teamPoolResetAfterRound
-            player.submissionTokenRaw = p.submissionTokenRaw
             context.insert(player)
             game.players.append(player)
             newPlayerId[p.id] = player

@@ -11,6 +11,7 @@ private let submissionsLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "
 struct OpenRoundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     /// The kind of round to open. Tie follow-ups pass `.playoff`/`.rollover`.
     var roundType: RoundType = .normal
@@ -285,7 +286,7 @@ struct OpenRoundView: View {
             roundType: roundType,
             context: context
         )
-        if pwaSubmissionsEnabled {
+        if entitlements.canUseCloud && pwaSubmissionsEnabled {
             pushRound(round)
         }
         onOpened()
@@ -327,12 +328,27 @@ struct OpenRoundView: View {
         let roundNumber = round.roundNumber
         let deadline = round.deadline
 
-        let linkedPlayers = game.activePlayers.filter { $0.submissionToken != nil && !$0.isManager }
+        // Resolve roster-member tokens synchronously before the async task
+        // (avoids SwiftData main-actor access from a background context).
+        let playerTokenMap: [UUID: String] = {
+            var dict: [UUID: String] = [:]
+            for player in game.activePlayers where !player.isManager {
+                guard let memberId = player.rosterMemberId else { continue }
+                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
+                if let members = try? context.fetch(fd),
+                   let member = members.first,
+                   let rawToken = member.submissionTokenRaw {
+                    dict[player.id] = rawToken.lowercased()
+                }
+            }
+            return dict
+        }()
+        let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
 
         Task {
             var playerItems: [PlayerPushItem] = []
             for player in linkedPlayers {
-                guard let token = player.submissionToken else { continue }
+                guard let token = playerTokenMap[player.id] else { continue }
                 let eligibleTeams: [EligibleTeam]
                 if mode == .lms {
                     let used = GameLogicService.usedTeamIds(for: player)
@@ -347,7 +363,8 @@ struct OpenRoundView: View {
                     eligibleTeams = fixtureTeamRefs.map { EligibleTeam(id: $0.id, name: $0.name) }
                 }
                 playerItems.append(PlayerPushItem(
-                    token: token.uuidString.lowercased(),
+                    token: token,
+                    localPlayerId: player.id.uuidString.lowercased(),
                     eligibleTeams: eligibleTeams.isEmpty ? nil : eligibleTeams
                 ))
             }

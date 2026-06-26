@@ -9,6 +9,11 @@ final class RosterMember {
     @Attribute(.unique) var id: UUID
     var name: String
     var createdAt: Date
+    /// Global submission token — one link for this player across all games.
+    /// Nil until the manager mints a link. Use `submissionToken` for typed access.
+    var submissionTokenRaw: String?
+
+    var submissionToken: UUID? { submissionTokenRaw.flatMap(UUID.init) }
 
     /// Groups this person belongs to (many-to-many; see `PlayerGroup`).
     @Relationship(inverse: \PlayerGroup.members)

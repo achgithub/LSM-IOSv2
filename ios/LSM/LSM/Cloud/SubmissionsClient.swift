@@ -1,6 +1,6 @@
 import Foundation
 
-/// Wire types for the Phase 3 submission queue Worker routes.
+/// Wire types for the Phase 4 submission queue Worker routes.
 
 struct FixturePushItem: Encodable {
     let fixtureId: Int
@@ -16,6 +16,7 @@ struct EligibleTeam: Encodable {
 
 struct PlayerPushItem: Encodable {
     let token: String
+    let localPlayerId: String
     let eligibleTeams: [EligibleTeam]?
 }
 
@@ -51,7 +52,7 @@ struct ApproveResult: Decodable {
     let payload: SubmissionPayload
 }
 
-/// Client for the Phase 3 submission-queue Worker routes. Follows the same
+/// Client for the Phase 4 submission-queue Worker routes. Follows the same
 /// actor/singleton pattern as `SnapshotClient`.
 actor SubmissionsClient {
     static let shared = SubmissionsClient()
@@ -66,6 +67,7 @@ actor SubmissionsClient {
     static func playerLinkURL(token: String) -> URL {
         playerBase.appending(path: "s/\(token.lowercased())")
     }
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -76,29 +78,26 @@ actor SubmissionsClient {
 
     // ── Manager-facing ────────────────────────────────────────────────────────
 
-    /// Mint (or regenerate) a player link. Returns the new token.
-    func mintLink(gameToken: UUID, localPlayerId: UUID, playerName: String) async throws -> String {
-        struct Body: Encodable { let localPlayerId: String; let playerName: String }
+    /// Mint (or retrieve existing) global token for a player name. Idempotent.
+    func mintLink(playerName: String) async throws -> String {
+        struct Body: Encodable { let playerName: String }
         struct Response: Decodable { let token: String }
-        var req = try await request(
-            path: "/games/\(gameToken.uuidString.lowercased())/links", method: "POST"
-        )
-        req.httpBody = try encoder.encode(Body(localPlayerId: localPlayerId.uuidString.lowercased(), playerName: playerName))
+        var req = try await request(path: "/links", method: "POST")
+        req.httpBody = try encoder.encode(Body(playerName: playerName))
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(req)
         return try decoder.decode(Response.self, from: data).token
     }
 
-    /// Revoke a player link immediately.
-    func revokeLink(gameToken: UUID, token: String) async throws {
+    /// Revoke a player token globally — all game enrollments stop working.
+    func revokeLink(token: String) async throws {
         let req = try await request(
-            path: "/games/\(gameToken.uuidString.lowercased())/links/\(token.lowercased())/revoke",
-            method: "POST"
+            path: "/links/\(token.lowercased())/revoke", method: "POST"
         )
         _ = try await send(req)
     }
 
-    /// Push the current open round. Only players with an existing token get updated.
+    /// Push the current open round and enroll all players who have tokens.
     func pushRound(
         gameToken: UUID,
         mode: String,
@@ -135,8 +134,7 @@ actor SubmissionsClient {
         return try decoder.decode(Response.self, from: data).submissions
     }
 
-    /// Approve a submission. gameToken scopes the request to the manager's own game,
-    /// preventing any caller without the game token from approving arbitrary submissions.
+    /// Approve a submission.
     func approve(submissionId: String, gameToken: UUID) async throws -> ApproveResult {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/approve"
         let req = try await request(path: path, method: "POST")
@@ -144,7 +142,7 @@ actor SubmissionsClient {
         return try decoder.decode(ApproveResult.self, from: data)
     }
 
-    /// Reject a submission. Same game-scope guard as approve.
+    /// Reject a submission.
     func reject(submissionId: String, gameToken: UUID) async throws {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/reject"
         let req = try await request(path: path, method: "POST")

@@ -153,6 +153,7 @@ struct AddPlayersView: View {
     private func add(_ member: RosterMember) {
         guard !existingNames().contains(member.name.lowercased()) else { return }
         let player = Player(name: member.name, game: game, entryNumber: game.nextEntryNumber)
+        player.rosterMemberId = member.id
         context.insert(player)
         game.players.append(player)
     }

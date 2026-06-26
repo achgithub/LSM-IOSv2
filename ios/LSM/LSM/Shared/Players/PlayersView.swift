@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 /// happens inside the game (Games → Add Players), pulling from this roster.
 struct PlayersView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     @Query(sort: \RosterMember.name) private var members: [RosterMember]
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
 
@@ -15,6 +16,7 @@ struct PlayersView: View {
     @State private var importing = false
     @State private var importGroupId: UUID?
     @State private var message: String?
+    @State private var showPaywall = false
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
 
@@ -25,11 +27,17 @@ struct PlayersView: View {
         NavigationStack {
             List {
                 Section {
-                    Toggle("Player submission links", isOn: $pwaSubmissionsEnabled)
+                    if entitlements.canUseCloud {
+                        Toggle("Player submission links", isOn: $pwaSubmissionsEnabled)
+                    } else {
+                        Button("Unlock Player Submission Links") { showPaywall = true }
+                    }
                 } header: {
                     Text("PWA Submissions")
                 } footer: {
-                    Text("When on, you can share a personal link with each player so they can submit picks themselves. You review and approve before anything goes live.")
+                    Text(entitlements.canUseCloud
+                         ? "When on, you can share a personal link with each player so they can submit picks themselves. You review and approve before anything goes live."
+                         : "Share a personal link with each player so they can submit picks from their phone. Requires the Cloud Bundle.")
                 }
 
                 Section("Add a player") {
@@ -40,7 +48,7 @@ struct PlayersView: View {
                             .disabled(trimmedName.isEmpty || isDuplicateMember(trimmedName))
                     }
                     if isDuplicateMember(trimmedName) {
-                        Text("‘\(trimmedName)’ is already in your players.")
+                        Text("'\(trimmedName)' is already in your players.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -91,13 +99,22 @@ struct PlayersView: View {
                     } else {
                         ForEach(members) { member in
                             NavigationLink {
-                                MemberGroupsView(member: member)
+                                MemberGroupsView(member: member, pwaEnabled: entitlements.canUseCloud && pwaSubmissionsEnabled)
                             } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(member.name)
-                                    if !member.groups.isEmpty {
-                                        Text(member.groups.map(\.name).sorted().joined(separator: ", "))
-                                            .font(.caption).foregroundStyle(.secondary)
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(member.name)
+                                        if !member.groups.isEmpty {
+                                            Text(member.groups.map(\.name).sorted().joined(separator: ", "))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    if entitlements.canUseCloud && pwaSubmissionsEnabled,
+                                       member.submissionTokenRaw != nil {
+                                        Image(systemName: "link")
+                                            .font(.caption)
+                                            .foregroundStyle(.blue)
                                     }
                                 }
                             }
@@ -115,6 +132,9 @@ struct PlayersView: View {
                 allowsMultipleSelection: false
             ) { result in
                 handleImport(result)
+            }
+            .sheet(isPresented: $showPaywall) {
+                CloudBundlePaywallView()
             }
         }
     }
@@ -232,10 +252,20 @@ struct PlayersView: View {
     }
 }
 
-/// Toggle which groups a roster member belongs to.
-private struct MemberGroupsView: View {
+/// Toggle which groups a roster member belongs to, and manage their submission link.
+struct MemberGroupsView: View {
     @Bindable var member: RosterMember
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
+
+    let pwaEnabled: Bool
+
+    @State private var isMintingLink = false
+    @State private var pendingRevoke = false
+    @State private var linkShareItem: PlayerLinkShareItem?
+
+    private var linkURL: URL? {
+        member.submissionToken.map { SubmissionsClient.playerLinkURL(token: $0.uuidString) }
+    }
 
     var body: some View {
         List {
@@ -259,9 +289,54 @@ private struct MemberGroupsView: View {
                     }
                 }
             }
+
+            if pwaEnabled {
+                Section {
+                    if let url = linkURL {
+                        Button {
+                            linkShareItem = PlayerLinkShareItem(playerName: member.name, url: url)
+                        } label: {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                        }
+                        Button(role: .destructive) { pendingRevoke = true } label: {
+                            Label("Revoke Link", systemImage: "link.badge.minus")
+                        }
+                    } else if isMintingLink {
+                        HStack {
+                            ProgressView()
+                            Text("Getting link…").foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Button {
+                            mintLink()
+                        } label: {
+                            Label("Get Submission Link", systemImage: "link.badge.plus")
+                        }
+                    }
+                } header: {
+                    Text("Submission Link")
+                } footer: {
+                    Text(linkURL != nil
+                         ? "This player's personal link. Share it so they can submit picks from their phone."
+                         : "Mint a personal link for this player. One link works across all their games.")
+                }
+            }
         }
         .navigationTitle(member.name)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $linkShareItem) { item in
+            ActivityShareView(items: item.shareItems)
+        }
+        .confirmationDialog(
+            "Revoke link for \(member.name)?",
+            isPresented: $pendingRevoke,
+            titleVisibility: .visible
+        ) {
+            Button("Revoke", role: .destructive) { revokeLink() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The link stops working in all their games immediately. You can mint a new one at any time.")
+        }
     }
 
     private func isMember(of group: PlayerGroup) -> Bool {
@@ -274,5 +349,31 @@ private struct MemberGroupsView: View {
         } else {
             member.groups.append(group)
         }
+    }
+
+    private func mintLink() {
+        guard !isMintingLink else { return }
+        isMintingLink = true
+        let name = member.name
+        Task {
+            do {
+                let token = try await SubmissionsClient.shared.mintLink(playerName: name)
+                member.submissionTokenRaw = token.lowercased()
+                let url = SubmissionsClient.playerLinkURL(token: token)
+                await MainActor.run {
+                    isMintingLink = false
+                    linkShareItem = PlayerLinkShareItem(playerName: name, url: url)
+                }
+            } catch {
+                await MainActor.run { isMintingLink = false }
+            }
+        }
+    }
+
+    private func revokeLink() {
+        guard let token = member.submissionTokenRaw else { return }
+        member.submissionTokenRaw = nil
+        let t = token
+        Task { try? await SubmissionsClient.shared.revokeLink(token: t) }
     }
 }
