@@ -355,8 +355,8 @@ struct OpenRoundView: View {
         // Last 8 hex chars of the manager's player UUID — used by the PWA to
         // identify which manager owns each game.
         let managerSuffix: String? = game.players.first(where: { $0.isManager }).map {
-            $0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8).lowercased()
-        }.map(String.init)
+            String($0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
+        }
 
         let jokerEnabled = game.predictorJokerEnabled
         let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }

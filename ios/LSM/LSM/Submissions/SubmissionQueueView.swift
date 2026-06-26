@@ -128,9 +128,8 @@ struct SubmissionQueueView: View {
 
     /// The local manager's suffix — last 8 hex chars of the manager player's UUID.
     private var localManagerSuffix: String? {
-        game.players.first(where: { $0.isManager }).map {
-            $0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8).lowercased()
-        }.map(String.init)
+        guard let manager = game.players.first(where: { $0.isManager }) else { return nil }
+        return String(manager.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
     }
 
     @MainActor
