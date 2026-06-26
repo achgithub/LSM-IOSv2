@@ -131,10 +131,14 @@ function renderGame(game, token) {
       : prior.status === "approved"
       ? "Your pick has been approved ✓"
       : "Your pick was rejected.";
-    banner.appendChild(el("p", "muted small", statusText));
-    if (prior.status !== "approved") {
-      banner.appendChild(el("p", "small", "You can submit again to update it."));
+    const statusEl = el("p", "muted small", statusText);
+    if (prior.status === "approved") statusEl.style.color = "#4caf50";
+    banner.appendChild(statusEl);
+    if (prior.status === "approved") {
+      card.appendChild(banner);
+      return card;  // approved — no re-submission
     }
+    banner.appendChild(el("p", "small", "You can submit again to update it."));
     card.appendChild(banner);
   }
 
@@ -177,16 +181,16 @@ function renderLMS(container, game, token) {
   teamList.style.marginBottom = "0.5rem";
   for (const team of eligibleTeams) {
     const btn = el("button", "pick-btn", team.name);
-    btn.addEventListener("click", () => submitLMS(token, game, team.id));
+    btn.addEventListener("click", () => submitLMS(token, game, team.id, team.name));
     teamList.appendChild(btn);
   }
   container.appendChild(teamList);
   container.appendChild(el("p", "small muted", "Pick the team you think will win (or survive) this round."));
 }
 
-async function submitLMS(token, game, teamId) {
+async function submitLMS(token, game, teamId, teamName) {
   try {
-    await postSubmission(token, game.gameToken, { teamId });
+    await postSubmission(token, game.gameToken, { teamId, teamName });
     updateGameState(game, { _submitted: true });
   } catch (e) {
     updateGameState(game, { _submitError: e.message });

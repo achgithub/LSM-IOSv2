@@ -188,9 +188,12 @@ private struct SubmissionRow: View {
 
     private var payloadDescription: String {
         if game.mode == .lms, let teamId = item.payload.teamId {
-            return "Pick: team \(teamId)"
+            let name = item.payload.teamName ?? "Team \(teamId)"
+            return "Pick: \(name)"
         } else if let scores = item.payload.scores {
-            return scores.map { "\($0.home)–\($0.away)" }.joined(separator: ", ")
+            return scores.map { s in
+                s.isJoker == true ? "\(s.home)–\(s.away) ★" : "\(s.home)–\(s.away)"
+            }.joined(separator: ", ")
         }
         return "—"
     }

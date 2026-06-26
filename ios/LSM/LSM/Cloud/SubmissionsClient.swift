@@ -36,6 +36,7 @@ struct SubmissionItem: Decodable, Identifiable {
 struct SubmissionPayload: Decodable {
     // LMS
     let teamId: Int?
+    let teamName: String?
     // Predictor
     let scores: [PredictorScore]?
 }
