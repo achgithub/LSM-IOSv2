@@ -3,6 +3,7 @@ import SwiftData
 
 private enum PredictorSheet: String, Identifiable {
     case open, predictions, results, standings, publish, submissions
+    case shareFixtures, shareEntryClosed, shareWeeklyResults, shareLeague, shareWinner
     var id: String { rawValue }
 }
 
@@ -38,6 +39,7 @@ struct PredictorGameDetailView: View {
         List {
             infoSection
             roundSection
+            shareSection
             playersSection
         }
         .navigationTitle(game.name)
@@ -60,6 +62,26 @@ struct PredictorGameDetailView: View {
                     NavigationStack {
                         SubmissionQueueView(game: game, round: round, gameToken: gameToken)
                     }
+                }
+            case .shareFixtures:
+                if let round = openRound {
+                    PredictorShareView(game: game, round: round, type: .fixtures)
+                }
+            case .shareEntryClosed:
+                if let round = openRound ?? latestClosedRound {
+                    PredictorShareView(game: game, round: round, type: .entryClosed)
+                }
+            case .shareWeeklyResults:
+                if let round = latestClosedRound {
+                    PredictorShareView(game: game, round: round, type: .weeklyResults)
+                }
+            case .shareLeague:
+                if let round = latestClosedRound {
+                    PredictorShareView(game: game, round: round, type: .league)
+                }
+            case .shareWinner:
+                if let round = latestClosedRound {
+                    PredictorShareView(game: game, round: round, type: .winner)
                 }
             }
         }
@@ -84,6 +106,13 @@ struct PredictorGameDetailView: View {
         } message: {
             Text("This resets the round so you can reselect fixtures. Any predictions already entered are cleared. This can't be undone.")
         }
+    }
+
+    private func shareCardButton(_ title: LocalizedStringKey, _ which: PredictorSheet, enabled: Bool) -> some View {
+        Button { AdGate.run { sheet = which } } label: {
+            Label(title, systemImage: "square.and.arrow.up")
+        }
+        .disabled(!enabled)
     }
 
     private var infoSection: some View {
@@ -116,9 +145,22 @@ struct PredictorGameDetailView: View {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
                     }
                 }
+                shareCardButton("Share Fixtures Card", .shareFixtures, enabled: true)
+                shareCardButton("Share Entry Closed Card", .shareEntryClosed, enabled: round.status != .open)
             } else {
                 Button { sheet = .open } label: { Label("Open Matchday", systemImage: "calendar.badge.plus") }
                     .disabled(game.players.isEmpty)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var shareSection: some View {
+        if latestClosedRound != nil {
+            Section("Share") {
+                shareCardButton("Share Weekly Results", .shareWeeklyResults, enabled: true)
+                shareCardButton("Share League Table", .shareLeague, enabled: true)
+                shareCardButton("Share Final Standings", .shareWinner, enabled: true)
             }
         }
     }

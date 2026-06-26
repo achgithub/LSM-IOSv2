@@ -1,79 +1,29 @@
 import SwiftUI
 
-/// The shareable round summary card (spec §13b.3). A pure function of
-/// `SummaryData`; rendered to a `UIImage` via `ImageRenderer` for the share
-/// sheet. Fixed 390pt width, height follows content.
+/// The shareable LMS round summary card. A pure function of `SummaryData`;
+/// rendered to a `UIImage` via `ImageRenderer`. Fixed 390pt width via
+/// `ShareCardChrome`; height follows content.
 struct SummaryCardView: View {
     let data: SummaryData
 
-    // Palette (spec §13b.3 — dark, matches app theme).
-    private let bg = Color(hex: "0F1A14")
-    private let headerBar = Color(hex: "1A2E1E")
-    private let textPrimary = Color(hex: "F5F5F5")
-    private let textSecondary = Color(hex: "9CA3AF")
-    private let accent = Color(hex: "F0C030")
-    private let survivedGreen = Color(hex: "22C55E")
-    private let eliminatedRed = Color(hex: "EF4444")
+    // LMS palette constants (used by content sections not covered by chrome).
+    private let p = ShareCardPalette.lms
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            sectionLabel
+        ShareCardChrome(
+            palette: .lms,
+            badgeText: "LSM",
+            headerLabel: "ROUND",
+            roundNumber: data.roundNumber,
+            gameName: data.gameName,
+            appName: data.appName,
+            sectionLabel: data.type.sectionLabel,
+            timestampLabel: data.timestampLabel
+        ) {
             content
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-            Divider().overlay(textSecondary.opacity(0.3))
-            footer
+        } footer: {
+            lmsFooter
         }
-        .frame(width: 390)
-        .background(bg)
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack(spacing: 14) {
-            // App brand mark (not a club) — a clean accent badge.
-            RoundedRectangle(cornerRadius: 12)
-                .fill(accent)
-                .frame(width: 64, height: 64)
-                .overlay(
-                    Text("LSM")
-                        .font(.system(size: 22, weight: .heavy, design: .rounded))
-                        .foregroundStyle(bg)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(data.gameName)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(textPrimary)
-                Text(data.appName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(textSecondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 0) {
-                Text("ROUND").font(.system(size: 11, weight: .semibold)).foregroundStyle(textSecondary)
-                Text("\(data.roundNumber)")
-                    .font(.system(size: 34, weight: .heavy, design: .rounded))
-                    .foregroundStyle(accent)
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(headerBar)
-    }
-
-    private var sectionLabel: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(data.type.sectionLabel)
-                .font(.system(size: 15, weight: .heavy)).tracking(2)
-                .foregroundStyle(accent)
-            Text(data.timestampLabel)
-                .font(.system(size: 12)).foregroundStyle(textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
     }
 
     // MARK: Content
@@ -92,21 +42,21 @@ struct SummaryCardView: View {
     private var fixturesContent: some View {
         if data.fixtures.isEmpty {
             Text("No fixtures in this round.")
-                .font(.system(size: 15)).foregroundStyle(textSecondary)
+                .font(.system(size: 15)).foregroundStyle(p.textSecondary)
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(data.fixtures) { fixture in
                     HStack(spacing: 8) {
                         Text(fixture.homeName)
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(textPrimary)
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(p.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .trailing).lineLimit(1)
-                        Text("v").font(.system(size: 13)).foregroundStyle(textSecondary)
+                        Text("v").font(.system(size: 13)).foregroundStyle(p.textSecondary)
                         Text(fixture.awayName)
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(textPrimary)
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(p.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
                         if let kickoff = fixture.kickoff {
                             Text(kickoff, format: .dateTime.weekday(.abbreviated).hour().minute())
-                                .font(.system(size: 11)).foregroundStyle(textSecondary)
+                                .font(.system(size: 11)).foregroundStyle(p.textSecondary)
                                 .frame(width: 64, alignment: .trailing).lineLimit(1)
                         }
                     }
@@ -121,12 +71,12 @@ struct SummaryCardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text(ending.headline)
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(p.accent)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(ending.listHeading)  (\(data.outcomePlayers.count))")
-                        .font(.system(size: 16, weight: .bold)).foregroundStyle(textPrimary)
+                        .font(.system(size: 16, weight: .bold)).foregroundStyle(p.textPrimary)
                     if data.outcomePlayers.isEmpty {
-                        Text("—").font(.system(size: 15)).foregroundStyle(textSecondary)
+                        Text("—").font(.system(size: 15)).foregroundStyle(p.textSecondary)
                     } else {
                         namesLine(data.outcomePlayers, flag: false)
                     }
@@ -139,24 +89,24 @@ struct SummaryCardView: View {
     private var picksContent: some View {
         if data.pickGroups.isEmpty {
             Text("No picks recorded for this round.")
-                .font(.system(size: 15)).foregroundStyle(textSecondary)
+                .font(.system(size: 15)).foregroundStyle(p.textSecondary)
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(data.pickGroups) { group in
                     HStack(alignment: .top, spacing: 12) {
                         if data.mode == .anonymous {
                             Text(group.teamName)
-                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(textPrimary)
+                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(p.textPrimary)
                             Spacer(minLength: 8)
                             HStack(spacing: 4) {
                                 Text("× \(group.count)")
-                                    .font(.system(size: 16, weight: .bold)).foregroundStyle(accent)
+                                    .font(.system(size: 16, weight: .bold)).foregroundStyle(p.accent)
                                 if group.includesManager { managerFlag }
                             }
                         } else {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(group.teamName)
-                                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(textPrimary)
+                                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(p.textPrimary)
                                 namesLine(group.playerNames, flag: group.includesManager)
                             }
                             Spacer(minLength: 0)
@@ -169,9 +119,6 @@ struct SummaryCardView: View {
 
     @ViewBuilder
     private var resultsContent: some View {
-        // A single survivor means the game is won (last man standing) — show the
-        // winner, not a non-existent next round. Zero survivors = all eliminated,
-        // so there's no "through" line at all.
         let survived = data.survivors.count
         let won = survived == 1
         if data.mode == .anonymous {
@@ -180,13 +127,13 @@ struct SummaryCardView: View {
                     Label {
                         Text(verbatim: won ? AppString("Winner")
                                            : AppString("\(survived) players through to Round \(data.nextRoundNumber)"))
-                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(textPrimary)
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(p.textPrimary)
                     } icon: { Text(verbatim: won ? "🏆" : "✅") }
-                    Divider().overlay(textSecondary.opacity(0.3))
+                    Divider().overlay(p.textSecondary.opacity(0.3))
                 }
                 Label {
                     Text(verbatim: eliminatedLine)
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(textPrimary)
+                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(p.textPrimary)
                 } icon: { Text(verbatim: "❌") }
             }
         } else {
@@ -198,7 +145,7 @@ struct SummaryCardView: View {
                                    : AppString("Through to Round \(data.nextRoundNumber) (\(survived))"),
                         names: data.survivors,
                         flagged: data.managerSurvived,
-                        titleColor: won ? accent : survivedGreen
+                        titleColor: won ? p.accent : p.positive
                     )
                 }
                 resultGroup(
@@ -206,7 +153,7 @@ struct SummaryCardView: View {
                     title: AppString("Eliminated (\(data.eliminated.count))"),
                     names: data.eliminated,
                     flagged: data.managerEliminated,
-                    titleColor: eliminatedRed
+                    titleColor: p.negative
                 )
             }
         }
@@ -226,45 +173,42 @@ struct SummaryCardView: View {
                 Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(titleColor)
             }
             if names.isEmpty {
-                Text("—").font(.system(size: 15)).foregroundStyle(textSecondary)
+                Text("—").font(.system(size: 15)).foregroundStyle(p.textSecondary)
             } else {
                 namesLine(names, flag: flagged).padding(.leading, 30)
             }
         }
     }
 
-    /// A wrapping, comma-separated names line. Manager (if present) carries ⚑.
     private func namesLine(_ names: [String], flag: Bool) -> some View {
         (Text(names.joined(separator: ", "))
-            + (flag ? Text("  ⚑").foregroundColor(accent) : Text("")))
+            + (flag ? Text("  ⚑").foregroundColor(p.accent) : Text("")))
             .font(.system(size: 14))
-            .foregroundStyle(textSecondary)
+            .foregroundStyle(p.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private var managerFlag: some View {
-        Text("⚑").font(.system(size: 15)).foregroundStyle(accent)
+        Text("⚑").font(.system(size: 15)).foregroundStyle(p.accent)
     }
 
     // MARK: Footer
 
-    private var footer: some View {
+    private var lmsFooter: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
                 Text("\(data.activeCount) active")
-                    .foregroundStyle(survivedGreen)
-                Text("•").foregroundStyle(textSecondary)
+                    .foregroundStyle(p.positive)
+                Text("•").foregroundStyle(p.textSecondary)
                 Text("\(data.eliminatedCount) eliminated")
-                    .foregroundStyle(eliminatedRed)
+                    .foregroundStyle(p.negative)
             }
             .font(.system(size: 14, weight: .semibold))
 
             Text(data.appName)
                 .font(.system(size: 11))
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(p.textSecondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
     }
 }
 
