@@ -43,3 +43,39 @@ body {
 .error { color: var(--error); }
 
 footer { margin-top: auto; text-align: center; }
+
+.pick-btn, .submit-btn {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.pick-btn:hover, .submit-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.submit-btn {
+  text-align: center;
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
+input[type="number"] {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 0.375rem;
+  padding: 0.4rem;
+  font-size: 1rem;
+  font-family: inherit;
+}

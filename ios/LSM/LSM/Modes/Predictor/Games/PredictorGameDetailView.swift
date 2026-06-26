@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum PredictorSheet: String, Identifiable {
-    case open, predictions, results, standings, publish
+    case open, predictions, results, standings, publish, submissions
     var id: String { rawValue }
 }
 
@@ -17,6 +17,12 @@ struct PredictorGameDetailView: View {
     @State private var sheet: PredictorSheet?
     @State private var pendingRemovePlayer: Player?
     @State private var pendingEditFixtures = false
+
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @State private var pendingLinkPlayer: Player?
+    @State private var pendingRevokePlayer: Player?
+    @State private var linkShareItem: PlayerLinkShareItem?
+    @State private var isMintingLink = false
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -52,8 +58,15 @@ struct PredictorGameDetailView: View {
                 NavigationStack { PredictorStandingsView(game: game) }
             case .publish:
                 PublishPredictorView(game: game)
+            case .submissions:
+                if let round = openRound, let gameToken = game.cloudGameToken {
+                    NavigationStack {
+                        SubmissionQueueView(game: game, round: round, gameToken: gameToken)
+                    }
+                }
             }
         }
+        .background(linkDialogHost)
         .confirmationDialog(
             "Remove \(pendingRemovePlayer?.name ?? "")?",
             isPresented: Binding(get: { pendingRemovePlayer != nil }, set: { if !$0 { pendingRemovePlayer = nil } }),
@@ -102,6 +115,11 @@ struct PredictorGameDetailView: View {
                 }
                 Button { sheet = .predictions } label: { Label("Enter Predictions", systemImage: "checklist") }
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
+                if pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                    Button { sheet = .submissions } label: {
+                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
+                    }
+                }
             } else {
                 Button { sheet = .open } label: { Label("Open Matchday", systemImage: "calendar.badge.plus") }
                     .disabled(game.players.isEmpty)
@@ -122,10 +140,39 @@ struct PredictorGameDetailView: View {
                                 .font(.caption2).fontWeight(.semibold)
                                 .foregroundStyle(.blue)
                         }
+                        Spacer()
+                        if pwaSubmissionsEnabled, !player.isManager {
+                            Button {
+                                if player.submissionToken != nil {
+                                    pendingLinkPlayer = player
+                                } else {
+                                    mintLink(for: player, regenerate: false)
+                                }
+                            } label: {
+                                Image(systemName: player.submissionToken != nil ? "link" : "link.badge.plus")
+                                    .foregroundStyle(player.submissionToken != nil ? .blue : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) { pendingRemovePlayer = player } label: {
                             Label("Remove", systemImage: "person.fill.xmark")
+                        }
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if pwaSubmissionsEnabled, !player.isManager {
+                            Button {
+                                if player.submissionToken != nil {
+                                    pendingLinkPlayer = player
+                                } else {
+                                    mintLink(for: player, regenerate: false)
+                                }
+                            } label: {
+                                Label(player.submissionToken != nil ? "Link" : "Get Link",
+                                      systemImage: "link")
+                            }
+                            .tint(.blue)
                         }
                     }
                 }
@@ -146,5 +193,96 @@ struct PredictorGameDetailView: View {
         guard let round = openRound else { return }
         game.rounds.removeAll { $0.id == round.id }
         context.delete(round)
+    }
+
+    // MARK: - PWA Submissions
+
+    @ViewBuilder
+    private var linkDialogHost: some View {
+        Color.clear
+            .sheet(item: $linkShareItem) { item in
+                ActivityShareView(items: item.shareItems)
+            }
+            .confirmationDialog(
+                "Link for \(pendingLinkPlayer?.name ?? "")",
+                isPresented: Binding(
+                    get: { pendingLinkPlayer != nil },
+                    set: { if !$0 { pendingLinkPlayer = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingLinkPlayer
+            ) { player in
+                Button("Share Link") { shareLink(for: player) }
+                Button("Regenerate Link", role: .destructive) { mintLink(for: player, regenerate: true) }
+                Button("Revoke Link", role: .destructive) { revokeLink(for: player) }
+                Button("Cancel", role: .cancel) {}
+            }
+            .confirmationDialog(
+                "Revoke link for \(pendingRevokePlayer?.name ?? "")?",
+                isPresented: Binding(
+                    get: { pendingRevokePlayer != nil },
+                    set: { if !$0 { pendingRevokePlayer = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingRevokePlayer
+            ) { player in
+                Button("Revoke", role: .destructive) { confirmRevokeLink(for: player) }
+                Button("Cancel", role: .cancel) {}
+            } message: { player in
+                Text("\(player.name)'s link stops working immediately. You can mint a new one at any time.")
+            }
+    }
+
+    private func playerLinkURL(for player: Player) -> URL? {
+        guard let token = player.submissionToken else { return nil }
+        return URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev/s/\(token.uuidString.lowercased())")
+    }
+
+    private func shareLink(for player: Player) {
+        guard let url = playerLinkURL(for: player) else { return }
+        pendingLinkPlayer = nil
+        linkShareItem = PlayerLinkShareItem(playerName: player.name, url: url)
+    }
+
+    private func mintLink(for player: Player, regenerate: Bool) {
+        guard !isMintingLink else { return }
+        if game.cloudGameTokenRaw == nil {
+            game.cloudGameTokenRaw = UUID().uuidString.lowercased()
+        }
+        guard let gameToken = game.cloudGameToken else { return }
+        pendingLinkPlayer = nil
+        isMintingLink = true
+        let name = player.name
+        Task {
+            do {
+                let token = try await SubmissionsClient.shared.mintLink(
+                    gameToken: gameToken,
+                    localPlayerId: player.id,
+                    playerName: name
+                )
+                player.submissionTokenRaw = token.lowercased()
+                let url = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev/s/\(token.lowercased())")
+                await MainActor.run {
+                    isMintingLink = false
+                    if let url { linkShareItem = PlayerLinkShareItem(playerName: name, url: url) }
+                }
+            } catch {
+                await MainActor.run { isMintingLink = false }
+            }
+        }
+    }
+
+    private func revokeLink(for player: Player) {
+        pendingLinkPlayer = nil
+        pendingRevokePlayer = player
+    }
+
+    private func confirmRevokeLink(for player: Player) {
+        guard let gameToken = game.cloudGameToken,
+              let token = player.submissionTokenRaw else { return }
+        pendingRevokePlayer = nil
+        let t = token
+        Task { try? await SubmissionsClient.shared.revokeLink(gameToken: gameToken, token: t) }
+        player.submissionTokenRaw = nil
     }
 }

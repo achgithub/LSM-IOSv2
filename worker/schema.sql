@@ -212,38 +212,66 @@ CREATE TABLE IF NOT EXISTS predictions (
 CREATE INDEX IF NOT EXISTS idx_predictions_player  ON predictions (player_id);
 CREATE INDEX IF NOT EXISTS idx_predictions_fixture ON predictions (fixture_id);
 
--- ── Submission tokens ────────────────────────────────────────────────────────
--- The per-player unguessable PWA link. No email / no account (deliberately out
--- of GDPR personal-data scope). One active token per player; revoking sets
--- revoked_at rather than deleting (keeps an audit trail of issued links).
-CREATE TABLE IF NOT EXISTS submission_tokens (
-  id          TEXT PRIMARY KEY,            -- uuid (internal)
-  player_id   TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
-  token       TEXT NOT NULL UNIQUE,        -- the UUID that appears in the player's link
-  created_at  TEXT NOT NULL,
-  revoked_at  TEXT
+-- ── Player links (Phase 3: PWA submission queue) ─────────────────────────────
+-- One unguessable per-player-per-game link. No email / no account — deliberately
+-- outside GDPR personal-data scope. The token is the only credential in the URL
+-- (/s/<token>). game_token groups all links for one game (client-generated UUID,
+-- minted on first round push). local_player_id maps a submission back to the
+-- on-device Player row at approval time. Revoking sets revoked_at; no delete
+-- (keeps an audit trail). Regenerating overwrites the row (old token gone).
+--
+-- Redesigned from the original submission_tokens shape in Phase 3; safe to drop
+-- and recreate — zero real rows, all handlers were 501 stubs.
+CREATE TABLE IF NOT EXISTS player_links (
+  token                  TEXT PRIMARY KEY,  -- uuid in the public /s/<token> URL
+  game_token             TEXT NOT NULL,     -- groups all links for one game
+  local_player_id        TEXT NOT NULL,     -- on-device Player.id (not the token — never exposed)
+  player_name            TEXT NOT NULL,
+  eligible_team_ids_json TEXT,              -- LMS only; null for Predictor; refreshed on every push
+  created_at             TEXT NOT NULL,
+  revoked_at             TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_tokens_player ON submission_tokens (player_id);
+CREATE INDEX IF NOT EXISTS idx_player_links_game   ON player_links (game_token);
+CREATE INDEX IF NOT EXISTS idx_player_links_player ON player_links (game_token, local_player_id);
+
+-- ── Round pushes (Phase 3) ────────────────────────────────────────────────────
+-- One row per game's currently open round. The iOS app upserts this after
+-- openRound (and after fixture resets). The PWA reads it to show what's
+-- actionable right now. Overwritten on every push — only current-round state
+-- is kept here; rolling history is a fast-follow.
+CREATE TABLE IF NOT EXISTS round_pushes (
+  game_token    TEXT PRIMARY KEY,           -- the game's client-generated UUID
+  mode          TEXT NOT NULL,              -- 'lms' | 'predictor'
+  round_number  INTEGER NOT NULL,
+  deadline      TEXT,                       -- ISO8601 UTC; nil if unset
+  fixtures_json TEXT NOT NULL,              -- JSON array: [{fixtureId,home,away,kickoff}]
+  updated_at    TEXT NOT NULL
+);
 
 -- ── Submissions (the approval queue) ─────────────────────────────────────────
 -- A player's self-submitted pick/prediction lands here as 'pending' — it does
 -- NOT write straight into picks/predictions. The manager approves (which creates
 -- the real pick/prediction row) or rejects. Manager-typed entries skip this
--- table entirely and write straight through.
+-- table entirely and write straight through. One row per player per round —
+-- resubmitting while still pending replaces the existing row (latest wins).
+--
+-- Redesigned from the original shape in Phase 3 (payload_json now holds the
+-- full LMS {teamId} or Predictor {scores:[...]} in one blob, no game_id FK
+-- since game state stays on-device per §0).
 CREATE TABLE IF NOT EXISTS submissions (
-  id           TEXT PRIMARY KEY,           -- uuid
-  token_id     TEXT NOT NULL REFERENCES submission_tokens (id) ON DELETE CASCADE,
-  game_id      TEXT NOT NULL REFERENCES games (id) ON DELETE CASCADE,
-  context      TEXT NOT NULL,              -- JSON: { round_id } (LMS) or { fixture_id } (Predictor)
-  payload      TEXT NOT NULL,              -- JSON: { team_id } or { home, away }
+  id           TEXT PRIMARY KEY,            -- uuid
+  token        TEXT NOT NULL REFERENCES player_links (token) ON DELETE CASCADE,
+  round_number INTEGER NOT NULL,
+  payload_json TEXT NOT NULL,               -- LMS: {"teamId":N}; Predictor: {"scores":[...]}
   status       TEXT NOT NULL DEFAULT 'pending', -- pending | approved | rejected
   submitted_at TEXT NOT NULL,
-  decided_at   TEXT
+  decided_at   TEXT,
+  UNIQUE (token, round_number)              -- one submission per player per round; resubmit replaces
 );
 
-CREATE INDEX IF NOT EXISTS idx_submissions_game   ON submissions (game_id, status);
-CREATE INDEX IF NOT EXISTS idx_submissions_token  ON submissions (token_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_game   ON submissions (token);
+CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions (status);
 
 -- ════════════════════════════════════════════════════════════════════════════
 --  CLOUD BUNDLE (Phase 2; NOT the Layer 2 sync above — see §0) ────────────────

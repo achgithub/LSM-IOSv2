@@ -36,6 +36,7 @@ struct GameSnapshot: Codable {
     let predictorPublishPin: String?
     let predictorPublishLinkIdRaw: String?
     let predictorPublishOwnerToken: String?
+    let cloudGameTokenRaw: String?
     let players: [PlayerSnapshot]
     let rounds: [RoundSnapshot]
 
@@ -46,6 +47,7 @@ struct GameSnapshot: Codable {
         let entryNumber: Int
         let teamPoolResetAfterRound: Int
         let isManager: Bool
+        let submissionTokenRaw: String?
     }
 
     struct RoundSnapshot: Codable {
@@ -112,6 +114,7 @@ enum GameSnapshotBuilder {
             predictorPublishPin: game.predictorPublishPin,
             predictorPublishLinkIdRaw: game.predictorPublishLinkIdRaw,
             predictorPublishOwnerToken: game.predictorPublishOwnerToken,
+            cloudGameTokenRaw: game.cloudGameTokenRaw,
             players: game.players.map { player in
                 GameSnapshot.PlayerSnapshot(
                     id: player.id,
@@ -119,7 +122,8 @@ enum GameSnapshotBuilder {
                     statusRaw: player.statusRaw,
                     entryNumber: player.entryNumber,
                     teamPoolResetAfterRound: player.teamPoolResetAfterRound,
-                    isManager: player.isManager
+                    isManager: player.isManager,
+                    submissionTokenRaw: player.submissionTokenRaw
                 )
             },
             rounds: game.rounds.map { round in
@@ -183,6 +187,7 @@ enum GameSnapshotBuilder {
         game.predictorPublishPin = snapshot.predictorPublishPin
         game.predictorPublishLinkIdRaw = snapshot.predictorPublishLinkIdRaw
         game.predictorPublishOwnerToken = snapshot.predictorPublishOwnerToken
+        game.cloudGameTokenRaw = snapshot.cloudGameTokenRaw
         context.insert(game)
 
         var newPlayerId: [UUID: Player] = [:]
@@ -190,6 +195,7 @@ enum GameSnapshotBuilder {
             let player = Player(name: p.name, game: game, isManager: p.isManager, entryNumber: p.entryNumber)
             player.statusRaw = p.statusRaw
             player.teamPoolResetAfterRound = p.teamPoolResetAfterRound
+            player.submissionTokenRaw = p.submissionTokenRaw
             context.insert(player)
             game.players.append(player)
             newPlayerId[p.id] = player

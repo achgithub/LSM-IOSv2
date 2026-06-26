@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+import OSLog
+
+private let submissionsLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
 /// Open a new round: choose a league, narrow fixtures (matchday / date range /
 /// unplayed-only) and select the ones the round runs on, then set the picks
@@ -17,6 +20,8 @@ struct OpenRoundView: View {
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
 
     // Filters — date is the primary driver (matchday numbers don't line up across
     // leagues), so the date window is on by default.
@@ -273,14 +278,92 @@ struct OpenRoundView: View {
     }
 
     private func create() {
-        GameLogicService.openRound(
+        let round = GameLogicService.openRound(
             in: game,
             fixtureIds: Array(selectedFixtureIds),
             deadline: deadline,
             roundType: roundType,
             context: context
         )
+        if pwaSubmissionsEnabled {
+            pushRound(round)
+        }
         onOpened()
         dismiss()
+    }
+
+    /// Fire-and-forget round push to the Worker. Mints cloudGameToken on first push.
+    private func pushRound(_ round: Round) {
+        guard let ld = data else { return }
+
+        let fixtureItems: [FixturePushItem] = round.fixtureIds.compactMap { fid in
+            guard let m = ld.matches.first(where: { $0.id == fid }) else { return nil }
+            let home = ld.teamsById[m.homeTeamId]?.name ?? "Home"
+            let away = ld.teamsById[m.awayTeamId]?.name ?? "Away"
+            return FixturePushItem(fixtureId: fid, home: home, away: away, kickoff: m.kickoff)
+        }
+
+        // Lazily mint cloudGameToken on first push for this game.
+        if game.cloudGameTokenRaw == nil {
+            game.cloudGameTokenRaw = UUID().uuidString.lowercased()
+        }
+        guard let gameToken = game.cloudGameToken else { return }
+
+        // Build fixture-level TeamRefs for eligible-team computation (LMS only).
+        let fixtureTeamRefs: [TeamRef] = {
+            var seen = Set<Int>()
+            return round.fixtureIds.flatMap { fid -> [TeamRef] in
+                guard let m = ld.matches.first(where: { $0.id == fid }) else { return [] }
+                return [m.homeTeamId, m.awayTeamId].compactMap { tid in
+                    guard seen.insert(tid).inserted, let t = ld.teamsById[tid] else { return nil }
+                    return TeamRef(id: t.externalId, name: t.name,
+                                  position: ld.standingsByTeam[t.externalId]?.position)
+                }
+            }
+        }()
+        let standingsKnown = fixtureTeamRefs.contains { $0.position != nil }
+        let allowRepeats = game.allowRepeats
+        let mode = game.mode
+        let roundNumber = round.roundNumber
+        let deadline = round.deadline
+
+        let linkedPlayers = game.activePlayers.filter { $0.submissionToken != nil && !$0.isManager }
+
+        Task {
+            var playerItems: [PlayerPushItem] = []
+            for player in linkedPlayers {
+                guard let token = player.submissionToken else { continue }
+                let eligibleTeams: [EligibleTeam]
+                if mode == .lms {
+                    let used = GameLogicService.usedTeamIds(for: player)
+                    let ordered = GameEngine.orderedAvailableTeams(
+                        fixtureTeams: fixtureTeamRefs,
+                        used: used,
+                        allowRepeats: allowRepeats,
+                        standingsKnown: standingsKnown
+                    )
+                    eligibleTeams = ordered.map { EligibleTeam(id: $0.id, name: $0.name) }
+                } else {
+                    eligibleTeams = fixtureTeamRefs.map { EligibleTeam(id: $0.id, name: $0.name) }
+                }
+                playerItems.append(PlayerPushItem(
+                    token: token.uuidString.lowercased(),
+                    eligibleTeams: eligibleTeams.isEmpty ? nil : eligibleTeams
+                ))
+            }
+
+            do {
+                try await SubmissionsClient.shared.pushRound(
+                    gameToken: gameToken,
+                    mode: mode.rawValue,
+                    roundNumber: roundNumber,
+                    deadline: deadline,
+                    fixtures: fixtureItems,
+                    players: playerItems
+                )
+            } catch {
+                submissionsLog.warning("Round push failed: \(error.localizedDescription)")
+            }
+        }
     }
 }

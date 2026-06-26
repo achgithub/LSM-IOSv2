@@ -18,6 +18,13 @@ final class Player {
     /// True for the app owner's own entry in a game (spec §13b.2 transparency ⚑).
     var isManager: Bool
     var game: Game?
+    // Phase 3: the unguessable UUID that appears in this player's /s/<token>
+    // PWA link. Nil until the manager mints a link for them. Stored raw so
+    // SwiftData can persist it; the typed wrapper is the read-only accessor.
+    var submissionTokenRaw: String?
+
+    /// Typed accessor; nil until a link has been minted for this player.
+    var submissionToken: UUID? { submissionTokenRaw.flatMap(UUID.init) }
 
     @Relationship(deleteRule: .cascade, inverse: \Pick.player)
     var picks: [Pick] = []

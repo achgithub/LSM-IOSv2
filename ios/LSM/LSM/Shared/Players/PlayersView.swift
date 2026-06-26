@@ -16,12 +16,22 @@ struct PlayersView: View {
     @State private var importGroupId: UUID?
     @State private var message: String?
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+
     private var trimmedName: String { newName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedGroup: String { newGroup.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Toggle("Player submission links", isOn: $pwaSubmissionsEnabled)
+                } header: {
+                    Text("PWA Submissions")
+                } footer: {
+                    Text("When on, you can share a personal link with each player so they can submit picks themselves. You review and approve before anything goes live.")
+                }
+
                 Section("Add a player") {
                     HStack {
                         TextField("Player name", text: $newName)

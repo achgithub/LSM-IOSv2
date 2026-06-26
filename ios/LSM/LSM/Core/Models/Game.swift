@@ -64,6 +64,17 @@ final class Game {
     /// See worker/src/routes/publish.ts.
     var predictorPublishOwnerToken: String?
 
+    // Cloud Submissions (Phase 3) — the client-generated game identity token
+    // used to group all player links and round pushes for this game on the
+    // Worker. Nil until the first round push fires (lazy mint: if the manager
+    // never enables pwaSubmissionsEnabled, this stays nil forever and no
+    // resources are consumed). Stored raw so SwiftData can persist it; the
+    // typed wrapper is the read-only accessor.
+    var cloudGameTokenRaw: String?
+
+    /// Typed accessor; nil if PWA submissions have never been activated.
+    var cloudGameToken: UUID? { cloudGameTokenRaw.flatMap(UUID.init) }
+
     @Relationship(deleteRule: .cascade, inverse: \Player.game)
     var players: [Player] = []
 
