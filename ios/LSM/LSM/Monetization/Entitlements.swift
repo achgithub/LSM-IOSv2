@@ -1,16 +1,6 @@
 import Foundation
 import Observation
 
-/// Explicit three-state cloud entitlement — kept for the RevenueCat unsubscribe
-/// safety flow (prevents false data-deletion on a failed refresh). Cloud access
-/// itself is now derived from `Tier.cloudLevel`, not from this state directly.
-/// Only `.inactive` (positively confirmed by RevenueCat) may trigger the grace flow.
-enum CloudEntitlementState: Equatable {
-    case unknown
-    case active
-    case inactive
-}
-
 /// Cloud feature level derived from tier. Backup, Publish, and PWA all unlock
 /// together at `leagues_3` — quantity caps (`maxActiveGames`, `maxPWALinks`)
 /// do the differentiation above that point, not a feature split.
@@ -120,22 +110,13 @@ final class Entitlements {
     /// True once a tier has been resolved (RevenueCat or a dev override).
     private(set) var verified = false
 
-    /// Cloud bundle entitlement state — starts `.unknown` until RevenueCat resolves.
-    /// Only transitions to `.active` or `.inactive` on a confirmed RevenueCat response.
-    /// Stays `.unknown` when RevenueCat is not configured or the refresh fails.
-    private(set) var cloudEntitlement: CloudEntitlementState = .unknown
-
     // RevenueCat entitlement identifiers (match the dashboard + Tier raw values).
     static let entitlementNoAds = Tier.noAds.rawValue
     static let entitlementLeagues3 = Tier.leagues3.rawValue
     static let entitlementLeagues5 = Tier.leagues5.rawValue
     static let entitlementLeagues7 = Tier.leagues7.rawValue
-    /// RevenueCat entitlement identifier for the cloud bundle. Must match the
-    /// entitlement key in the RevenueCat dashboard exactly — verify before release.
-    static let entitlementCloudBundle = "cloud_bundle"
 
     private static let devTierKey = "devTierOverride"
-    private static let devCloudBundleKey = "devCloudBundleOverride"
 
     private init() {
         // Pre-release: restore a dev tier override so a rebuild/reinstall doesn't
@@ -145,9 +126,6 @@ final class Entitlements {
            let saved = Tier(rawValue: raw) {
             tier = saved
             verified = true
-        }
-        if UserDefaults.standard.object(forKey: Self.devCloudBundleKey) != nil {
-            cloudEntitlement = UserDefaults.standard.bool(forKey: Self.devCloudBundleKey) ? .active : .inactive
         }
         #endif
     }
@@ -172,8 +150,7 @@ final class Entitlements {
     var maxPWALinks: Int? { tier.maxPWALinks }
 
     /// Gates all cloud features (Backup, Publish, PWA). True when the tier
-    /// includes cloud — `leagues_3` and above. The separate `cloudEntitlement`
-    /// state is retained for the RevenueCat unsubscribe safety flow only.
+    /// includes cloud — `leagues_3` and above.
     var canUseCloud: Bool { tier.cloudLevel == .full }
 
     /// Local testing override — flips the tier with no purchase. DEBUG-only: a
@@ -187,26 +164,10 @@ final class Entitlements {
         #endif
     }
 
-    /// Local testing override for the cloud bundle — independent of `setDevTier`
-    /// since it's a separate purchase. DEBUG-only.
-    func setDevCloudBundle(_ on: Bool) {
-        #if DEBUG
-        cloudEntitlement = on ? .active : .inactive
-        UserDefaults.standard.set(on, forKey: Self.devCloudBundleKey)
-        #endif
-    }
-
     /// Applied by `PurchaseService` once it resolves the live entitlements.
     func apply(tier: Tier) {
         self.tier = tier
         self.verified = true
-    }
-
-    /// Applied by `PurchaseService` once it receives a confirmed RevenueCat response.
-    /// Pass `.active` or `.inactive` only — never `.unknown`; unknown is the default
-    /// before any resolution and must never overwrite a previously confirmed state.
-    func apply(cloudEntitlement: CloudEntitlementState) {
-        self.cloudEntitlement = cloudEntitlement
     }
 
     func refresh() async {

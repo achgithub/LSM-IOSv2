@@ -37,37 +37,6 @@ struct PurchaseOption: Identifiable, Hashable {
     ]
 }
 
-/// The cloud bundle's RevenueCat package id — a standalone purchase, not a
-/// `Tier`/`PurchaseOption` (it isn't part of the league-count cascade).
-/// Verify this matches the package identifier in the RevenueCat dashboard.
-private let cloudBundlePackageId = "cloud_bundle_monthly"
-
-/// Outcome of buying/restoring the cloud bundle. Mirrors
-/// `PurchaseService.PurchaseOutcome` but has no `Tier` to report (the cloud
-/// bundle is a single on/off entitlement, not a ladder).
-enum CloudPurchaseOutcome {
-    case success
-    case cancelled
-    case failed(String)
-    case unavailable
-
-    /// A user-facing alert for the outcome, or nil when nothing should show.
-    func alert(restoring: Bool) -> (title: String, message: String)? {
-        switch self {
-        case .success:
-            return (restoring ? AppString("Purchases restored") : AppString("You're subscribed"),
-                    AppString("Cloud Backup is now active."))
-        case .cancelled:
-            return nil
-        case .failed(let message):
-            return (restoring ? AppString("Restore failed") : AppString("Purchase failed"), message)
-        case .unavailable:
-            return (AppString("Not available yet"),
-                    AppString("Cloud Backup isn't available in this build yet. Please check back after the next update."))
-        }
-    }
-}
-
 /// RevenueCat wrapper. Compiles with or without the SDK present (guarded by
 /// `canImport`), so the build stays green until the `purchases-ios` package is
 /// added in Xcode. Until a real API key is set, the app runs on the dev tier
@@ -111,7 +80,6 @@ final class PurchaseService {
         do {
             let info = try await Purchases.shared.customerInfo()
             Entitlements.shared.apply(tier: Self.tier(from: info))
-            Entitlements.shared.apply(cloudEntitlement: Self.hasCloudBundle(from: info) ? .active : .inactive)
         } catch {
             // Leave the current tier; a later refresh (foreground) can retry.
         }
@@ -127,51 +95,7 @@ final class PurchaseService {
             let info = try await Purchases.shared.restorePurchases()
             let tier = Self.tier(from: info)
             Entitlements.shared.apply(tier: tier)
-            Entitlements.shared.apply(cloudEntitlement: Self.hasCloudBundle(from: info) ? .active : .inactive)
             return .success(tier)
-        } catch {
-            return .failed(error.localizedDescription)
-        }
-        #else
-        return .unavailable
-        #endif
-    }
-
-    /// Buy the cloud bundle (backup + publish) — a standalone purchase
-    /// independent of the league-tier ladder.
-    func purchaseCloudBundle() async -> CloudPurchaseOutcome {
-        #if canImport(RevenueCat)
-        guard isConfigured else { return .unavailable }
-        do {
-            let offerings = try await Purchases.shared.offerings()
-            guard let package = offerings.current?.availablePackages.first(where: { $0.identifier == cloudBundlePackageId }) else {
-                return .unavailable
-            }
-            let result = try await Purchases.shared.purchase(package: package)
-            if result.userCancelled { return .cancelled }
-            let info = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
-            let active = Self.hasCloudBundle(from: info)
-            Entitlements.shared.apply(cloudEntitlement: active ? .active : .inactive)
-            return active ? .success : .unavailable
-        } catch {
-            return .failed(error.localizedDescription)
-        }
-        #else
-        return .unavailable
-        #endif
-    }
-
-    /// Restore the cloud bundle specifically (mirrors `restore()`, scoped to
-    /// the cloud entitlement so the UI's Restore button in the Cloud Backup
-    /// section reports the right outcome, not a league-tier message).
-    func restoreCloudBundle() async -> CloudPurchaseOutcome {
-        #if canImport(RevenueCat)
-        guard isConfigured else { return .unavailable }
-        do {
-            let info = try await Purchases.shared.restorePurchases()
-            let active = Self.hasCloudBundle(from: info)
-            Entitlements.shared.apply(cloudEntitlement: active ? .active : .inactive)
-            return active ? .success : .unavailable
         } catch {
             return .failed(error.localizedDescription)
         }
@@ -213,12 +137,6 @@ final class PurchaseService {
         if info.entitlements[Entitlements.entitlementLeagues3]?.isActive == true { return .leagues3 }
         if info.entitlements[Entitlements.entitlementNoAds]?.isActive == true { return .noAds }
         return .free
-    }
-
-    /// Independent of `tier(from:)` — the cloud bundle is its own entitlement,
-    /// not part of the league-count cascade.
-    private static func hasCloudBundle(from info: CustomerInfo) -> Bool {
-        info.entitlements[Entitlements.entitlementCloudBundle]?.isActive == true
     }
 
     /// Maps a purchase option to its RevenueCat package by `packageId`.

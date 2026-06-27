@@ -135,7 +135,7 @@ struct PlayersView: View {
                 handleImport(result)
             }
             .sheet(isPresented: $showPaywall) {
-                CloudBundlePaywallView()
+                PaywallView()
             }
         }
     }

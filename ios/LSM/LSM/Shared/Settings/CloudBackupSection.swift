@@ -2,10 +2,9 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Cloud Backup (Phase 2) — explicit, user-triggered R2 snapshot of every
-/// on-device game, mode-agnostic (LMS + Predictor together). Lives in
-/// Settings since it acts on the whole device, not one game. Gated on the
-/// standalone `cloudBundle` entitlement (independent of the league tiers).
+/// Cloud Backup — explicit, user-triggered R2 snapshot of every on-device
+/// game, mode-agnostic (LMS + Predictor together). Lives in Settings since it
+/// acts on the whole device, not one game. Gated on `canUseCloud` (leagues_3+).
 struct CloudBackupSection: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(\.modelContext) private var context
@@ -79,9 +78,9 @@ struct CloudBackupSection: View {
                     await ManagerLifecycleClient.shared.resubscribe()
                     lifecycleStatus = await ManagerLifecycleClient.shared.status()
                 }
-            } else if entitlements.cloudEntitlement == .inactive {
-                // Only schedule deletion when the entitlement is positively confirmed
-                // inactive — never on `.unknown` (RevenueCat not yet resolved or failed).
+            } else if entitlements.verified && !entitlements.canUseCloud {
+                // Only schedule deletion once RevenueCat has confirmed the tier —
+                // `verified` prevents a false unsubscribe before the first refresh.
                 await ManagerLifecycleClient.shared.unsubscribe()
                 lifecycleStatus = await ManagerLifecycleClient.shared.status()
             }
@@ -94,7 +93,7 @@ struct CloudBackupSection: View {
             Text("Enter the restore code shown when this backup was made.")
         }
         .sheet(isPresented: $showPaywall) {
-            CloudBundlePaywallView()
+            PaywallView()
         }
     }
 
@@ -134,50 +133,3 @@ struct CloudBackupSection: View {
     }
 }
 
-/// Minimal paywall for the standalone cloud entitlement — separate from
-/// `PaywallView` (the league-tier ladder), since this is a single on/off
-/// purchase, not a tier picker.
-struct CloudBundlePaywallView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(Entitlements.self) private var entitlements
-    @State private var isPurchasing = false
-    @State private var alertItem: PurchaseAlertItem?
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Text("Cloud Backup").font(.title2.bold())
-                Text("Back up every game on this device to the cloud, and restore them on a new phone. No account needed — just a restore code.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-                Button {
-                    Task { await purchase() }
-                } label: {
-                    if isPurchasing { ProgressView() } else { Text("Subscribe") }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isPurchasing)
-            }
-            .padding()
-            .navigationTitle("Cloud Backup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
-            }
-            .alert(item: $alertItem) { a in
-                Alert(title: Text(a.title), message: Text(a.message), dismissButton: .default(Text("OK")))
-            }
-        }
-    }
-
-    private func purchase() async {
-        isPurchasing = true
-        defer { isPurchasing = false }
-        let outcome = await PurchaseService.shared.purchaseCloudBundle()
-        if let a = outcome.alert(restoring: false) {
-            alertItem = PurchaseAlertItem(title: a.title, message: a.message)
-        }
-        if case .success = outcome { dismiss() }
-    }
-}
