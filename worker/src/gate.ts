@@ -19,8 +19,6 @@
 // the window is served from the warmed store. Result: ~1 upstream call per TTL
 // window per resource regardless of concurrent users.
 
-import { getSeasonPhase } from "./seasonPhase";
-
 // Minimal structural type — we only need waitUntil, so we don't couple to the
 // exact ExecutionContext shape (which differs between Hono and the workerd
 // runtime types). Both Hono's c.executionCtx and the global ctx satisfy this.
@@ -35,25 +33,23 @@ export interface GateKeys {
   ts: string;
 }
 
-// Scores additionally cache their payload in KV under this key (fixtures and
-// standings keep their data in D1, so they need no data key).
-export const SCORES_DATA_KEY = "scores";
+// Per-league KV keys — all keys are prefixed with the leagueId so many leagues
+// can share one KV namespace (the v2 shard pattern).
+export interface LeagueGateKeys {
+  scoresData: string;     // KV blob: JSON ScoreEntry[]
+  scores: GateKeys;
+  fixtures: GateKeys;
+  standings: GateKeys;
+}
 
-export const SCORES_KEYS: GateKeys = {
-  call: "scores:call",
-  refresh: "scores:refresh",
-  ts: "scores:ts",
-};
-export const FIXTURES_KEYS: GateKeys = {
-  call: "fixtures:call",
-  refresh: "fixtures:refresh",
-  ts: "fixtures:ts",
-};
-export const STANDINGS_KEYS: GateKeys = {
-  call: "standings:call",
-  refresh: "standings:refresh",
-  ts: "standings:ts",
-};
+export function leagueKeys(leagueId: string): LeagueGateKeys {
+  return {
+    scoresData: `${leagueId}:scores`,
+    scores:    { call: `${leagueId}:scores:call`,    refresh: `${leagueId}:scores:refresh`,    ts: `${leagueId}:scores:ts`    },
+    fixtures:  { call: `${leagueId}:fixtures:call`,  refresh: `${leagueId}:fixtures:refresh`,  ts: `${leagueId}:fixtures:ts`  },
+    standings: { call: `${leagueId}:standings:call`, refresh: `${leagueId}:standings:refresh`, ts: `${leagueId}:standings:ts` },
+  };
+}
 
 const MAX_RETRIES = 5; // 5 × 1s = 5s max background poll
 
@@ -84,11 +80,9 @@ function parseInt0(v: string | null): number {
  * `refresh` must fetch upstream and write the data store(s); it must NOT touch
  * this gate's counters — that's handled here once it resolves.
  *
- * Outside the "live" season phase (closed/rollover — see seasonPhase.ts) this
- * is a pure no-op: no upstream call, ever, regardless of TTL. The caller then
- * just serves whatever's already in its data store, unchanged. This is the
- * single choke point for that — fixtures/scores/standings routes all call
- * this and need no phase-awareness of their own.
+ * Season-phase check is the caller's responsibility (call getSeasonPhase before
+ * invoking this if you want to skip when closed). This keeps gate.ts free of
+ * seasonPhase dependencies and lets callers control the check precisely.
  */
 export async function withFreshness(
   kv: KVNamespace,
@@ -97,7 +91,6 @@ export async function withFreshness(
   refresh: () => Promise<unknown>,
   ctx: BackgroundCtx,
 ): Promise<void> {
-  if ((await getSeasonPhase(kv)) !== "live") return;
 
   const [callStr, refreshStr, tsStr] = await Promise.all([
     kv.get(keys.call),

@@ -1,10 +1,11 @@
-// Upstream → store refreshers, shared by the request-triggered gates (routes),
-// the on-demand admin sync, and the nightly cron. Each fetches the provider once
-// and writes the relevant store(s); the gate counters are managed by gate.ts.
+// Upstream → store refreshers. Identical semantics to v1 (one /matches fetch
+// warms both scores KV blob + fixtures D1, co-warms the sibling gate). The only
+// v2 difference: all writes and KV keys are scoped by leagueId so many leagues
+// can share one D1 and one KV namespace in a regional shard.
 
 import { recordSync, replaceFixtures, replaceStandings } from "./db";
 import type { Provider } from "./football";
-import { FIXTURES_KEYS, SCORES_DATA_KEY, SCORES_KEYS, touchGate } from "./gate";
+import { leagueKeys, touchGate } from "./gate";
 
 export interface MatchCounts {
   scores: number;
@@ -12,53 +13,40 @@ export interface MatchCounts {
 }
 
 /**
- * Fetch /matches once → cache the compact scores in KV, store the full fixtures
- * in D1, then mark BOTH the scores and fixtures gates fresh. Scores and fixtures
- * share this one upstream source, so a scores refresh co-warms fixtures and a
- * fixtures refresh co-warms scores ("one /matches → both timestamps", spec
- * cross-resource warming). The caller's own gate is settled by gate.ts on top of
- * this — the touch here is what keeps the *sibling* gate from re-fetching.
- *
- * Both D1 (replaceFixtures) and the KV scores blob are full replacements of
- * whatever `season` resolves to — never an accumulation across seasons. A
- * routine same-season refresh replaces itself (a no-op in effect); a
- * deliberate manager-triggered cutover to a new season correctly drops the
- * old one from both stores in the same call.
- *
- * An EMPTY fetch (e.g. a season probed/synced before its fixtures are
- * actually published upstream) must change nothing in either store — same
- * guard `replaceFixtures` already has on the D1 side, applied here to the KV
- * scores blob too (it has no guard of its own; an empty `scores` array would
- * otherwise silently replace real cached data with `[]`). `recordSync` only
- * fires when something genuinely changed, so sync_meta/health never reports
- * a misleading "0 rows" for a write that was correctly skipped.
+ * Fetch /matches once → cache compact scores in KV, store full fixtures in D1,
+ * co-warm both gates. Identical to v1's refreshMatchData except all keys and
+ * DB writes are league-scoped.
  */
 export async function refreshMatchData(
   db: D1Database,
   kv: KVNamespace,
   provider: Provider,
   season: number,
+  leagueId: string,
 ): Promise<MatchCounts> {
   const { scores, fixtures } = await provider.fetchMatchData(season);
-  if (fixtures.length === 0) {
-    return { scores: 0, fixtures: 0 };
-  }
-  await replaceFixtures(db, fixtures);
-  await recordSync(db, "fixtures", fixtures.length);
-  await kv.put(SCORES_DATA_KEY, JSON.stringify(scores));
-  await Promise.all([touchGate(kv, SCORES_KEYS), touchGate(kv, FIXTURES_KEYS)]);
+  if (fixtures.length === 0) return { scores: 0, fixtures: 0 };
+  const keys = leagueKeys(leagueId);
+  await replaceFixtures(db, fixtures, leagueId);
+  await recordSync(db, leagueId, "fixtures", fixtures.length);
+  await kv.put(keys.scoresData, JSON.stringify(scores));
+  await Promise.all([touchGate(kv, keys.scores), touchGate(kv, keys.fixtures)]);
   return { scores: scores.length, fixtures: fixtures.length };
 }
 
 /**
- * Fetch the league table → replace it in D1. Standings have their own upstream
- * (/standings) and their own gate; nothing co-warms them. Same empty-fetch
- * guard as refreshMatchData — recordSync only fires on a genuine write.
+ * Fetch /standings → replace in D1. No KV data key (standings are served
+ * straight from D1). Gate settlement is handled by withFreshness in gate.ts.
  */
-export async function refreshStandings(db: D1Database, provider: Provider, season: number): Promise<number> {
+export async function refreshStandings(
+  db: D1Database,
+  provider: Provider,
+  season: number,
+  leagueId: string,
+): Promise<number> {
   const standings = await provider.fetchStandings(season);
   if (standings.length === 0) return 0;
-  await replaceStandings(db, standings);
-  await recordSync(db, "standings", standings.length);
+  await replaceStandings(db, standings, leagueId);
+  await recordSync(db, leagueId, "standings", standings.length);
   return standings.length;
 }

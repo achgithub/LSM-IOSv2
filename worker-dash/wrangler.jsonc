@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lsm-v2-dash-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-14",
+
+  // workers_dev: true — no custom domain set yet; access via
+  // lsm-v2-dash-worker.<account>.workers.dev. Lock down with Cloudflare
+  // Access before sharing the URL (same policy as v1 dash.sportsmanager.site).
+  "routes": [{ "pattern": "dash.sportsmanager.site", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+
+  // Two D1 shards (one per region, each holding many leagues).
+  // Read + write of the KV "season:phase" key. Season sync/probe calls
+  // proxy to the shard Worker's /admin/* endpoints with the shard admin token.
+  //
+  // Secrets to set after deploy (WRK_ prefix = dash Worker's copy, avoids confusion
+  // with the shard secrets of the same underlying value):
+  //   pnpm wrangler secret put WRK_UK_ADMIN_TOKEN   (same value as uk shard's UK_ADMIN_TOKEN)
+  //   pnpm wrangler secret put WRK_EU_ADMIN_TOKEN   (same value as eu shard's EU_ADMIN_TOKEN)
+  "d1_databases": [
+    { "binding": "UK_DB", "database_name": "lsm-uk-db", "database_id": "198a83ea-c3ac-489a-9f09-14a2f121d1a0" },
+    { "binding": "EU_DB", "database_name": "lsm-eu-db", "database_id": "384ffb93-13af-43ac-b400-d4e1b0266264" }
+  ],
+  "kv_namespaces": [
+    { "binding": "UK_KV", "id": "c65ea1d30cb345f2b39e4c0a48a5f39d" },
+    { "binding": "EU_KV", "id": "37b6e5767a0a4ed4bdc48deba5a31e61" }
+  ]
+}

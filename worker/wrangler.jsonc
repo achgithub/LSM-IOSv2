@@ -31,14 +31,13 @@
     "uk": {
       "name": "lsm-uk-worker",
 
-      // Hosting: workers.dev for now (kept off the v1 sportsmanager.site zone).
-      // URL is lsm-uk-worker.<account-subdomain>.workers.dev after deploy.
       "workers_dev": true,
+      "routes": [{ "pattern": "uk-api.sportsmanager.site", "custom_domain": true }],
 
       "vars": {
         "SHARD_REGION": "uk",
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
-        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LSM",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
         "APP_ATTEST_ENV": "production",
         // Region-wide maintenance window (UK leagues cluster around the same hours).
         "MAINTENANCE_WINDOW_UTC": "04:00"
@@ -59,18 +58,18 @@
       // Cloud bundle (Phase 2) — backup/publish blobs. ONE bucket, bound into
       // both shards: a backup/publish blob is self-contained (it isn't scoped
       // to a league), so either shard can serve it regardless of which
-      // league(s) the game uses. Bucket itself isn't provisioned yet — create
-      // it on Cloudflare before deploying this config.
+      // league(s) the game uses.
       "r2_buckets": [
         { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
       ],
 
-      // No KV yet — the v2 read path serves scores from D1. KV (live-score cache)
-      // comes back when the deferred upstream sync is built.
+      // Shared KV cache for all leagues in this shard. Keys are league-scoped:
+      // "{leagueId}:scores" (payload), "{leagueId}:scores:call" (gate), etc.
+      "kv_namespaces": [
+        { "binding": "SCORES", "id": "c65ea1d30cb345f2b39e4c0a48a5f39d" }
+      ],
 
-      // Explicit empty list — maintenance is driven by a shared orchestrator
-      // cron, not a per-shard Cloudflare Cron Trigger. Must stay explicit (an
-      // absent key leaves the OLD schedule registered server-side on deploy).
+      // Explicit empty list — activate with a cron string when ready, e.g. "0 4 * * *".
       "triggers": { "crons": [] }
     },
 
@@ -79,13 +78,13 @@
     "eu": {
       "name": "lsm-eu-worker",
 
-      // Hosting: workers.dev (kept off the v1 sportsmanager.site zone).
       "workers_dev": true,
+      "routes": [{ "pattern": "eu-api.sportsmanager.site", "custom_domain": true }],
 
       "vars": {
         "SHARD_REGION": "eu",
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
-        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LSM",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
         "APP_ATTEST_ENV": "production",
         // CET-cluster window (most of these leagues are CET); a single regional
         // value is a deliberate simplification of v1's per-league windows.
@@ -108,7 +107,10 @@
         { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
       ],
 
-      // No KV yet — see the uk block.
+      // Shared KV cache for all leagues in this shard — same pattern as uk.
+      "kv_namespaces": [
+        { "binding": "SCORES", "id": "37b6e5767a0a4ed4bdc48deba5a31e61" }
+      ],
 
       "triggers": { "crons": [] }
     }

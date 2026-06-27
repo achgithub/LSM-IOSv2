@@ -3,19 +3,19 @@
 // One deployment per region shard (--env uk | eu). Each shard's D1 holds many
 // leagues (rows in the `leagues` table). Two surfaces:
 //   • Layer 1 (./routes/data): the app↔DB read path — /leagues/:id/{teams,
-//     fixtures,standings,scores} + /leagues.json discovery, served straight off
-//     the seeded shard. NO upstream football-data.org call here (that sync is a
-//     separate, deferred concern; the v1 sync machinery is kept dormant in
-//     football.ts/refresh.ts/sync.ts for when it's built).
+//     fixtures,standings,scores} + /leagues.json discovery. Request-triggered
+//     stale-while-revalidate (same gate.ts pattern as v1) keeps football-data.org
+//     calls TTL-limited.
 //   • Layer 2 (./routes/{games,submissions}): cloud-backed game state + the
-//     anonymous PWA submission queue (skeletons).
+//     anonymous PWA submission queue.
 //
 // See docs/lsm-v2-architecture.md.
 
 import { Hono } from "hono";
 import { backup } from "./routes/backup";
 import { attest } from "./routes/attest";
-import { runDailyCleanup } from "./cron";
+import { admin } from "./routes/admin";
+import { runDailyCleanup, runDailySync } from "./cron";
 import { data } from "./routes/data";
 import { games } from "./routes/games";
 import { manager } from "./routes/manager";
@@ -57,6 +57,9 @@ app.route("/publish", publish);
 app.use("/manager/*", requireAttestation);
 app.route("/manager", manager);
 
+// Admin — ops endpoints (sync, probe, phase flag). Auth is inside admin.ts.
+app.route("/admin", admin);
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {
   console.error(JSON.stringify({ msg: "unhandled error", error: String(err) }));
@@ -65,9 +68,10 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
-  // Daily cleanup cron — handler is built but the trigger is NOT active yet.
-  // To activate: add "0 3 * * *" to wrangler.jsonc triggers.crons for each env.
+  // Cron scheduled handler — activate by setting triggers.crons in wrangler.jsonc,
+  // e.g. "0 4 * * *" for the uk shard, "0 2 * * *" for eu (match MAINTENANCE_WINDOW_UTC).
   scheduled: async (_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) => {
     await runDailyCleanup(env);
+    await runDailySync(env);
   },
 } satisfies ExportedHandler<Env>;

@@ -1,29 +1,24 @@
-// Per-league cache-only flag for the close season, distinct from the
-// deploy-outage "maintenance mode" concept — see lms-season-phase-rollover
-// memory. Stored as a single KV string per league Worker, so no cross-league
-// coordination is needed (each league has its own KV namespace).
+// Per-league season-phase flag, identical in purpose to v1 but with league-scoped
+// KV keys so many leagues can share one KV namespace in the v2 shard model.
+// Key shape: "{leagueId}:season:phase"
 //
 // This is a PURE cost/cron switch, nothing more: "live" lets the cron and
 // request-triggered gates call upstream as normal; "closed" blocks them
-// entirely, regardless of TTL, so polling a competition that has nothing new
-// to say doesn't burn API quota. It carries NO correctness responsibility —
-// every upstream call (whether through this gate or the on-demand admin
-// sync) is always pinned to an explicit season (see currentSeasonYear
-// below), so fixtures/teams/standings can never disagree about which season
-// they're describing, whatever this flag is set to.
+// entirely, regardless of TTL. It carries NO correctness responsibility —
+// every upstream call is always pinned to an explicit season (see currentSeasonYear).
 
 export type SeasonPhase = "live" | "closed";
 
-const PHASE_KEY = "season:phase";
+const phaseKey = (leagueId: string) => `${leagueId}:season:phase`;
 
-/** Defaults to "live" (today's behaviour) when unset — ships inert. */
-export async function getSeasonPhase(kv: KVNamespace): Promise<SeasonPhase> {
-  const v = await kv.get(PHASE_KEY);
-  return v === "closed" ? v : "live";
+/** Defaults to "live" when unset — ships inert. */
+export async function getSeasonPhase(kv: KVNamespace, leagueId: string): Promise<SeasonPhase> {
+  const v = await kv.get(phaseKey(leagueId));
+  return v === "closed" ? "closed" : "live";
 }
 
-export async function setSeasonPhase(kv: KVNamespace, phase: SeasonPhase): Promise<void> {
-  await kv.put(PHASE_KEY, phase);
+export async function setSeasonPhase(kv: KVNamespace, leagueId: string, phase: SeasonPhase): Promise<void> {
+  await kv.put(phaseKey(leagueId), phase);
 }
 
 /** A season's name (the year it starts, e.g. 2026 for "2026/27") from a kickoff date. */
@@ -33,32 +28,25 @@ function seasonOfDate(d: Date): number {
 }
 
 /**
- * The season a competition should currently be treated as being in,
- * independent of whatever football-data.org itself currently calls "current"
- * for that competition — that pointer lags reality (e.g. it can still point
- * at last season weeks after next season's fixtures are published).
- *
- * Derived from D1's own fixture data rather than the wall clock: a fixed
- * calendar cutover (e.g. "July onward = next season") can't track real
- * season-end dates, which shift year to year — a season finishing in May
- * means the *next* season is already the right default for the whole of
- * June, not just from July. So: use whichever season the next NOT-YET-
- * FINISHED fixture belongs to (the season "in progress or about to start"),
- * falling back to the most recent fixture's season if everything on file is
- * finished (e.g. right after a season ends, before next season's fixtures
- * have even been synced yet — nothing better to default to).
+ * The season the competition is currently in, derived from D1 fixture data for
+ * this league — not football-data.org's own "current season" pointer (which lags).
+ * Uses the next upcoming fixture's season; falls back to the latest finished
+ * fixture's season if everything is FINISHED (end of season, before next sync).
  */
-export async function currentSeasonYear(db: D1Database): Promise<number> {
+export async function currentSeasonYear(db: D1Database, leagueId: string): Promise<number> {
   const next = await db
     .prepare(
-      `SELECT kickoff FROM fixtures WHERE status NOT IN ('FINISHED','CANCELLED')
+      `SELECT kickoff FROM fixtures
+       WHERE league_id = ? AND status NOT IN ('FINISHED','CANCELLED')
        ORDER BY kickoff ASC LIMIT 1`,
     )
+    .bind(leagueId)
     .first<{ kickoff: string }>();
   if (next) return seasonOfDate(new Date(next.kickoff));
 
   const latest = await db
-    .prepare(`SELECT kickoff FROM fixtures ORDER BY kickoff DESC LIMIT 1`)
+    .prepare(`SELECT kickoff FROM fixtures WHERE league_id = ? ORDER BY kickoff DESC LIMIT 1`)
+    .bind(leagueId)
     .first<{ kickoff: string }>();
   return seasonOfDate(latest ? new Date(latest.kickoff) : new Date());
 }

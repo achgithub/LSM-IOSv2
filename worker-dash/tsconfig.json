@@ -4,25 +4,14 @@
     "module": "ES2022",
     "moduleResolution": "Bundler",
     "lib": ["ES2022"],
-    "types": ["./worker-configuration.d.ts"],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "worker-configuration.d.ts"],
-  "exclude": [
-    "node_modules",
-    "src/routes/fixtures.ts",
-    "src/routes/scores.ts",
-    "src/routes/standings.ts",
-    "src/routes/demo.ts",
-    "src/demo.ts"
-  ]
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
 }

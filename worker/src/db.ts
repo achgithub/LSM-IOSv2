@@ -189,6 +189,42 @@ export async function getScoresByLeague(db: D1Database, leagueId: string): Promi
   }));
 }
 
+// ── League config (sync) ────────────────────────────────────────────────────
+
+export interface LeagueRow {
+  id: string;
+  name: string;
+  football_data_code: string;
+  region: string;
+  score_ttl_seconds: number;
+  standings_ttl_seconds: number;
+  fixtures_ttl_seconds: number;
+  status: string;
+  maintenance_window_utc: string | null;
+}
+
+export async function getLeagueRow(db: D1Database, leagueId: string): Promise<LeagueRow | null> {
+  return db
+    .prepare(
+      `SELECT id, name, football_data_code, region, score_ttl_seconds,
+              standings_ttl_seconds, fixtures_ttl_seconds, status, maintenance_window_utc
+       FROM leagues WHERE id = ?`,
+    )
+    .bind(leagueId)
+    .first<LeagueRow>();
+}
+
+export async function getAllLeagues(db: D1Database): Promise<LeagueRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, name, football_data_code, region, score_ttl_seconds,
+              standings_ttl_seconds, fixtures_ttl_seconds, status, maintenance_window_utc
+       FROM leagues ORDER BY id ASC`,
+    )
+    .all<LeagueRow>();
+  return results;
+}
+
 // ── Writes (cron sync) ──────────────────────────────────────────────────────
 
 // Upserts the provider's current team list. Pruning teams no longer
@@ -203,9 +239,8 @@ export async function upsertTeams(db: D1Database, teams: Team[]): Promise<void> 
   const stmt = db.prepare(
     `INSERT INTO teams (id, external_id, name, short_name, tla, league_id)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(external_id) DO UPDATE SET
-       name = excluded.name, short_name = excluded.short_name,
-       tla = excluded.tla, league_id = excluded.league_id`,
+     ON CONFLICT(league_id, external_id) DO UPDATE SET
+       name = excluded.name, short_name = excluded.short_name, tla = excluded.tla`,
   );
   await db.batch(teams.map((t) => stmt.bind(t.id, t.externalId, t.name, t.shortName, t.tla, t.leagueId)));
 }
@@ -218,14 +253,16 @@ export async function upsertTeams(db: D1Database, teams: Team[]): Promise<void> 
 // anywhere" is always safe. Call this AFTER fixtures/standings have been
 // refreshed in the same maintenance run (see sync.ts runMaintenance), so a
 // new league's just-inserted teams are already referenced by the time this runs.
-export async function pruneOrphanedTeams(db: D1Database): Promise<void> {
+export async function pruneOrphanedTeams(db: D1Database, leagueId: string): Promise<void> {
   await db
     .prepare(
-      `DELETE FROM teams WHERE external_id NOT IN (
-         SELECT home_team_id FROM fixtures UNION SELECT away_team_id FROM fixtures
-         UNION SELECT team_id FROM standings
+      `DELETE FROM teams WHERE league_id = ? AND external_id NOT IN (
+         SELECT home_team_id FROM fixtures WHERE league_id = ?
+         UNION SELECT away_team_id FROM fixtures WHERE league_id = ?
+         UNION SELECT team_id FROM standings WHERE league_id = ?
        )`,
     )
+    .bind(leagueId, leagueId, leagueId, leagueId)
     .run();
 }
 
@@ -240,20 +277,20 @@ export async function pruneOrphanedTeams(db: D1Database): Promise<void> {
 // DELETE-all-then-insert (not a NOT-IN prune) avoids a 380-row bind-parameter
 // list. Guarded on empty input — an empty fetch (transient hiccup, or a
 // not-yet-published next season) must never wipe what's already there.
-export async function replaceFixtures(db: D1Database, fixtures: Fixture[]): Promise<void> {
+export async function replaceFixtures(db: D1Database, fixtures: Fixture[], leagueId: string): Promise<void> {
   if (fixtures.length === 0) return;
-  const del = db.prepare(`DELETE FROM fixtures`);
+  const del = db.prepare(`DELETE FROM fixtures WHERE league_id = ?`).bind(leagueId);
   const insert = db.prepare(
     `INSERT INTO fixtures
-       (id, matchday, kickoff, status, home_team_id, away_team_id,
+       (id, league_id, matchday, kickoff, status, home_team_id, away_team_id,
         home_score, away_score, winner, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   await db.batch([
     del,
     ...fixtures.map((f) =>
       insert.bind(
-        f.id, f.matchday, f.kickoff, f.status, f.homeTeamId, f.awayTeamId,
+        f.id, leagueId, f.matchday, f.kickoff, f.status, f.homeTeamId, f.awayTeamId,
         f.homeScore, f.awayScore, f.winner, f.updatedAt,
       ),
     ),
@@ -267,14 +304,14 @@ export async function replaceFixtures(db: D1Database, fixtures: Fixture[]): Prom
 // fixtures/standings reference and so can only prune what's unreferenced —
 // see upsertTeams), so a straightforward delete-anything-not-in-this-fetch
 // is safe here.
-export async function replaceStandings(db: D1Database, standings: Standing[]): Promise<void> {
+export async function replaceStandings(db: D1Database, standings: Standing[], leagueId: string): Promise<void> {
   if (standings.length === 0) return;
   const insert = db.prepare(
     `INSERT INTO standings
-       (team_id, position, played, won, drawn, lost,
+       (league_id, team_id, position, played, won, drawn, lost,
         goals_for, goals_against, goal_difference, points, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(team_id) DO UPDATE SET
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(league_id, team_id) DO UPDATE SET
        position = excluded.position, played = excluded.played,
        won = excluded.won, drawn = excluded.drawn, lost = excluded.lost,
        goals_for = excluded.goals_for, goals_against = excluded.goals_against,
@@ -282,30 +319,33 @@ export async function replaceStandings(db: D1Database, standings: Standing[]): P
        updated_at = excluded.updated_at`,
   );
   const placeholders = standings.map(() => "?").join(",");
-  const prune = db.prepare(`DELETE FROM standings WHERE team_id NOT IN (${placeholders})`);
+  const prune = db.prepare(
+    `DELETE FROM standings WHERE league_id = ? AND team_id NOT IN (${placeholders})`,
+  );
   await db.batch([
     ...standings.map((s) =>
       insert.bind(
-        s.teamId, s.position, s.played, s.won, s.drawn, s.lost,
+        leagueId, s.teamId, s.position, s.played, s.won, s.drawn, s.lost,
         s.goalsFor, s.goalsAgainst, s.goalDifference, s.points, s.updatedAt,
       ),
     ),
-    prune.bind(...standings.map((s) => s.teamId)),
+    prune.bind(leagueId, ...standings.map((s) => s.teamId)),
   ]);
 }
 
 export async function recordSync(
   db: D1Database,
+  leagueId: string,
   dataset: "fixtures" | "standings" | "teams",
   rowCount: number,
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO sync_meta (dataset, synced_at, row_count)
-       VALUES (?, ?, ?)
-       ON CONFLICT(dataset) DO UPDATE SET
+      `INSERT INTO sync_meta (league_id, dataset, synced_at, row_count)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(league_id, dataset) DO UPDATE SET
          synced_at = excluded.synced_at, row_count = excluded.row_count`,
     )
-    .bind(dataset, new Date().toISOString(), rowCount)
+    .bind(leagueId, dataset, new Date().toISOString(), rowCount)
     .run();
 }

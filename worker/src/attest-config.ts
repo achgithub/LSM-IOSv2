@@ -2,6 +2,7 @@
 // "never bypass in production" contract is auditable.
 
 import type { AttestConfig, AttestEnvironment } from "./attest";
+import { regionSecret } from "./auth";
 
 // A challenge is valid for this long after issue. The client fetches one then
 // immediately makes its request, so a few minutes is ample.
@@ -16,8 +17,8 @@ export function getAttestConfig(env: Env): AttestConfig {
 }
 
 export function getChallengeSecret(env: Env): string {
-  const secret = env.ATTEST_CHALLENGE_KEY;
-  if (!secret) throw new Error("ATTEST_CHALLENGE_KEY is not configured");
+  const secret = regionSecret(env, "ATTEST_CHALLENGE_KEY");
+  if (!secret) throw new Error(`${env.SHARD_REGION.toUpperCase()}_ATTEST_CHALLENGE_KEY is not configured`);
   return secret;
 }
 

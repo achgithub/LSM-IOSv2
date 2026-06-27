@@ -1,4 +1,13 @@
-// ── LSM Daily Cleanup Cron (Phase 6) ─────────────────────────────────────────
+// ── LSM Cron handlers ─────────────────────────────────────────────────────────
+// Two exports: runDailyCleanup (game/token/backup retention) + runDailySync
+// (per-league football-data.org refresh). Both called from index.ts scheduled.
+
+import { regionSecret } from "./auth";
+import { getAllLeagues } from "./db";
+import { FootballDataProvider } from "./football";
+import { runMaintenance } from "./sync";
+
+// ── Daily Cleanup (Phase 6) ───────────────────────────────────────────────────
 //
 // Built but NOT yet activated. To activate, add to wrangler.jsonc under the
 // relevant env's "triggers":
@@ -99,6 +108,29 @@ export async function runDailyCleanup(env: Env): Promise<void> {
   }
 
   log("done");
+}
+
+// ── Daily Sync ────────────────────────────────────────────────────────────────
+// Runs runMaintenance for every league in this shard — same as sync-if-due but
+// called directly from the cron scheduled handler rather than over HTTP.
+// FOOTBALL_DATA_TOKEN must be set as a secret; if unset the sync is skipped.
+
+export async function runDailySync(env: Env): Promise<void> {
+  const log = (msg: string) => console.log(JSON.stringify({ cron: "daily-sync", msg }));
+  const footballToken = regionSecret(env, "FOOTBALL_DATA_TOKEN");
+  if (!footballToken) { log("FOOTBALL_DATA_TOKEN not set, skipping"); return; }
+
+  const leagues = await getAllLeagues(env.DB);
+  for (const league of leagues) {
+    log(`syncing ${league.id}`);
+    const provider = new FootballDataProvider(footballToken, league.football_data_code, league.id);
+    try {
+      await runMaintenance(env.DB, env.SCORES, provider, league.id);
+      log(`done ${league.id}`);
+    } catch (err) {
+      log(`failed ${league.id}: ${String(err)}`);
+    }
+  }
 }
 
 // Purge all D1 and R2 data for one manager (used by both scheduled delete and
