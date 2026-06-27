@@ -85,7 +85,8 @@ struct GamesListView: View {
             .alert("Game limit reached", isPresented: $showingGameLimit) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Your \(entitlements.tier.label) plan includes \(entitlements.maxActiveGames) active games. Complete an existing game or upgrade to run more.")
+                let limit = entitlements.maxActiveGames
+                Text("Your \(entitlements.tier.label) plan includes \(limit) active games. Complete an existing game or upgrade to run more.")
             }
             .fullScreenCover(isPresented: $showingWizard) { GameWizardView() }
             .fullScreenCover(item: $wizardGame) { GameWizardView(game: $0) }
