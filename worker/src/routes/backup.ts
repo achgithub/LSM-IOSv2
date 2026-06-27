@@ -20,6 +20,26 @@ const keyFor = (id: string) => `backups/${id}.json`;
 
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024; // 5 MB — generous for any realistic game state
 
+// Validate that the body is a well-formed BackupBundle: valid JSON with a
+// top-level `games` array where each entry has the minimum required fields.
+// Catches garbage writes and truncated uploads before they reach R2.
+function isValidBackupBundle(body: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as Record<string, unknown>).games)) return false;
+    return ((parsed as Record<string, unknown>).games as unknown[]).every((g) => {
+      if (!g || typeof g !== "object") return false;
+      const game = g as Record<string, unknown>;
+      return typeof game.id === "string" &&
+             typeof game.name === "string" &&
+             typeof game.modeRaw === "string" &&
+             typeof game.statusRaw === "string";
+    });
+  } catch {
+    return false;
+  }
+}
+
 // PUT /backup/:id — body is the app's BackupBundle JSON. Overwrites any
 // existing blob at this id (the manager just re-backs-up onto the same code).
 // Send X-Manager-Token header so this backup can be attributed for lifecycle
@@ -30,6 +50,7 @@ backup.put("/:id", async (c) => {
   const body = await c.req.text();
   if (!body) return c.json({ error: "empty body" }, 400);
   if (body.length > MAX_BACKUP_BYTES) return c.json({ error: "payload too large" }, 413);
+  if (!isValidBackupBundle(body)) return c.json({ error: "invalid backup format" }, 400);
   await c.env.BACKUPS.put(keyFor(id), body, {
     httpMetadata: { contentType: "application/json" },
   });
