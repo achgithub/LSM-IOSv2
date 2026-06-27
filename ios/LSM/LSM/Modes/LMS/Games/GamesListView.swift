@@ -5,11 +5,21 @@ import SwiftData
 /// ad gate for free users is added in a later phase.
 struct GamesListView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNew = false
     @State private var showingWizard = false
     @State private var showingTutorial = false
+    @State private var showingGameLimit = false
     @State private var wizardGame: Game?
+
+    private var activeGameCount: Int {
+        games.filter { $0.status != .complete }.count
+    }
+
+    private var atGameLimit: Bool {
+        activeGameCount >= entitlements.maxActiveGames
+    }
 
     var body: some View {
         NavigationStack {
@@ -24,7 +34,9 @@ struct GamesListView: View {
                             Label("Guided Setup", systemImage: "wand.and.stars")
                         }
                         .buttonStyle(.borderedProminent)
-                        Button("New Game") { showingNew = true }
+                        Button("New Game") {
+                            if atGameLimit { showingGameLimit = true } else { showingNew = true }
+                        }
                         Button { showingTutorial = true } label: {
                             Label("See How It Works", systemImage: "play.circle")
                         }
@@ -57,7 +69,9 @@ struct GamesListView: View {
                     Button { showingWizard = true } label: { Image(systemName: "wand.and.stars") }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingNew = true } label: { Image(systemName: "plus") }
+                    Button {
+                        if atGameLimit { showingGameLimit = true } else { showingNew = true }
+                    } label: { Image(systemName: "plus") }
                         .accessibilityLabel("New Game")
                 }
             }
@@ -68,6 +82,11 @@ struct GamesListView: View {
                 }
             }
             .sheet(isPresented: $showingNew) { NewGameView() }
+            .alert("Game limit reached", isPresented: $showingGameLimit) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your \(entitlements.tier.label) plan includes \(entitlements.maxActiveGames) active games. Complete an existing game or upgrade to run more.")
+            }
             .fullScreenCover(isPresented: $showingWizard) { GameWizardView() }
             .fullScreenCover(item: $wizardGame) { GameWizardView(game: $0) }
             .fullScreenCover(isPresented: $showingTutorial) { TutorialContainerView() }

@@ -1,21 +1,34 @@
 import Foundation
 import Observation
 
-/// Explicit three-state cloud entitlement to prevent false-negative deletions.
-/// `.unknown` is the default — RevenueCat hasn't resolved yet (or isn't configured).
-/// Only `.inactive` (positively confirmed) may trigger the unsubscribe grace flow.
+/// Explicit three-state cloud entitlement — kept for the RevenueCat unsubscribe
+/// safety flow (prevents false data-deletion on a failed refresh). Cloud access
+/// itself is now derived from `Tier.cloudLevel`, not from this state directly.
+/// Only `.inactive` (positively confirmed by RevenueCat) may trigger the grace flow.
 enum CloudEntitlementState: Equatable {
     case unknown
     case active
     case inactive
 }
 
-/// Subscription tiers (see docs/pricing-model.md for the priced ladder).
-/// RevenueCat entitlement identifiers MUST match the raw values `no_ads` /
-/// `leagues_3` / `leagues_5` / `leagues_7`.
+/// Cloud feature level derived from tier. Backup, Publish, and PWA all unlock
+/// together at `leagues_3` — quantity caps (`maxActiveGames`, `maxPWALinks`)
+/// do the differentiation above that point, not a feature split.
+enum CloudLevel {
+    case none
+    case full
+}
+
+/// Subscription tiers (see docs/pricing-model.md for the full priced ladder).
+/// Tier names and RevenueCat entitlement identifiers are fixed to the raw values:
+/// `no_ads` / `leagues_3` / `leagues_5` / `leagues_7`.
+///
+/// Caps follow the 1 league : 3 active games : 20 PWA links ratio.
+/// Active games = games with status `.setup` or `.active` (not `.complete`).
+/// Tournament-type games are excluded from the cap by design (periodic events).
 enum Tier: String, CaseIterable, Identifiable {
     case free
-    case noAds = "no_ads"
+    case noAds    = "no_ads"
     case leagues3 = "leagues_3"
     case leagues5 = "leagues_5"
     case leagues7 = "leagues_7"
@@ -24,25 +37,74 @@ enum Tier: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .free: return AppString("Free")
-        case .noAds: return AppString("No Ads")
+        case .free:     return AppString("Free")
+        case .noAds:    return AppString("No Ads")
         case .leagues3: return AppString("3 Leagues")
         case .leagues5: return AppString("5 Leagues")
         case .leagues7: return AppString("7 Leagues")
         }
     }
 
+    /// Short description for paywall and settings screens — reflects the full
+    /// value bundle at each tier (leagues, games, PWA links, cloud features).
     var detail: String {
         switch self {
-        case .free: return AppString("Ad-supported · 1 league")
-        case .noAds: return AppString("Ads removed · 1 league")
-        case .leagues3: return AppString("Ads removed · 3 leagues")
-        case .leagues5: return AppString("Ads removed · 5 leagues")
-        case .leagues7: return AppString("Ads removed · 7 leagues")
+        case .free:
+            return AppString("Ad-supported · 1 league · 2 games")
+        case .noAds:
+            return AppString("No ads · 1 league · 3 games")
+        case .leagues3:
+            return AppString("No ads · 3 leagues · 9 games · Cloud backup, publish & PWA")
+        case .leagues5:
+            return AppString("No ads · 5 leagues · 15 games · 100 PWA links")
+        case .leagues7:
+            return AppString("No ads · 7 leagues · 21 games · 140 PWA links")
         }
     }
 
-    /// All paid tiers remove ads (spec §ads / free-vs-sub tiers).
+    /// Maximum simultaneous non-completed games (1:3 ratio per league).
+    /// Games with `.complete` status do not count against this limit.
+    var maxActiveGames: Int {
+        switch self {
+        case .free:     return 2
+        case .noAds:    return 3
+        case .leagues3: return 9
+        case .leagues5: return 15
+        case .leagues7: return 21
+        }
+    }
+
+    /// Maximum total PWA player links minted across all games combined (1:20 ratio
+    /// per league). `nil` means PWA is unavailable at this tier.
+    var maxPWALinks: Int? {
+        switch self {
+        case .free, .noAds: return nil
+        case .leagues3:     return 60
+        case .leagues5:     return 100
+        case .leagues7:     return 140
+        }
+    }
+
+    /// Cloud features (Backup, Publish, PWA) bundled into every league tier.
+    var cloudLevel: CloudLevel {
+        switch self {
+        case .free, .noAds:               return .none
+        case .leagues3, .leagues5, .leagues7: return .full
+        }
+    }
+
+    /// How many leagues the user may have enabled at once. Capped at the number
+    /// that actually exist so a small catalogue never claims more than it has.
+    var leagueAllowance: Int {
+        switch self {
+        case .free, .noAds: return 1
+        case .leagues3:     return min(3, Leagues.all.count)
+        case .leagues5:     return min(5, Leagues.all.count)
+        case .leagues7:     return min(7, Leagues.all.count)
+        }
+    }
+
+    /// All paid tiers remove ads.
     var removesAds: Bool { self != .free }
 }
 
@@ -93,30 +155,26 @@ final class Entitlements {
     /// The single gate the UI uses to decide whether to render ad placements.
     var shouldShowAds: Bool { !tier.removesAds }
 
-    /// How many leagues the user may have enabled at once (ticked in Settings).
-    /// Free / No Ads = 1, then 3 / 5 / 7 leagues by tier — a fixed step ladder,
-    /// not "all leagues", so price always tracks exactly what's enabled even as
-    /// the league catalogue grows past 7 (see docs/pricing-model.md). Capped at
-    /// the number of leagues that actually exist so a small catalogue never
-    /// claims more than it has. Change tier→count here only.
-    var leagueAllowance: Int {
-        switch tier {
-        case .free:     return 1
-        case .noAds:    return 1
-        case .leagues3: return min(3, Leagues.all.count)
-        case .leagues5: return min(5, Leagues.all.count)
-        case .leagues7: return min(7, Leagues.all.count)
-        }
-    }
+    /// How many leagues the user may have enabled at once. Passthrough to
+    /// `tier.leagueAllowance` — capped at the actual catalogue size.
+    var leagueAllowance: Int { tier.leagueAllowance }
 
     /// True when the user may enable more than one league (so the Settings
     /// checklist and in-game league chooser are worth showing as multi-select).
     var canHaveMultipleLeagues: Bool { leagueAllowance > 1 }
 
-    /// The single gate the Cloud Backup / Publish UI uses (Phase 2). Paid,
-    /// independent of league tier. Only true when RevenueCat has positively
-    /// confirmed the entitlement — `.unknown` never grants access.
-    var canUseCloud: Bool { cloudEntitlement == .active }
+    /// Maximum non-completed games the user may run simultaneously.
+    /// Passthrough to `tier.maxActiveGames` — enforce at game creation.
+    var maxActiveGames: Int { tier.maxActiveGames }
+
+    /// Maximum PWA player links that may be minted across all games combined.
+    /// `nil` means PWA is unavailable at the current tier.
+    var maxPWALinks: Int? { tier.maxPWALinks }
+
+    /// Gates all cloud features (Backup, Publish, PWA). True when the tier
+    /// includes cloud — `leagues_3` and above. The separate `cloudEntitlement`
+    /// state is retained for the RevenueCat unsubscribe safety flow only.
+    var canUseCloud: Bool { tier.cloudLevel == .full }
 
     /// Local testing override — flips the tier with no purchase. DEBUG-only: a
     /// no-op in release builds so it can never bypass the RevenueCat entitlement

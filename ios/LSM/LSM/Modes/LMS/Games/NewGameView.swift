@@ -207,6 +207,7 @@ struct NewGameView: View {
     }
 
     private func create() {
+        guard activeGameCount() < Entitlements.shared.maxActiveGames else { return }
         let game = Game(
             name: trimmedName,
             season: season,
@@ -321,6 +322,7 @@ struct NewGameView: View {
     }
 
     private func createPredictor() {
+        guard activeGameCount() < Entitlements.shared.maxActiveGames else { return }
         let game = Game(
             name: trimmedName,
             season: season,
@@ -345,6 +347,17 @@ struct NewGameView: View {
             jokerEnabled: predictorJokerEnabled
         )
         dismiss()
+    }
+
+    /// Non-completed game count — used as a safety net before insert.
+    /// The primary gate is in GamesListView; this prevents a bypass if
+    /// NewGameView is ever presented through another path.
+    private func activeGameCount() -> Int {
+        let completeRaw = GameStatus.complete.rawValue
+        let descriptor = FetchDescriptor<Game>(
+            predicate: #Predicate { $0.statusRaw != completeRaw }
+        )
+        return (try? context.fetchCount(descriptor)) ?? 0
     }
 
     /// The manager plays only if they opted in (they may run games they don't
