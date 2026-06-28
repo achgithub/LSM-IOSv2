@@ -3,22 +3,44 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1d3a" />
+    <meta name="theme-color" content="#0B1220" />
     <title>Last Stand Manager — Submit</title>
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="stylesheet" href="/styles.css" />
+    <script>
+      (() => {
+        const match = location.pathname.match(/\/s\/([0-9a-f-]{36})(?:\/|$)/i);
+        const href = match ? `/s/${match[1].toLowerCase()}/manifest.webmanifest` : "/manifest.webmanifest";
+        document.write(`<link rel="manifest" href="${href}" />`);
+      })();
+    </script>
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main id="app">
-      <!-- Populated by app.js from GET /s/:token. Skeleton placeholder below. -->
-      <header class="brand">Last Stand Manager</header>
-      <section id="content" class="card">
-        <p class="muted">Loading your link…</p>
+      <header class="brand-shell">
+        <div class="brand-lockup">
+          <img class="brand-mark" src="logo.png" alt="" width="56" height="56" />
+          <div>
+            <p class="wordmark">SPORTS MANAGER</p>
+            <p class="app-title">Last Stand Manager</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="save-link-action" class="save-link-action" type="button" hidden>Save link</button>
+          <button id="text-size-toggle" class="text-toggle" type="button" aria-pressed="false">Text +</button>
+        </div>
+      </header>
+      <section id="content" class="content-stack" aria-live="polite">
+        <section class="notice-card">
+          <h1>Loading your link</h1>
+          <p class="muted">Checking what your manager has opened for you.</p>
+        </section>
       </section>
       <footer class="muted small">
         Submissions are reviewed by your game's manager before they go live.
       </footer>
     </main>
-    <script src="/app.js" type="module"></script>
+    <script src="app.js" type="module"></script>
   </body>
 </html>

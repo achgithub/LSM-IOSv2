@@ -1,0 +1,2 @@
+/s/:token /index.html 200
+/s/:token/ /index.html 200
