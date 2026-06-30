@@ -1,0 +1,11 @@
+/index.html
+  Cache-Control: public, max-age=60, must-revalidate
+
+/app.js
+  Cache-Control: public, max-age=60, must-revalidate
+
+/manifest.webmanifest
+  Cache-Control: public, max-age=60, must-revalidate
+
+/s/*/manifest.webmanifest
+  Cache-Control: public, max-age=60, must-revalidate
