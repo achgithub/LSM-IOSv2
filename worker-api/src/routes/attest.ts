@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { issueChallenge, verifyAttestation, verifyAssertion, verifyChallenge } from "../attest";
 import { CHALLENGE_MAX_AGE_MS, attestBypassed, getAttestConfig, getChallengeSecret } from "../attest-config";
 import { getDevice, insertDevice, updateSignCount } from "../attest-store";
-import { regionSecret } from "../auth";
+import { requireAdmin, regionSecret } from "../auth";
 import { signJWT } from "../jwt";
 
 // ── App Attest enrolment + JWT issuance ──────────────────────────────────────
@@ -87,7 +87,7 @@ attest.post("/assert", async (c) => {
     );
     await updateSignCount(c.env.DB, keyId, result.signCount);
   } catch (err) {
-    console.error(JSON.stringify({ msg: "assertion rejected", error: String(err) }));
+    console.error(JSON.stringify({ msg: "assertion rejected", keyId, error: String(err) }));
     return c.json({ error: "assertion rejected" }, 403);
   }
 
@@ -98,4 +98,40 @@ attest.post("/assert", async (c) => {
   const token = await signJWT(privateKey, c.env.JWT_KID, issuer);
   const exp = Math.floor(Date.now() / 1000) + 900;
   return c.json({ token, expiresAt: new Date(exp * 1000).toISOString() });
+});
+
+// ── Admin: device management ──────────────────────────────────────────────────
+// All routes require Bearer <UK_ADMIN_TOKEN>.
+
+// List all registered devices.
+// GET /attest/devices → { count, devices: [{ keyId, signCount, environment, createdAt }] }
+attest.get("/devices", async (c) => {
+  if (!requireAdmin(c.env, c.req.header("Authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const rows = await c.env.DB.prepare(
+    "SELECT key_id, sign_count, environment, created_at FROM attest_devices ORDER BY created_at DESC"
+  ).all<{ key_id: string; sign_count: number; environment: string; created_at: string }>();
+  const devices = (rows.results ?? []).map((r) => ({
+    keyId: r.key_id,
+    signCount: r.sign_count,
+    environment: r.environment,
+    createdAt: r.created_at,
+  }));
+  return c.json({ count: devices.length, devices });
+});
+
+// Delete a specific device — forces the iOS client to re-attest on next request.
+// DELETE /attest/devices/:keyId
+attest.delete("/devices/:keyId", async (c) => {
+  if (!requireAdmin(c.env, c.req.header("Authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const keyId = c.req.param("keyId");
+  const result = await c.env.DB.prepare(
+    "DELETE FROM attest_devices WHERE key_id = ?"
+  ).bind(keyId).run();
+  if (!result.meta.changes) return c.json({ error: "device not found" }, 404);
+  console.log(JSON.stringify({ msg: "device deleted by admin", keyId }));
+  return c.json({ ok: true, keyId });
 });
