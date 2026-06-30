@@ -85,19 +85,27 @@ actor AppAttestService {
         }
         if let inFlight = jwtTask { return try await inFlight.value }
 
-        let task = Task<String, Error> {
-            let authority = await self.authorityURL()
-            let keyId     = try await self.attestedKeyId(authority: authority)
-            let challenge = try await self.fetchChallenge(baseURL: authority)
-            let assertion = try await self.assertion(keyId: keyId, challenge: challenge)
-            return try await self.mintJWT(
-                authority: authority, keyId: keyId,
-                challenge: challenge, assertion: assertion
-            )
-        }
+        let task = Task<String, Error> { try await self.attemptJWT(freshAttest: false) }
         jwtTask = task
         defer { jwtTask = nil }
         return try await task.value
+    }
+
+    private func attemptJWT(freshAttest: Bool) async throws -> String {
+        let authority = await authorityURL()
+        let keyId     = try await attestedKeyId(authority: authority, fresh: freshAttest)
+        let challenge = try await fetchChallenge(baseURL: authority)
+        let assertion = try await assertion(keyId: keyId, challenge: challenge)
+        do {
+            return try await mintJWT(authority: authority, keyId: keyId,
+                                     challenge: challenge, assertion: assertion)
+        } catch APIError.badStatus(403, _) where !freshAttest {
+            // Stored key's public key in the authority DB doesn't verify — stale
+            // registration (e.g. re-install, or DB was seeded from a dev session).
+            // Clear the key so attestedKeyId generates and registers a fresh one.
+            defaults.removeObject(forKey: keyIdDefaultsKey)
+            return try await attemptJWT(freshAttest: true)
+        }
     }
 
     // MARK: - JWT mint via POST /attest/assert
@@ -126,8 +134,8 @@ actor AppAttestService {
 
     private var attestationTask: Task<String, Error>?
 
-    private func attestedKeyId(authority: URL) async throws -> String {
-        if let existing = storedKeyId() { return existing }
+    private func attestedKeyId(authority: URL, fresh: Bool = false) async throws -> String {
+        if !fresh, let existing = storedKeyId() { return existing }
         if let inFlight = attestationTask { return try await inFlight.value }
 
         let task = Task<String, Error> {
