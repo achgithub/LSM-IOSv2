@@ -1,4 +1,14 @@
 {
+  "authorities": {
+    "uk": "https://api.uk.sportsmanager.site"
+  },
+  "storefrontMap": {
+    "GBR": "uk",
+    "IRL": "uk",
+    "AUS": "uk",
+    "NZL": "uk"
+  },
+  "defaultAuthority": "uk",
   "app": {
     "name": "Last Stand Manager",
     "season": "2025/26",

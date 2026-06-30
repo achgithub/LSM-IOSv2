@@ -25,11 +25,9 @@ struct PublishPredictorView: View {
 
     private var hasPublishedBefore: Bool { game.predictorPublishLinkId != nil }
     private var publishedLink: String? {
-        // Lowercase for display/sharing — Swift's UUID.uuidString is always
-        // uppercase, but the id is server-minted lowercase (crypto.randomUUID())
-        // and a lowercase URL just reads more like a normal link. The server
-        // lowercases on lookup regardless, so this is cosmetic, not load-bearing.
-        game.predictorPublishLinkId.map { "\(PublishPredictorView.pagesBaseURL)/l/\($0.uuidString.lowercased())" }
+        guard let id = game.predictorPublishLinkId else { return nil }
+        let region = game.predictorPublishLinkRegion ?? "uk"
+        return "\(PublishPredictorView.pagesBaseURL)/l/\(region)/\(id.uuidString.lowercased())"
     }
 
     var body: some View {
@@ -118,10 +116,12 @@ struct PublishPredictorView: View {
             game.predictorPublishPin = pinToSet
             game.predictorPublishLinkId = result.id
             game.predictorPublishOwnerToken = result.ownerToken
+            game.predictorPublishLinkRegion = result.region
             didPublish = true
         } catch APIError.badStatus(401, _) where allowFreshRetry && game.predictorPublishLinkId != nil {
             game.predictorPublishLinkId = nil
             game.predictorPublishOwnerToken = nil
+            game.predictorPublishLinkRegion = nil
             await publish(newPin: newPin, allowFreshRetry: false)
         } catch {
             // Include the id we attempted, so a "not found" can be cross-checked

@@ -46,7 +46,7 @@ actor APIClient {
         // App Attest: prove this is the genuine app so the Worker serves the
         // licensed feed. Best-effort — no headers on Simulator / pre-enrolment,
         // and the Worker decides whether to accept (see AppAttestService).
-        for (field, value) in await AppAttestService.shared.authorizationHeaders(for: base) {
+        for (field, value) in await AppAttestService.shared.authorizationHeaders() {
             request.setValue(value, forHTTPHeaderField: field)
         }
         let (data, response) = try await URLSession.shared.data(for: request)

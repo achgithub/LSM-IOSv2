@@ -15,12 +15,10 @@ import { Hono } from "hono";
 import { admin } from "./routes/admin";
 import { runDailyCleanup, runDailySync } from "./cron";
 import { data } from "./routes/data";
-import { publish } from "./routes/publish";
-
 // Sports data shard — league discovery + read-only data (teams, fixtures,
-// standings, scores). All lifecycle, backup, submissions and attest now live
-// in the regional authority Worker (worker-api/). JWT verification for
-// /scores and /fixtures is applied inside data.ts via requireJWT.
+// standings, scores). All lifecycle, backup, submissions, publish and attest
+// now live in the regional authority Worker (worker-api/). JWT verification
+// for /scores and /fixtures is applied inside data.ts via requireJWT.
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -35,10 +33,6 @@ app.get("/health", async (c) => {
 // /scores and /fixtures are JWT-gated (requireJWT applied inside data.ts).
 // /leagues.json, /teams, /standings remain public.
 app.route("/", data);
-
-// Publish links remain on the shard for now (no attest requirement on the
-// viewer unlock path; the write path uses owner_token validation).
-app.route("/publish", publish);
 
 // Admin — ops endpoints (sync, probe). Auth is inside admin.ts.
 app.route("/admin", admin);

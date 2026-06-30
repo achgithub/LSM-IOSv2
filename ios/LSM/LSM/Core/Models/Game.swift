@@ -61,6 +61,9 @@ final class Game {
     /// have let anyone steal/relock someone else's link, not just view it).
     /// See worker/src/routes/publish.ts.
     var predictorPublishOwnerToken: String?
+    /// Authority region that owns this game's publish link (e.g. "uk").
+    /// Stored so the share URL /l/{region}/{id} survives without a server round-trip.
+    var predictorPublishLinkRegion: String?
 
     // Cloud Submissions (Phase 3) — the client-generated game identity token
     // used to group all player links and round pushes for this game on the

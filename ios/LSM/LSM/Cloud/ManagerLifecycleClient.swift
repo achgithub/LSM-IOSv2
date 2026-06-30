@@ -1,6 +1,6 @@
 import Foundation
 
-/// Lifecycle state returned by GET /manager/:token/status.
+/// Lifecycle state returned by GET /manager/status.
 struct ManagerLifecycleStatus: Decodable {
     /// "active" | "warned" | "pending_delete" | "not_found"
     let state: String
@@ -12,7 +12,6 @@ struct ManagerLifecycleStatus: Decodable {
     var isWarned: Bool { state == "warned" }
     var isPendingDelete: Bool { state == "pending_delete" }
 
-    /// Human-readable summary for the Cloud Settings footer.
     var bannerMessage: String? {
         switch state {
         case "warned":
@@ -30,51 +29,46 @@ struct ManagerLifecycleStatus: Decodable {
     }
 }
 
-/// Client for Phase 6 manager lifecycle endpoints.
+/// Client for manager lifecycle endpoints (/manager/*) on the authority worker.
 actor ManagerLifecycleClient {
     static let shared = ManagerLifecycleClient()
 
-    private static let base = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
     private let decoder = JSONDecoder()
 
     private init() {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
 
-    /// Fetch lifecycle status — call when Cloud Settings is opened.
     func status() async -> ManagerLifecycleStatus? {
-        guard let url = URL(string: "/manager/status", relativeTo: Self.base) else { return nil }
-        var req = await request(url: url, method: "GET")
-        req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
+        guard let req = await makeRequest(path: "/manager/status", method: "GET") else { return nil }
+        var r = req
+        r.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, _) = try await URLSession.shared.data(for: r)
             return try decoder.decode(ManagerLifecycleStatus.self, from: data)
         } catch {
             return nil
         }
     }
 
-    /// Signal that the cloud bundle subscription has lapsed.
-    /// Idempotent — safe to call every time Settings opens while unsubscribed.
     func unsubscribe() async {
-        guard let url = URL(string: "/manager/unsubscribe", relativeTo: Self.base) else { return }
-        var req = await request(url: url, method: "POST")
+        guard var req = await makeRequest(path: "/manager/unsubscribe", method: "POST") else { return }
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
     }
 
-    /// Clear the pending deletion if the manager re-subscribes.
     func resubscribe() async {
-        guard let url = URL(string: "/manager/resubscribe", relativeTo: Self.base) else { return }
-        var req = await request(url: url, method: "POST")
+        guard var req = await makeRequest(path: "/manager/resubscribe", method: "POST") else { return }
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try? await URLSession.shared.data(for: req)
     }
 
-    private func request(url: URL, method: String) async -> URLRequest {
+    private func makeRequest(path: String, method: String) async -> URLRequest? {
+        let base = await AppAttestService.shared.authorityURL()
+        guard let url = URL(string: path, relativeTo: base) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = method
-        for (field, value) in await AppAttestService.shared.authorizationHeaders(for: Self.base) {
+        for (field, value) in await AppAttestService.shared.authorizationHeaders() {
             req.setValue(value, forHTTPHeaderField: field)
         }
         return req

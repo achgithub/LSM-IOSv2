@@ -1,7 +1,9 @@
-// Cloud Publish viewer - Cloudflare Pages Function at /l/:id.
+// Cloud Publish viewer — Cloudflare Pages Function at /l/:region/:id.
 //
-// The Worker validates the PIN server-side and is the only component that
-// touches the blob. This Function is a branded PIN form plus read-only renderer.
+// The region in the URL identifies which authority worker to call for PIN
+// validation. Each regional authority owns its own publish_links rows; the
+// snapshot blob lives in the shared BACKUPS R2 bucket. No WORKER_BASE_URL
+// env var needed — the authority URL is derived from the region path segment.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => (
@@ -236,19 +238,27 @@ function html(body, scriptNonce, status = 200) {
   });
 }
 
-export async function onRequestGet() {
+const VALID_REGION = /^[a-z]{2,8}$/;
+
+export async function onRequestGet({ params }) {
+  if (!VALID_REGION.test(params.region)) {
+    return new Response("Not found", { status: 404 });
+  }
   const n = nonce();
   return html(pinFormPage({}, n), n);
 }
 
-export async function onRequestPost({ request, params, env }) {
+export async function onRequestPost({ request, params }) {
+  if (!VALID_REGION.test(params.region)) {
+    return new Response("Not found", { status: 404 });
+  }
   const n = nonce();
   const form = await request.formData();
   const pin = form.get("pin");
   if (!pin) return html(pinFormPage({ error: "PIN is required" }, n), n, 400);
 
-  const workerBase = env.WORKER_BASE_URL;
-  const resp = await fetch(`${workerBase}/publish/${params.id}/unlock`, {
+  const authorityBase = `https://api.${params.region}.sportsmanager.site`;
+  const resp = await fetch(`${authorityBase}/publish/${params.id}/unlock`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pin }),
@@ -256,7 +266,8 @@ export async function onRequestPost({ request, params, env }) {
 
   if (resp.status === 401) return html(pinFormPage({ error: "Incorrect PIN" }, n), n, 401);
   if (resp.status === 404) return html(pinFormPage({ error: "This link no longer exists" }, n), n, 404);
-  if (!resp.ok) return html(pinFormPage({ error: "Something went wrong - please try again" }, n), n, 502);
+  if (resp.status === 429) return html(pinFormPage({ error: "Too many attempts — try again later" }, n), n, 429);
+  if (!resp.ok) return html(pinFormPage({ error: "Something went wrong — please try again" }, n), n, 502);
 
   const snapshot = await resp.json();
   return html(resultsPage(snapshot, n), n);

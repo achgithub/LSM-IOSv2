@@ -97,6 +97,11 @@ enum Leagues {
         let app: AppSettings
         let homeLeagueId: String
         let leagues: [LeagueOption]
+        // Authority routing — added v2. Optional so stale disk-cached manifests
+        // without these fields still decode; the bundle copy always has them.
+        let authorities: [String: String]?   // region key → base URL, e.g. "uk" → "https://api.uk.sportsmanager.site"
+        let storefrontMap: [String: String]? // ISO 3166-1 alpha-3 → region key, e.g. "GBR" → "uk"
+        let defaultAuthority: String?        // region key used when storefront is unmapped
     }
 
     /// Disk-cache key for the registry's manifest — see `refreshFromRegistry`.
@@ -110,6 +115,12 @@ enum Leagues {
 
     /// App-wide settings (product name, default season + gameplay rules).
     static var app: AppSettings { manifest.app }
+
+    /// Authority routing tables — used by AppAttestService to resolve the
+    /// regional authority URL from the StoreKit storefront on first launch.
+    static var authorities: [String: String] { manifest.authorities ?? ["uk": "https://api.uk.sportsmanager.site"] }
+    static var storefrontMap: [String: String] { manifest.storefrontMap ?? [:] }
+    static var defaultAuthority: String { manifest.defaultAuthority ?? "uk" }
 
     /// Every registered league, in manifest order. `devOnly` leagues (the
     /// standalone screenshot/demo league — see leagues.json) only ever appear

@@ -1,24 +1,16 @@
 import Foundation
 
-/// Cloud Backup client (Phase 2) — pushes/pulls a `BackupBundle` blob to/from
-/// the Worker's R2-backed `/backup/:id` route. Mirrors `APIClient`'s
-/// conventions (URLComponents/URLRequest, `AppAttestService` headers,
-/// `APIError`-style errors) but for a single shared write/read route rather
-/// than a per-league read-only one.
+/// Cloud Backup + Publish client.
 ///
-/// Always talks to one CANONICAL shard, never `Leagues.home` — backup's R2
-/// blob genuinely is region-agnostic (no D1 involved), but Publish's
-/// `publish_links` lookup lives in ONE shard's D1 (`uk`'s). If this pointed
-/// at whichever shard happens to be the user's home league, a manager whose
-/// home league is on the `eu` shard would publish a link the Pages Function
-/// (wired to a fixed `WORKER_BASE_URL`) could never find — a permanent 404,
-/// not a "either shard works" situation. Same hardcoded-canonical-shard
-/// rationale as `Leagues.registryURL`; keep both pointed at the same shard.
+/// Backup/restore and publish all live on the regional authority worker
+/// (api.{region}.sportsmanager.site). The publish write path is JWT-gated;
+/// the viewer unlock path is public and called from the browser, not here.
+///
+/// The publish share link embeds the region so the Pages Function at
+/// /l/:region/:id can route to the correct authority without a global index.
 actor SnapshotClient {
     static let shared = SnapshotClient()
 
-    private static let canonicalBase = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
-    private let base = SnapshotClient.canonicalBase
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -27,49 +19,47 @@ actor SnapshotClient {
         decoder.dateDecodingStrategy = .iso8601
     }
 
-    /// Push a backup blob, keyed by the manager's restore-code `id`. Overwrites
-    /// whatever was previously stored at that id.
+    // MARK: - Backup
+
     func backup(_ bundle: BackupBundle, id: UUID) async throws {
         let body = try encoder.encode(bundle)
-        var request = try await request(path: "/backup/\(id.uuidString)", method: "PUT")
+        var request = try await authorityRequest(path: "/backup/\(id.uuidString)", method: "PUT")
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         _ = try await send(request)
     }
 
-    /// Pull the bundle stored under a restore-code `id`.
     func restore(id: UUID) async throws -> BackupBundle {
-        let request = try await request(path: "/backup/\(id.uuidString)", method: "GET")
+        let request = try await authorityRequest(path: "/backup/\(id.uuidString)", method: "GET")
         let data = try await send(request)
         return try decoder.decode(BackupBundle.self, from: data)
     }
 
-    /// Publish (or republish, passing the same `existingLinkId`/`ownerToken`)
-    /// a Predictor predictions-league snapshot, PIN-gated server-side for
-    /// viewers. Returns the link id for `/l/<id>` (stable across republishes)
-    /// and the owner token to store on `Game` and pass back next time.
-    ///
-    /// `ownerToken` — NOT the PIN — is the republish credential while
-    /// attestation is off (see worker/src/routes/publish.ts): the PIN is
-    /// short and viewer-facing, brute-forceable in seconds, and was
-    /// deliberately removed from this role after a security review flagged
-    /// it as a takeover vector. `pin` is the PIN to set going forward.
+    // MARK: - Publish
+
+    struct PublishResult {
+        let id: UUID
+        let ownerToken: String
+        let region: String
+    }
+
+    /// Publish (or republish) a Predictor snapshot. Returns the link id, owner
+    /// token, and region — all three are stored on `Game` so the share link URL
+    /// `/l/{region}/{id}` can be reconstructed without a server round-trip.
     func publish(
-        _ snapshot: PublishSnapshot, pin: String, existingLinkId: UUID?, ownerToken: String?
-    ) async throws -> (id: UUID, ownerToken: String) {
+        _ snapshot: PublishSnapshot, pin: String,
+        existingLinkId: UUID?, ownerToken: String?
+    ) async throws -> PublishResult {
         struct Body: Encodable {
             let id: String?
             let ownerToken: String?
             let pin: String
             let snapshot: PublishSnapshot
         }
-        struct Response: Decodable { let id: String; let ownerToken: String }
+        struct Response: Decodable { let id: String; let ownerToken: String; let region: String }
 
-        // No trailing slash — Hono's sub-router mounted at "/publish" matches
-        // the bare path "/publish", not "/publish/" (confirmed live: the
-        // trailing-slash form 404s). Verified against production 2026-06-25.
-        var request = try await request(path: "/publish", method: "POST")
+        var request = try await authorityRequest(path: "/publish", method: "POST")
         request.httpBody = try encoder.encode(
             Body(id: existingLinkId?.uuidString, ownerToken: ownerToken, pin: pin, snapshot: snapshot)
         )
@@ -79,17 +69,20 @@ actor SnapshotClient {
         guard let id = UUID(uuidString: response.id) else {
             throw APIError.badStatus(-1, body: "Worker returned an invalid link id")
         }
-        return (id, response.ownerToken)
+        return PublishResult(id: id, ownerToken: response.ownerToken, region: response.region)
     }
 
-    private func request(path: String, method: String) async throws -> URLRequest {
+    // MARK: - Internals
+
+    private func authorityRequest(path: String, method: String) async throws -> URLRequest {
+        let base = await AppAttestService.shared.authorityURL()
         guard let url = URL(string: path, relativeTo: base) else { throw APIError.badURL }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        for (field, value) in await AppAttestService.shared.authorizationHeaders(for: base) {
-            request.setValue(value, forHTTPHeaderField: field)
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        for (field, value) in await AppAttestService.shared.authorizationHeaders() {
+            req.setValue(value, forHTTPHeaderField: field)
         }
-        return request
+        return req
     }
 
     @discardableResult

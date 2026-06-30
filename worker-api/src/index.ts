@@ -14,6 +14,7 @@ import { Hono } from "hono";
 import { attest } from "./routes/attest";
 import { backup } from "./routes/backup";
 import { manager } from "./routes/manager";
+import { publish } from "./routes/publish";
 import { submissions } from "./routes/submissions";
 import { migrate } from "./routes/migrate";
 import { requireJWT } from "./middleware/jwt";
@@ -38,6 +39,7 @@ app.route("/attest", attest);
 // Middleware registered before any route mount so every matching path is covered.
 // /s/* and /s/:token/games/* are deliberately absent — player PWA is browser-only.
 
+app.use("/publish", requireJWT);   // write path only — /:id/unlock stays public
 app.use("/links", requireJWT);
 app.use("/links/*", requireJWT);
 app.use("/games/*", requireJWT);
@@ -46,6 +48,7 @@ app.use("/manager/*", requireJWT);
 
 // Single submissions mount after middleware — /s/* stays public, everything else gated.
 app.route("/", submissions);
+app.route("/publish", publish);
 app.route("/backup", backup);
 app.route("/manager", manager);
 app.route("/manager", migrate); // /manager/export, /manager/import

@@ -60,9 +60,6 @@ struct ApproveResult: Decodable {
 actor SubmissionsClient {
     static let shared = SubmissionsClient()
 
-    private static let canonicalBase = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev")!
-    private let base = SubmissionsClient.canonicalBase
-
     static let playerBase = URL(string: "https://submit.sportsmanager.site")!
 
     static func playerLinkURL(token: String) -> URL {
@@ -158,10 +155,11 @@ actor SubmissionsClient {
     // ── Internals ─────────────────────────────────────────────────────────────
 
     private func request(path: String, method: String) async throws -> URLRequest {
+        let base = await AppAttestService.shared.authorityURL()
         guard let url = URL(string: path, relativeTo: base) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = method
-        for (field, value) in await AppAttestService.shared.authorizationHeaders(for: base) {
+        for (field, value) in await AppAttestService.shared.authorizationHeaders() {
             req.setValue(value, forHTTPHeaderField: field)
         }
         return req
