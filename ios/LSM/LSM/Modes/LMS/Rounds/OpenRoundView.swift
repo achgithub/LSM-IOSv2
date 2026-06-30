@@ -23,6 +23,7 @@ struct OpenRoundView: View {
     @State private var errorMessage: String?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     // Filters — date is the primary driver (matchday numbers don't line up across
     // leagues), so the date window is on by default.
@@ -386,6 +387,11 @@ struct OpenRoundView: View {
         let jokerEnabled = game.predictorJokerEnabled
         let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
 
+        let trimmedManagerName: String? = {
+            let n = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return n.isEmpty ? nil : n
+        }()
+
         Task {
             var playerItems: [PlayerPushItem] = []
             for player in linkedPlayers {
@@ -419,6 +425,7 @@ struct OpenRoundView: View {
                     fixtures: fixtureItems,
                     jokerEnabled: jokerEnabled,
                     managerSuffix: managerSuffix,
+                    managerName: trimmedManagerName,
                     players: playerItems
                 )
             } catch {

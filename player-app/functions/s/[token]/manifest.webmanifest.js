@@ -1,4 +1,5 @@
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const WORKER_BASE = "https://lsm-uk-worker.sportsmanager.workers.dev";
 
 export async function onRequestGet({ params }) {
   const token = String(params.token ?? "").toLowerCase();
@@ -6,9 +7,25 @@ export async function onRequestGet({ params }) {
     return new Response("Not found", { status: 404 });
   }
 
+  let managerName = null;
+  try {
+    const res = await fetch(`${WORKER_BASE}/s/${token}`);
+    if (res.ok) {
+      const data = await res.json();
+      managerName = data.managerName ?? null;
+    }
+  } catch {
+    // Fall back to generic name if Worker is unreachable.
+  }
+
+  const shortName = managerName ? `LSM ${managerName}` : "LSM Submit";
+  const fullName = managerName
+    ? `Last Stand Manager — ${managerName}`
+    : "Last Stand Manager — Submit";
+
   return Response.json({
-    name: "Last Stand Manager - Submit",
-    short_name: "LSM Submit",
+    name: fullName,
+    short_name: shortName,
     description: "Submit your pick or score prediction. Reviewed by your game's manager before it goes live.",
     start_url: `/s/${token}`,
     scope: "/",

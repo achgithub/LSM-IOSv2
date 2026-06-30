@@ -44,7 +44,7 @@ async function ensureManagerLifecycle(env: Env, managerToken: string): Promise<v
 // Mint a global player token. Returns 409 if a non-revoked token already exists
 // for this player name — prevents credential harvesting by unauthenticated callers.
 submissions.post("/links", async (c) => {
-  const body = await c.req.json<{ playerName: string; managerToken?: string }>();
+  const body = await c.req.json<{ playerName: string; managerToken?: string; managerName?: string }>();
   const playerName = body?.playerName?.trim();
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
 
@@ -56,9 +56,10 @@ submissions.post("/links", async (c) => {
 
   const token = crypto.randomUUID().toLowerCase();
   const managerToken = body?.managerToken?.toLowerCase() ?? null;
+  const managerName = body?.managerName?.trim() ?? null;
   await c.env.DB.prepare(
-    `INSERT INTO player_tokens (token, player_name, created_at, manager_token) VALUES (?, ?, ?, ?)`
-  ).bind(token, playerName, now(), managerToken).run();
+    `INSERT INTO player_tokens (token, player_name, manager_name, created_at, manager_token) VALUES (?, ?, ?, ?, ?)`
+  ).bind(token, playerName, managerName, now(), managerToken).run();
 
   if (managerToken) await ensureManagerLifecycle(c.env, managerToken);
 
@@ -93,10 +94,11 @@ submissions.post("/games/:gameToken/push", async (c) => {
     fixtures: unknown[];
     jokerEnabled?: boolean;
     managerSuffix?: string | null;
+    managerName?: string | null;
     managerToken?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, managerToken, players } = body ?? {};
+  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, managerName, managerToken, players } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
@@ -127,6 +129,7 @@ submissions.post("/games/:gameToken/push", async (c) => {
   }
 
   const suffix = managerSuffix?.toLowerCase() ?? null;
+  const mgrName = managerName?.trim() ?? null;
 
   if (Array.isArray(players)) {
     for (const p of players) {
@@ -146,6 +149,12 @@ submissions.post("/games/:gameToken/push", async (c) => {
            eligible_team_ids_json = excluded.eligible_team_ids_json,
            manager_suffix = excluded.manager_suffix`
       ).bind(tk, gameToken, pid, eligJson, suffix).run();
+
+      if (mgrName) {
+        await c.env.DB.prepare(
+          `UPDATE player_tokens SET manager_name = ? WHERE token = ?`
+        ).bind(mgrName, tk).run();
+      }
     }
   }
 
@@ -247,7 +256,7 @@ submissions.get("/s/:token", async (c) => {
   const token = c.req.param("token").toLowerCase();
 
   const pt = await c.env.DB.prepare(
-    `SELECT token, player_name, revoked_at FROM player_tokens WHERE token = ?`
+    `SELECT token, player_name, manager_name, revoked_at FROM player_tokens WHERE token = ?`
   ).bind(token).first<any>();
 
   if (!pt) return c.json({ error: "Link not found." }, 404);
@@ -289,7 +298,7 @@ submissions.get("/s/:token", async (c) => {
     return game;
   }));
 
-  return c.json({ playerName: pt.player_name, games });
+  return c.json({ playerName: pt.player_name, managerName: pt.manager_name ?? null, games });
 });
 
 // POST /s/:token/games/:gameToken

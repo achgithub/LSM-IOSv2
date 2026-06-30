@@ -79,11 +79,11 @@ actor SubmissionsClient {
 
     // ── Manager-facing ────────────────────────────────────────────────────────
 
-    func mintLink(playerName: String) async throws -> String {
-        struct Body: Encodable { let playerName: String; let managerToken: String }
+    func mintLink(playerName: String, managerName: String) async throws -> String {
+        struct Body: Encodable { let playerName: String; let managerToken: String; let managerName: String }
         struct Response: Decodable { let token: String }
         var req = try await request(path: "/links", method: "POST")
-        req.httpBody = try encoder.encode(Body(playerName: playerName, managerToken: ManagerToken.current))
+        req.httpBody = try encoder.encode(Body(playerName: playerName, managerToken: ManagerToken.current, managerName: managerName))
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(req)
         return try decoder.decode(Response.self, from: data).token
@@ -105,6 +105,7 @@ actor SubmissionsClient {
         fixtures: [FixturePushItem],
         jokerEnabled: Bool,
         managerSuffix: String?,
+        managerName: String?,
         players: [PlayerPushItem]
     ) async throws {
         struct Body: Encodable {
@@ -114,6 +115,7 @@ actor SubmissionsClient {
             let fixtures: [FixturePushItem]
             let jokerEnabled: Bool
             let managerSuffix: String?
+            let managerName: String?
             let managerToken: String
             let players: [PlayerPushItem]
         }
@@ -124,8 +126,8 @@ actor SubmissionsClient {
         req.httpBody = try encoder.encode(
             Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr,
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
-                 managerSuffix: managerSuffix, managerToken: ManagerToken.current,
-                 players: players)
+                 managerSuffix: managerSuffix, managerName: managerName,
+                 managerToken: ManagerToken.current, players: players)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)

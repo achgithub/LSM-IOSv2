@@ -132,4 +132,3 @@ struct CloudBackupSection: View {
         }
     }
 }
-

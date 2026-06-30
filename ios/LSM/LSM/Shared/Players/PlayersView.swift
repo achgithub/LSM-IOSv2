@@ -19,6 +19,7 @@ struct PlayersView: View {
     @State private var showPaywall = false
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     private var trimmedName: String { newName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedGroup: String { newGroup.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -361,9 +362,10 @@ struct MemberGroupsView: View {
         guard !isMintingLink else { return }
         isMintingLink = true
         let name = member.name
+        let trimmedManagerName = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
             do {
-                let token = try await SubmissionsClient.shared.mintLink(playerName: name)
+                let token = try await SubmissionsClient.shared.mintLink(playerName: name, managerName: trimmedManagerName)
                 member.submissionTokenRaw = token.lowercased()
                 let url = SubmissionsClient.playerLinkURL(token: token)
                 await MainActor.run {

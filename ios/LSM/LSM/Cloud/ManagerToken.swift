@@ -28,11 +28,11 @@ enum ManagerToken {
 
     private static func keychainValue() -> String? {
         let query: [String: Any] = [
-            kSecClass as String:            kSecClassGenericPassword,
-            kSecAttrService as String:      keychainService,
-            kSecAttrAccount as String:      keychainAccount,
-            kSecReturnData as String:       true,
-            kSecMatchLimit as String:       kSecMatchLimitOne,
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
@@ -44,11 +44,11 @@ enum ManagerToken {
     private static func save(_ value: String) {
         guard let data = value.data(using: .utf8) else { return }
         let query: [String: Any] = [
-            kSecClass as String:            kSecClassGenericPassword,
-            kSecAttrService as String:      keychainService,
-            kSecAttrAccount as String:      keychainAccount,
-            kSecAttrAccessible as String:   kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-            kSecValueData as String:        data,
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecValueData as String: data,
         ]
         SecItemDelete(query as CFDictionary) // remove any prior value
         SecItemAdd(query as CFDictionary, nil)
