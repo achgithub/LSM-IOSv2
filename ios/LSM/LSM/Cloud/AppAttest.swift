@@ -117,8 +117,19 @@ actor AppAttestService {
 
     private struct ChallengeResponse: Decodable { let challenge: String }
 
+    /// Returns the scheme+host root of `baseURL`, stripping any path — attest
+    /// routes are mounted at the Worker root (/attest/...), not under /leagues/...
+    private func attestRoot(for baseURL: URL) -> URL {
+        var c = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) ?? URLComponents()
+        c.path = ""
+        c.query = nil
+        c.fragment = nil
+        return c.url ?? baseURL
+    }
+
     private func fetchChallenge(baseURL: URL) async throws -> String {
-        var request = URLRequest(url: baseURL.appendingPathComponent("attest/challenge"))
+        let url = attestRoot(for: baseURL).appendingPathComponent("attest/challenge")
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         let (data, response) = try await URLSession.shared.data(for: request)
         try Self.check(response, data: data)
@@ -126,7 +137,8 @@ actor AppAttestService {
     }
 
     private func register(baseURL: URL, keyId: String, attestation: String, challenge: String) async throws {
-        var request = URLRequest(url: baseURL.appendingPathComponent("attest/register"))
+        let url = attestRoot(for: baseURL).appendingPathComponent("attest/register")
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode([

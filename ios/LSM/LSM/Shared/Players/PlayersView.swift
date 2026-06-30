@@ -19,7 +19,6 @@ struct PlayersView: View {
     @State private var showPaywall = false
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
-    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     private var trimmedName: String { newName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedGroup: String { newGroup.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -260,6 +259,8 @@ struct MemberGroupsView: View {
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
 
     let pwaEnabled: Bool
+
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     @State private var isMintingLink = false
     @State private var pendingRevoke = false

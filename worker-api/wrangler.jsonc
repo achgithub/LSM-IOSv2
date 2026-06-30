@@ -1,0 +1,99 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ── LSM API Authority Worker ──────────────────────────────────────────────
+  // One deployment per region (--env uk | eu | us | asia …).
+  // Each authority owns: App Attest registration, JWT issuance (ES256, 15 min),
+  // manager lifecycle, cloud backup, and the PWA submission queue for its region.
+  //
+  // Sports data shards (worker/) verify JWTs from ANY authority using a shared
+  // public-key map (JWT_PUBLIC_KEYS var on those Workers). Adding a new region:
+  //   1. npx wrangler deploy --env <region>  (from this directory)
+  //   2. Add the new authority's public key to JWT_PUBLIC_KEYS in worker/wrangler.jsonc
+  //   3. Add country codes to storefrontMap in leagues.json
+  //   4. Deploy Pages
+  // No iOS release required, no code changes to any sports shard.
+  //
+  // Secrets per region (set with `wrangler secret put <KEY> --env <region>`):
+  //   UK_ATTEST_CHALLENGE_KEY  — HMAC secret for challenge issuance
+  //   UK_JWT_PRIVATE_KEY       — base64 PKCS8 ECDSA P-256 private key for JWT signing
+  //   UK_ADMIN_TOKEN           — bearer token for admin/ops endpoints
+  //   EU_*                     — same set for each additional region
+
+  "name": "lsm-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-14",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+
+  "env": {
+    "uk": {
+      "name": "lsm-api-uk",
+
+      "workers_dev": true,
+      "routes": [{ "pattern": "api.uk.sportsmanager.site/*", "custom_domain": true }],
+
+      "vars": {
+        "REGION": "uk",
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "production",
+        // Current signing key id — bump to "uk-2026-02" etc. on rotation.
+        // Old JWTs with the previous kid verify fine until their 15-min TTL expires.
+        "JWT_KID": "uk-2026-01",
+        // Public keys for verifying incoming JWTs (the authority verifies its own
+        // tokens on protected routes). JSON: { "<kid>": "<base64 SPKI>" }.
+        // Also maintained in worker/wrangler.jsonc so sports shards can verify.
+        // PLACEHOLDER — replace after keypair generation (see docs/jwt-keygen.md).
+        "JWT_PUBLIC_KEYS": "{}"
+      },
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lsm-api-uk-db",
+          // PLACEHOLDER — create with `wrangler d1 create lsm-api-uk-db` and paste id here.
+          "database_id": "PLACEHOLDER"
+        }
+      ],
+
+      "r2_buckets": [
+        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
+      ]
+    },
+
+    "eu": {
+      "name": "lsm-api-eu",
+
+      "workers_dev": true,
+      "routes": [{ "pattern": "api.eu.sportsmanager.site/*", "custom_domain": true }],
+
+      "vars": {
+        "REGION": "eu",
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "production",
+        "JWT_KID": "eu-2026-01",
+        // PLACEHOLDER — replace after keypair generation.
+        "JWT_PUBLIC_KEYS": "{}"
+      },
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lsm-api-eu-db",
+          // PLACEHOLDER — create with `wrangler d1 create lsm-api-eu-db` and paste id here.
+          "database_id": "PLACEHOLDER"
+        }
+      ],
+
+      "r2_buckets": [
+        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
+      ]
+    }
+  }
+}

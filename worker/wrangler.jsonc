@@ -39,8 +39,11 @@
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
         "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
         "APP_ATTEST_ENV": "production",
-        // Region-wide maintenance window (UK leagues cluster around the same hours).
-        "MAINTENANCE_WINDOW_UTC": "04:00"
+        "MAINTENANCE_WINDOW_UTC": "04:00",
+        // JWT_PUBLIC_KEYS: JSON map of kid → base64 SPKI for every regional authority.
+        // Adding a new region = add its public key here and redeploy. No code change.
+        // PLACEHOLDER — populate after running the authority keypair generation script.
+        "JWT_PUBLIC_KEYS": "{}"
       },
 
       // FOOTBALL_DATA_TOKEN is a SECRET (if this shard runs its own sync):
@@ -86,9 +89,10 @@
         "APP_ATTEST_TEAM_ID": "UD928WR9RR",
         "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
         "APP_ATTEST_ENV": "production",
-        // CET-cluster window (most of these leagues are CET); a single regional
-        // value is a deliberate simplification of v1's per-league windows.
-        "MAINTENANCE_WINDOW_UTC": "02:00"
+        "MAINTENANCE_WINDOW_UTC": "02:00",
+        // Same key map as the uk shard — all sports shards accept tokens from any authority.
+        // PLACEHOLDER — populate after running the authority keypair generation script.
+        "JWT_PUBLIC_KEYS": "{}"
       },
 
       // FOOTBALL_DATA_TOKEN is a SECRET:

@@ -13,7 +13,7 @@ import { regionSecret } from "../auth";
 import { FootballDataProvider } from "../football";
 import { leagueKeys, withFreshness } from "../gate";
 import { buildManifest } from "../manifest";
-import { requireAttestation } from "../middleware/attest";
+import { requireJWT } from "../middleware/jwt";
 import { refreshMatchData, refreshStandings } from "../refresh";
 import { currentSeasonYear, getSeasonPhase } from "../seasonPhase";
 import type { ScoreEntry } from "../types";
@@ -69,7 +69,7 @@ data.get("/leagues/:leagueId/standings", async (c) => {
 });
 
 // Scores — attest-gated, backed by KV cache (same as v1 /scores).
-data.use("/leagues/:leagueId/scores", requireAttestation);
+data.use("/leagues/:leagueId/scores", requireJWT);
 data.get("/leagues/:leagueId/scores", async (c) => {
   const league = c.get("league");
   const keys = leagueKeys(league.id);
@@ -88,7 +88,7 @@ data.get("/leagues/:leagueId/scores", async (c) => {
 });
 
 // Fixtures — attest-gated, co-warmed when scores gate fires.
-data.use("/leagues/:leagueId/fixtures", requireAttestation);
+data.use("/leagues/:leagueId/fixtures", requireJWT);
 data.get("/leagues/:leagueId/fixtures", async (c) => {
   const league = c.get("league");
   const keys = leagueKeys(league.id);

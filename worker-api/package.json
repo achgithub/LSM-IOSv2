@@ -1,0 +1,30 @@
+{
+  "name": "lsm-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LSM regional API authority — App Attest, JWT issuance, lifecycle, backup and submission queue. One deployment per region (--env uk | eu). Sports data shards verify JWTs issued here; adding a region requires no code changes to any shard.",
+  "type": "module",
+  "packageManager": "pnpm@11.2.2",
+  "volta": {
+    "node": "22.22.3",
+    "pnpm": "11.2.2"
+  },
+  "scripts": {
+    "dev": "wrangler dev --env uk",
+    "deploy:uk": "wrangler deploy --env uk",
+    "deploy:eu": "wrangler deploy --env eu",
+    "types": "wrangler types --env uk",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:uk": "wrangler d1 execute lsm-api-uk-db --remote --env uk --file=./schema.sql",
+    "db:migrate:eu": "wrangler d1 execute lsm-api-eu-db --remote --env eu --file=./schema.sql"
+  },
+  "dependencies": {
+    "@levischuck/tiny-cbor": "^0.3.4",
+    "@peculiar/x509": "^1.14.3",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "wrangler": "^4.100.0"
+  }
+}
