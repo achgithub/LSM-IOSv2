@@ -13,8 +13,8 @@ export async function onRequestGet({ params }) {
     start_url: `/s/${token}`,
     scope: "/",
     display: "standalone",
-    background_color: "#0b1d3a",
-    theme_color: "#0b1d3a",
+    background_color: "#0B1220",
+    theme_color: "#0B1220",
     icons: [
       {
         src: "/logo.png",

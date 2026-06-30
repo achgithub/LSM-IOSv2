@@ -10,6 +10,7 @@ const TOKEN_STORAGE_KEY = "lsm.playerSubmissionToken";
 const LARGE_TEXT_STORAGE_KEY = "lsm.largeText";
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+let _activeMode = null;
 let _deferredInstallPrompt = null;
 let _saveStatus = null;
 let _state = null;
@@ -179,6 +180,7 @@ function fixtureKickoff(value) {
 function render(state, token) {
   const root = document.getElementById("content");
   updateSaveLinkAction(token);
+  updateHeroSection(state);
 
   if (state.loading) {
     setContent(root, renderNotice("Loading your link", "Checking what your manager has opened for you."));
@@ -190,12 +192,10 @@ function render(state, token) {
     return;
   }
 
-  const pendingCount = pendingGameCount(state.games ?? []);
-
+  const allGames = state.games ?? [];
   const frag = document.createDocumentFragment();
-  frag.appendChild(renderHero(state, pendingCount));
 
-  if (!state.games || state.games.length === 0) {
+  if (allGames.length === 0) {
     frag.appendChild(renderNotice(
       "No active rounds right now",
       "Check back when your manager opens the next round."
@@ -204,8 +204,9 @@ function render(state, token) {
     return;
   }
 
+  const games = _activeMode ? allGames.filter((g) => g.mode === _activeMode) : allGames;
   const list = el("div", "game-list");
-  for (const game of state.games) {
+  for (const game of games) {
     list.appendChild(renderGame(game, token));
   }
   frag.appendChild(list);
@@ -222,31 +223,46 @@ function pendingGameCount(games, mode = null) {
   return games.filter((game) => (!mode || game.mode === mode) && needsPlayerAction(game)).length;
 }
 
-function renderHero(state, pendingCount) {
-  const games = state.games ?? [];
-  const hero = el("section", "hero-panel");
-  const titleRow = el("div", "hero-title-row");
-  const title = el("h1", null, `Hi ${state.playerName}`);
-  const badge = el("div", pendingCount === 0 ? "pending-badge clear" : "pending-badge",
-    String(pendingCount));
-  badge.setAttribute("role", "status");
-  badge.setAttribute("aria-label", pendingCount === 0
-    ? "No pending submissions"
-    : `${pendingCount} pending submission${pendingCount === 1 ? "" : "s"}`);
-  titleRow.append(title, badge);
+function updateHeroSection(state) {
+  const greetingDiv = document.getElementById("hero-greeting");
+  const modeRow = document.getElementById("mode-row");
 
-  const counts = el("div", "mode-count-row");
-  counts.appendChild(modeCountPill("LMS", pendingGameCount(games, "lms"), "lms"));
-  counts.appendChild(modeCountPill("PRED", pendingGameCount(games, "predictor"), "predictor"));
+  if (greetingDiv) {
+    const children = [];
+    if (state.playerName) {
+      children.push(el("h1", null, `Hi ${state.playerName}`));
+      if (state.managerName) {
+        children.push(el("p", "manager-line muted", `Manager: ${state.managerName}`));
+      }
+    } else {
+      children.push(el("h1", null, state.loading ? "Loading…" : "Last Stand Manager"));
+    }
+    greetingDiv.replaceChildren(...children);
+  }
 
-  hero.append(titleRow, counts);
-  return hero;
+  if (modeRow) {
+    const games = state.games ?? [];
+    const show = !state.loading && !state.error && games.length > 0;
+    modeRow.hidden = !show;
+    if (show) {
+      modeRow.replaceChildren(
+        modePill("LMS", pendingGameCount(games, "lms"), "lms"),
+        modePill("PRED", pendingGameCount(games, "predictor"), "predictor"),
+      );
+    }
+  }
 }
 
-function modeCountPill(label, count, mode) {
-  const pill = el("div", `mode-count-pill ${mode}`);
-  pill.append(el("span", null, label), el("strong", null, String(count)));
+function modePill(label, count, mode) {
+  const pill = el("button", `mode-count-pill ${mode}`);
+  pill.type = "button";
+  pill.setAttribute("aria-pressed", String(_activeMode === mode));
   pill.setAttribute("aria-label", `${label}: ${count} pending`);
+  pill.append(el("span", null, label), el("strong", null, String(count)));
+  pill.addEventListener("click", () => {
+    _activeMode = _activeMode === mode ? null : mode;
+    render(_state, _token);
+  });
   return pill;
 }
 
