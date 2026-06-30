@@ -1,5 +1,5 @@
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const WORKER_BASE = "https://lsm-uk-worker.sportsmanager.workers.dev";
+const WORKER_BASE = "https://api.uk.sportsmanager.site";
 
 export async function onRequestGet({ params }) {
   const token = String(params.token ?? "").toLowerCase();

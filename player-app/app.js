@@ -5,7 +5,7 @@
 // POST to /s/:token/games/:gameToken to submit. Nothing here writes a real
 // pick/prediction - the manager approves in the LSM app.
 
-const API_BASE = "https://lsm-uk-worker.sportsmanager.workers.dev";
+const API_BASE = "https://api.uk.sportsmanager.site";
 const TOKEN_STORAGE_KEY = "lsm.playerSubmissionToken";
 const LARGE_TEXT_STORAGE_KEY = "lsm.largeText";
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
