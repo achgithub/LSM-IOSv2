@@ -35,7 +35,7 @@
       "name": "lsm-api-uk",
 
       "workers_dev": true,
-      "routes": [{ "pattern": "api.uk.sportsmanager.site/*", "custom_domain": true }],
+      "routes": [{ "pattern": "api.uk.sportsmanager.site", "custom_domain": true }],
 
       "vars": {
         "REGION": "uk",
@@ -48,16 +48,14 @@
         // Public keys for verifying incoming JWTs (the authority verifies its own
         // tokens on protected routes). JSON: { "<kid>": "<base64 SPKI>" }.
         // Also maintained in worker/wrangler.jsonc so sports shards can verify.
-        // PLACEHOLDER — replace after keypair generation (see docs/jwt-keygen.md).
-        "JWT_PUBLIC_KEYS": "{}"
+        "JWT_PUBLIC_KEYS": "{\"uk-2026-01\": \"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEreBcUI2zrxwU0tbhW6MyUcuGa/LlH9eW77tje7Wh/rpV03oCkfXGiYQY7CTzxZErnTLpBARh9dXWdZHKTXep3A==\"}"
       },
 
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "lsm-api-uk-db",
-          // PLACEHOLDER — create with `wrangler d1 create lsm-api-uk-db` and paste id here.
-          "database_id": "PLACEHOLDER"
+            "database_id": "7f2ac085-fafc-4da0-b728-a717b4cd9bd5"
         }
       ],
 
@@ -70,7 +68,7 @@
       "name": "lsm-api-eu",
 
       "workers_dev": true,
-      "routes": [{ "pattern": "api.eu.sportsmanager.site/*", "custom_domain": true }],
+      "routes": [{ "pattern": "api.eu.sportsmanager.site", "custom_domain": true }],
 
       "vars": {
         "REGION": "eu",

@@ -31,26 +31,21 @@ app.get("/health", async (c) => {
 
 // ── Public ────────────────────────────────────────────────────────────────────
 
-// Attest enrolment + JWT issuance. All three endpoints are intentionally public
-// (the challenge + register flow is how a client becomes trusted; assert
-// verifies the assertion itself before issuing the token).
+// Attest enrolment + JWT issuance.
 app.route("/attest", attest);
 
-// Player PWA — browser-initiated, cannot carry attest headers.
-// /s/:token         GET  — load game list for this player
-// /s/:token/games/* POST — submit a pick/prediction
-app.route("/", submissions);
-
 // ── JWT-gated ─────────────────────────────────────────────────────────────────
-// Everything below requires a valid Bearer JWT issued by POST /attest/assert.
+// Middleware registered before any route mount so every matching path is covered.
+// /s/* and /s/:token/games/* are deliberately absent — player PWA is browser-only.
 
-app.use("/links/*", requireJWT);
 app.use("/links", requireJWT);
+app.use("/links/*", requireJWT);
 app.use("/games/*", requireJWT);
 app.use("/backup/*", requireJWT);
 app.use("/manager/*", requireJWT);
 
-app.route("/", submissions);   // /links, /links/:token/revoke, /games/* manager routes
+// Single submissions mount after middleware — /s/* stays public, everything else gated.
+app.route("/", submissions);
 app.route("/backup", backup);
 app.route("/manager", manager);
 app.route("/manager", migrate); // /manager/export, /manager/import

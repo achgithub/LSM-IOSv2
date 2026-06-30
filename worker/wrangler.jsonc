@@ -43,7 +43,7 @@
         // JWT_PUBLIC_KEYS: JSON map of kid → base64 SPKI for every regional authority.
         // Adding a new region = add its public key here and redeploy. No code change.
         // PLACEHOLDER — populate after running the authority keypair generation script.
-        "JWT_PUBLIC_KEYS": "{}"
+        "JWT_PUBLIC_KEYS": "{\"uk-2026-01\": \"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEreBcUI2zrxwU0tbhW6MyUcuGa/LlH9eW77tje7Wh/rpV03oCkfXGiYQY7CTzxZErnTLpBARh9dXWdZHKTXep3A==\"}"
       },
 
       // FOOTBALL_DATA_TOKEN is a SECRET (if this shard runs its own sync):
@@ -92,7 +92,7 @@
         "MAINTENANCE_WINDOW_UTC": "02:00",
         // Same key map as the uk shard — all sports shards accept tokens from any authority.
         // PLACEHOLDER — populate after running the authority keypair generation script.
-        "JWT_PUBLIC_KEYS": "{}"
+        "JWT_PUBLIC_KEYS": "{\"uk-2026-01\": \"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEreBcUI2zrxwU0tbhW6MyUcuGa/LlH9eW77tje7Wh/rpV03oCkfXGiYQY7CTzxZErnTLpBARh9dXWdZHKTXep3A==\"}"
       },
 
       // FOOTBALL_DATA_TOKEN is a SECRET:
