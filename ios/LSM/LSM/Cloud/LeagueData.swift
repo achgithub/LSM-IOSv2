@@ -42,11 +42,22 @@ struct LeagueData {
 
         // 1–3 leagues typically, so a sequential merge is fine.
         for league in targets {
-            let teams = try await cachedTeams(for: league)
+            var teams = try await cachedTeams(for: league)
             let (matchItems, matchDate) = cachedMatches(for: league)
-            matches.append(contentsOf: matchItems)
             let (rows, date) = cachedStandings(for: league)
 
+            // After promotion/relegation the server has new team IDs before
+            // our 7-day cache expires. If any match or standing references an
+            // unknown team, bypass the TTL and re-fetch immediately so names
+            // resolve correctly instead of falling back to "Team 60" etc.
+            let knownIds = Set(teams.map { $0.externalId })
+            let referencedIds = Set(matchItems.flatMap { [$0.homeTeamId, $0.awayTeamId] } + rows.map { $0.teamId })
+            if !referencedIds.subtracting(knownIds).isEmpty {
+                let key = LeagueDataCache.teamsKey(league.id)
+                teams = (try? await fetchTeams(league, key: key, fallback: teams)) ?? teams
+            }
+
+            matches.append(contentsOf: matchItems)
             for team in teams {
                 teamsById[team.externalId] = team
                 teamsCountByTeam[team.externalId] = league.teamsCount
