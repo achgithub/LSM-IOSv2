@@ -65,6 +65,7 @@ struct RootTabView: View {
             #if DEBUG
             DemoRosterSeeder.seedIfNeeded(context: context)
             DemoPredictorSeeder.seedIfNeeded(context: context)
+            await UITestPWAScenarioSeeder.seedIfRequested(context: context, entitlements: entitlements)
             #endif
             PurchaseService.shared.configure()
             // Skip ad bootstrap under UI tests so the ATT / UMP consent dialogs

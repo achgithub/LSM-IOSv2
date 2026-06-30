@@ -12,9 +12,9 @@ The PWA must handle:
 - LMS submissions.
 - Predictor submissions.
 - Future game modes.
-- Players who are in games run by more than one manager.
 
-There is also a related non-PWA Predictor published league / recent matchday page that should eventually share the same compact branding.
+
+There is also a related non-PWA Predictor published league / recent matchday page that should eventually share the same branding (web first, mobile responsive).
 
 ## Locked Branding
 
@@ -93,7 +93,7 @@ Technical note:
 
 ## LMS Behaviour
 
-Use a dropdown, not 20 large buttons.
+Use a dropdown, not multiple large buttons. In a blended league there could be 40+ teams
 
 LMS card:
 
@@ -116,7 +116,7 @@ Do not use a dropdown. Use a compact scrollable fixture section.
 
 Predictor card:
 
-- Header row 1: `PRED` and status pill.
+- Header row 1: `PRE` and status pill.
 - Header row 2: `Matchday 5 · Fri 9 Aug 19:45`.
 - Body:
   - Scrollable list of 10 fixtures.
@@ -220,7 +220,7 @@ This is a simplified target shape for the compact PWA. It is not meant to be a f
   <article class="game-card mode-predictor">
     <header class="game-head">
       <div class="card-topline">
-        <p class="eyebrow">PRED</p>
+        <p class="eyebrow">PRE</p>
         <span class="card-status status-action">Needs action</span>
       </div>
       <h2>Matchday 5 · Fri 9 Aug 19:45</h2>
@@ -303,5 +303,5 @@ Avoid:
 - Joker `J` is accessible and toggles correctly.
 - Status is clear: red needs action, amber submitted, green approved.
 - No team crests/badges/logos appear.
-- Published Predictor page still respects CSP and PIN unlock flow.
+- Published Predictor page still respects CSP and PIN unlock flow, is primarily intened for desktop, and needs to be responsive for small screens.
 
