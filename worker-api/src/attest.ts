@@ -357,15 +357,19 @@ export async function verifyAssertion(
   const authenticatorData = getBytes(decoded, "authenticatorData");
 
   const clientDataHash = await sha256(new TextEncoder().encode(challenge));
-  // Apple signs nonce = SHA256(authenticatorData || clientDataHash). We let
-  // WebCrypto's ECDSA+SHA-256 hash the pre-image, which yields that same nonce.
-  const signedData = concatBytes(authenticatorData, clientDataHash);
+  // Apple's Secure Enclave uses ECDSA-SHA256 to sign SHA256(authData || clientDataHash).
+  // ECDSA-SHA256 applies its own SHA256 to whatever you pass it, so the SE effectively
+  // signs SHA256(SHA256(authData || clientDataHash)).
+  // WebCrypto verify({ hash: "SHA-256" }) also applies SHA256 to its `data` argument,
+  // so we pass the pre-computed SHA256(authData || clientDataHash) and let WebCrypto
+  // apply the final hash — matching what the SE signed. Confirmed empirically.
+  const innerHash = await sha256(concatBytes(authenticatorData, clientDataHash));
   const key = await importVerifyKey(b64ToBytes(storedPublicKeyB64));
   const ok = await crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
     key,
     derToRawSignature(signature),
-    signedData,
+    innerHash,
   );
   if (!ok) throw new Error("assertion signature invalid");
 
