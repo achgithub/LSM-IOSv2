@@ -295,6 +295,42 @@ final class LMSSmokeUITests: XCTestCase {
         openSubmissionQueue(app, gameName: predictorName, playerNames: playerNames, screenshotName: "PWA-Predictor-Queue")
     }
 
+    /// Players tab smoke: add a player, confirm the new lean list (search +
+    /// filters visible, row renders), then open the detail screen and confirm
+    /// the header/groups/remove sections render without crashing.
+    @MainActor
+    func testPlayersListAndDetailRender() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        completeOnboardingIfNeeded(app)
+
+        XCTAssertTrue(app.tabBars.buttons["Players"].waitForExistence(timeout: 15), "Players tab never appeared")
+        app.tabBars.buttons["Players"].tap()
+
+        XCTAssertTrue(app.navigationBars["Players"].waitForExistence(timeout: 10), "Players screen did not open")
+        XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 10), "Search field missing from Players list")
+
+        let playerName = "UITest Player \(UUID().uuidString.prefix(6))"
+        app.navigationBars.buttons["Add player"].tap()
+        let nameField = app.alerts.textFields.firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Add player alert never appeared")
+        nameField.tap()
+        nameField.typeText(playerName)
+        app.alerts.buttons["Add"].tap()
+        attachScreenshot(named: "PlayersList")
+
+        let row = app.staticTexts[playerName]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "New player never appeared in the list")
+        row.tap()
+
+        XCTAssertTrue(app.navigationBars[playerName].waitForExistence(timeout: 10), "Player detail screen never opened")
+        XCTAssertTrue(app.staticTexts["Not in any groups yet."].waitForExistence(timeout: 5), "Groups section missing")
+        XCTAssertTrue(app.buttons["Remove Player"].waitForExistence(timeout: 5), "Remove Player action missing")
+        attachScreenshot(named: "PlayerDetail")
+    }
+
     private func attachScreenshot(named name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)

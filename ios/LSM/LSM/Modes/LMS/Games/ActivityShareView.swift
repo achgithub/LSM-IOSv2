@@ -15,11 +15,24 @@ struct PlayerLinkShareItem: Identifiable {
     let url: URL
     var id: String { url.absoluteString }
 
+    /// Three separate items, not one string with the URL pasted in — a bare
+    /// UUID link embedded in a paragraph reads as suspicious to less
+    /// tech-savvy players, and burying the URL in text stops Messages/WhatsApp
+    /// from rendering their own rich link preview. Sharing the URL as its own
+    /// `URL` value gets that preview back; the branded card image (with a QR
+    /// code as a face-to-face bonus, see `PlayerLinkCardView`) gives it visual
+    /// trust context, especially useful for a bare AirDrop with no chat UI.
     var shareItems: [Any] {
-        let message = "Hi \(playerName), here's your personal link to submit your pick. "
-            + "Save it as a bookmark or add it to your home screen so you can find it each week:"
-            + "\n\(url.absoluteString)"
-        return [message]
+        var items: [Any] = []
+        let renderer = ImageRenderer(content: PlayerLinkCardView(playerName: playerName, url: url))
+        renderer.scale = 3.0
+        if let image = renderer.uiImage {
+            items.append(image)
+        }
+        items.append("Hi \(playerName) 👋 Here's your personal link to submit your picks. "
+            + "Save it as a bookmark or add it to your Home Screen so you can find it each week.")
+        items.append(url)
+        return items
     }
 }
 

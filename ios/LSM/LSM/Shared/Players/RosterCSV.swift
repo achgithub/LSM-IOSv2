@@ -24,4 +24,20 @@ nonisolated enum RosterCSV {
             return Row(name: name, group: group)
         }
     }
+
+    /// Serialize members back to the same `Name` / `Name, Group` format `parse`
+    /// reads. A member in multiple groups produces one row per group (mirrors
+    /// how `parse` + import actually assign group membership); a member in no
+    /// groups produces a single bare-name row. Round-trips name+group-membership
+    /// losslessly; other fields (createdAt, token) were never carried by this
+    /// format, on either side.
+    static func serialize(_ members: [RosterMember]) -> String {
+        members
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .flatMap { member -> [String] in
+                let groupNames = member.groups.map(\.name).sorted()
+                return groupNames.isEmpty ? [member.name] : groupNames.map { "\(member.name), \($0)" }
+            }
+            .joined(separator: "\n")
+    }
 }

@@ -105,6 +105,8 @@ struct SettingsView: View {
 
                 CloudBackupSection()
 
+                RosterManagementSection()
+
                 leagueSection
 
                 Section {

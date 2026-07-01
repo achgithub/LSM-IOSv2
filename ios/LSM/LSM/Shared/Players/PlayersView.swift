@@ -1,146 +1,135 @@
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
+import UIKit
 
-/// The reusable player roster and groups hub (the second tab). Create players,
-/// import them from CSV, and organise them into groups. Adding people to a game
-/// happens inside the game (Games → Add Players), pulling from this roster.
+/// The reusable player roster hub (the second tab): browse, search, and filter
+/// your players. Adding people to a game happens inside the game (Games → Add
+/// Players), pulling from this roster. Roster administration — turning on
+/// player links, creating/renaming/deleting groups, CSV import/export — lives
+/// in Settings (`RosterManagementSection`) so this screen stays a lean list.
 struct PlayersView: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
     @Query(sort: \RosterMember.name) private var members: [RosterMember]
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
 
-    @State private var newName = ""
-    @State private var newGroup = ""
-    @State private var importing = false
-    @State private var importGroupId: UUID?
-    @State private var message: String?
-    @State private var showPaywall = false
-
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
 
-    private var trimmedName: String { newName.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedGroup: String { newGroup.trimmingCharacters(in: .whitespacesAndNewlines) }
+    @State private var searchText = ""
+    @State private var groupFilter: UUID?
+    @State private var linkFilter: LinkFilter = .all
+    @State private var showAddPlayerAlert = false
+    @State private var newPlayerName = ""
+
+    private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
+
+    private var filteredMembers: [RosterMember] {
+        members.filter { member in
+            (searchText.isEmpty || member.name.localizedCaseInsensitiveContains(searchText))
+                && (groupFilter == nil || member.groups.contains { $0.id == groupFilter })
+                && (!pwaEnabled || linkFilter == .all
+                    || (linkFilter == .active) == (member.submissionTokenRaw != nil))
+        }
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    if entitlements.canUseCloud {
-                        Toggle("Player submission links", isOn: $pwaSubmissionsEnabled)
-                    } else {
-                        Button("Unlock Player Submission Links") { showPaywall = true }
-                    }
-                } header: {
-                    Text("PWA Submissions")
-                } footer: {
-                    Text(entitlements.canUseCloud
-                         // swiftlint:disable:next line_length
-                         ? "When on, you can share a personal link with each player so they can submit picks themselves. You review and approve before anything goes live."
-                         : "Share a personal link with each player so they can submit picks from their phone. Requires the Cloud Bundle.")
+                filterSection
+                playersSection
+                infoSection
+            }
+            .appBackground()
+            .navigationTitle("Players")
+            .searchable(text: $searchText, prompt: "Search players...")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showAddPlayerAlert = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Add player")
                 }
-
-                Section("Add a player") {
-                    HStack {
-                        TextField("Player name", text: $newName)
-                            .onSubmit(addMember)
-                        Button("Add", action: addMember)
-                            .disabled(trimmedName.isEmpty || isDuplicateMember(trimmedName))
-                    }
-                    if isDuplicateMember(trimmedName) {
-                        Text("'\(trimmedName)' is already in your players.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                ToolbarItem(placement: .primaryAction) {
+                    if !members.isEmpty { EditButton() }
                 }
+            }
+            .alert("Add player", isPresented: $showAddPlayerAlert) {
+                TextField("Player name", text: $newPlayerName)
+                Button("Add", action: addMember)
+                    .disabled(trimmedNewName.isEmpty || isDuplicateMember(trimmedNewName))
+                Button("Cancel", role: .cancel) { newPlayerName = "" }
+            }
+        }
+    }
 
-                Section("Import") {
+    @ViewBuilder
+    private var filterSection: some View {
+        if !groups.isEmpty || pwaEnabled {
+            Section {
+                HStack {
                     if !groups.isEmpty {
-                        Picker("Import into group", selection: $importGroupId) {
-                            Text("No group").tag(UUID?.none)
+                        Picker("Group", selection: $groupFilter) {
+                            Text("All Groups").tag(UUID?.none)
                             ForEach(groups) { group in
                                 Text(group.name).tag(UUID?.some(group.id))
                             }
                         }
                     }
-                    Button { importing = true } label: {
-                        Label("Import CSV", systemImage: "doc.text")
-                    }
-                    // Single localized string key — can't wrap without changing the key.
-                    // swiftlint:disable:next line_length
-                    Text("One name per row. Add a group with `Name, Group`. Rows without one go to the selected import group above. `Name, Email` still works (email ignored).")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                if let message {
-                    Section { Text(message).font(.caption) }
-                }
-
-                Section("Groups (\(groups.count))") {
-                    HStack {
-                        TextField("New group name", text: $newGroup)
-                            .onSubmit(addGroup)
-                        Button("Add", action: addGroup)
-                            .disabled(trimmedGroup.isEmpty || isDuplicateGroup(trimmedGroup))
-                    }
-                    ForEach(groups) { group in
-                        HStack {
-                            Text(group.name)
-                            Spacer()
-                            Text("\(group.members.count)").foregroundStyle(.secondary)
+                    if pwaEnabled {
+                        Picker("Link status", selection: $linkFilter) {
+                            ForEach(LinkFilter.allCases) { Text($0.label).tag($0) }
                         }
                     }
-                    .onDelete(perform: deleteGroups)
                 }
-
-                Section("Your players (\(members.count))") {
-                    if members.isEmpty {
-                        Text("No saved players yet. Add people here, then add them to a game.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        ForEach(members) { member in
-                            NavigationLink {
-                                MemberGroupsView(member: member, pwaEnabled: entitlements.canUseCloud && pwaSubmissionsEnabled)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(member.name)
-                                        if !member.groups.isEmpty {
-                                            Text(member.groups.map(\.name).sorted().joined(separator: ", "))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    Spacer()
-                                    if entitlements.canUseCloud && pwaSubmissionsEnabled,
-                                       member.submissionTokenRaw != nil {
-                                        Image(systemName: "link")
-                                            .font(.caption)
-                                            .foregroundStyle(.blue)
-                                    }
-                                }
-                            }
-                        }
-                        .onDelete(perform: deleteMembers)
-                    }
-                }
-            }
-            .appBackground()
-            .navigationTitle("Players")
-            .toolbar { if !members.isEmpty { EditButton() } }
-            .fileImporter(
-                isPresented: $importing,
-                allowedContentTypes: [.commaSeparatedText, .plainText],
-                allowsMultipleSelection: false
-            ) { result in
-                handleImport(result)
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
+                .pickerStyle(.menu)
             }
         }
     }
 
-    // MARK: Members
+    @ViewBuilder
+    private var playersSection: some View {
+        Section {
+            if members.isEmpty {
+                Text("No saved players yet. Add people here, then add them to a game.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if filteredMembers.isEmpty {
+                Text("No players match.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(filteredMembers) { member in
+                    NavigationLink {
+                        PlayerDetailView(member: member, pwaEnabled: pwaEnabled)
+                    } label: {
+                        playerRow(member)
+                    }
+                }
+                .onDelete(perform: deleteMembers)
+            }
+        } header: {
+            Text("\(filteredMembers.count) player\(filteredMembers.count == 1 ? "" : "s")")
+        }
+    }
+
+    private func playerRow(_ member: RosterMember) -> some View {
+        HStack {
+            Text(member.name)
+            Spacer()
+            if pwaEnabled {
+                Image(systemName: member.submissionTokenRaw != nil ? "link" : "plus.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var infoSection: some View {
+        Section {
+            Text(pwaEnabled
+                 ? "Give each player a private link so they can submit picks themselves. You approve before it goes live."
+                 : "Turn on player links in Settings to share a personal submission link with each player.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var trimmedNewName: String { newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func isDuplicateMember(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
@@ -148,124 +137,45 @@ struct PlayersView: View {
     }
 
     private func addMember() {
-        let name = trimmedName
+        let name = trimmedNewName
         guard !name.isEmpty, !isDuplicateMember(name) else { return }
         context.insert(RosterMember(name: name))
-        newName = ""
-        message = nil
+        newPlayerName = ""
     }
 
     private func deleteMembers(at offsets: IndexSet) {
-        for index in offsets { context.delete(members[index]) }
-    }
-
-    // MARK: Groups
-
-    private func isDuplicateGroup(_ name: String) -> Bool {
-        guard !name.isEmpty else { return false }
-        return groups.contains { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
-    }
-
-    private func addGroup() {
-        let name = trimmedGroup
-        guard !name.isEmpty, !isDuplicateGroup(name) else { return }
-        context.insert(PlayerGroup(name: name))
-        newGroup = ""
-    }
-
-    private func deleteGroups(at offsets: IndexSet) {
-        for index in offsets { context.delete(groups[index]) }
-    }
-
-    // MARK: CSV import
-
-    private func handleImport(_ result: Result<[URL], Error>) {
-        switch result {
-        case .failure(let error):
-            message = AppString("Import failed: \(error.localizedDescription)")
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            do {
-                let text = try String(contentsOf: url, encoding: .utf8)
-                importRows(RosterCSV.parse(text))
-            } catch {
-                message = AppString("Couldn't read file: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    /// Insert new (case-insensitively unique) members, resolve/create groups on
-    /// the fly, and assign each member to its per-row group or the fallback.
-    private func importRows(_ rows: [RosterCSV.Row]) {
-        var membersByName = Dictionary(members.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
-        var groupsByName = Dictionary(groups.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
-        let fallbackGroupName = importGroupId.flatMap { id in groups.first { $0.id == id }?.name }
-
-        func resolveGroup(_ name: String) -> PlayerGroup {
-            let key = name.lowercased()
-            if let existing = groupsByName[key] { return existing }
-            let created = PlayerGroup(name: name)
-            context.insert(created)
-            groupsByName[key] = created
-            return created
-        }
-
-        var added = 0, skipped = 0, assigned = 0
-        for row in rows {
-            let key = row.name.lowercased()
-            let member: RosterMember
-            if let existing = membersByName[key] {
-                member = existing
-                skipped += 1
-            } else {
-                member = RosterMember(name: row.name)
-                context.insert(member)
-                membersByName[key] = member
-                added += 1
-            }
-
-            if let groupName = row.group ?? fallbackGroupName {
-                let group = resolveGroup(groupName)
-                if !member.groups.contains(where: { $0.id == group.id }) {
-                    member.groups.append(group)
-                    assigned += 1
-                }
-            }
-        }
-
-        var parts = [added == 1
-                     ? AppString("Imported 1 new player")
-                     : AppString("Imported \(added) new players")]
-        if skipped > 0 {
-            parts.append(skipped == 1
-                         ? AppString("1 already existed")
-                         : AppString("\(skipped) already existed"))
-        }
-        if assigned > 0 {
-            parts.append(assigned == 1
-                         ? AppString("1 group assignment")
-                         : AppString("\(assigned) group assignments"))
-        }
-        // List separator is locale-aware; the parts are full clauses per language.
-        message = parts.joined(separator: ", ") + "."
+        for index in offsets { RosterMemberLifecycleService.delete(members[index], context: context) }
     }
 }
 
-/// Toggle which groups a roster member belongs to, and manage their submission link.
-struct MemberGroupsView: View {
+private enum LinkFilter: String, CaseIterable, Identifiable {
+    case all, active, none
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .all: return "All Players"
+        case .active: return "Has Link"
+        case .none: return "No Link"
+        }
+    }
+}
+
+/// One player's detail: link status, the submission link itself, and their
+/// groups. Group membership editing and group creation/rename/delete live
+/// elsewhere now (a sheet here, Settings for the latter).
+struct PlayerDetailView: View {
     @Bindable var member: RosterMember
-    @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     let pwaEnabled: Bool
 
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
-    @State private var isMintingLink = false
-    @State private var pendingRevoke = false
+    @State private var linkOp: LinkOpState = .idle
     @State private var linkShareItem: PlayerLinkShareItem?
-    @State private var mintError: String?
+    @State private var showGroupEditor = false
+    @State private var pendingRemove = false
 
     private var linkURL: URL? {
         member.submissionToken.map { SubmissionsClient.playerLinkURL(token: $0.uuidString) }
@@ -273,9 +183,232 @@ struct MemberGroupsView: View {
 
     var body: some View {
         List {
-            Section("Groups") {
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(member.name).font(.headline)
+                    if pwaEnabled {
+                        if linkURL != nil {
+                            Label("Link active", systemImage: "link")
+                                .font(.subheadline)
+                                .foregroundStyle(.green)
+                        } else {
+                            Text("No link").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("Created \(member.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+
+            if pwaEnabled {
+                Section {
+                    linkSectionContent
+                } header: {
+                    Text("Submission Link")
+                } footer: {
+                    if showMintFooter {
+                        Text("Mint a personal link for this player. One link works across all their games.")
+                    }
+                }
+
+                if linkURL != nil {
+                    Section {
+                        Button {
+                            guard let url = linkURL else { return }
+                            linkShareItem = PlayerLinkShareItem(playerName: member.name, url: url)
+                        } label: {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(isBusy)
+
+                        Button {
+                            regenerateLink()
+                        } label: {
+                            Label("Regenerate Link", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .disabled(isBusy)
+                    }
+                }
+            }
+
+            Section {
+                if member.groups.isEmpty {
+                    Text("Not in any groups yet.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(member.groups.sorted { $0.name < $1.name }) { group in
+                        Text(group.name)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Groups")
+                    Spacer()
+                    Button("Edit") { showGroupEditor = true }
+                        .font(.caption)
+                }
+            }
+
+            Section {
+                Button(role: .destructive) { pendingRemove = true } label: {
+                    Text("Remove Player")
+                }
+            }
+        }
+        .navigationTitle(member.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $linkShareItem) { item in
+            ActivityShareView(items: item.shareItems)
+        }
+        .sheet(isPresented: $showGroupEditor) {
+            GroupMembershipEditorView(member: member)
+        }
+        .confirmationDialog(
+            "Remove \(member.name)?",
+            isPresented: $pendingRemove,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                RosterMemberLifecycleService.delete(member, context: context)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This also deactivates their submission link, if they have one.")
+        }
+    }
+
+    private var isBusy: Bool {
+        switch linkOp {
+        case .revoking, .minting: return true
+        case .idle, .error: return false
+        }
+    }
+
+    private var showMintFooter: Bool {
+        guard linkURL == nil else { return false }
+        if case .idle = linkOp { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var linkSectionContent: some View {
+        if let url = linkURL {
+            HStack {
+                Text(url.absoluteString)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button {
+                    UIPasteboard.general.string = url.absoluteString
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+                .font(.caption)
+                .buttonStyle(.borderless)
+            }
+        }
+        switch linkOp {
+        case .revoking:
+            HStack { ProgressView(); Text("Deactivating old link…").foregroundStyle(.secondary) }
+        case .minting:
+            HStack { ProgressView(); Text("Getting link…").foregroundStyle(.secondary) }
+        case .error(let message):
+            Text(message).font(.caption).foregroundStyle(.red)
+            if linkURL == nil {
+                Button { mintLink() } label: {
+                    Label("Get Submission Link", systemImage: "link.badge.plus")
+                }
+            }
+        case .idle:
+            if linkURL == nil {
+                Button { mintLink() } label: {
+                    Label("Get Submission Link", systemImage: "link.badge.plus")
+                }
+            }
+        }
+    }
+
+    private func mintLink() {
+        guard !isBusy else { return }
+        linkOp = .minting
+        let name = member.name
+        let trimmedManagerName = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            do {
+                let token = try await SubmissionsClient.shared.mintLink(playerName: name, managerName: trimmedManagerName)
+                await MainActor.run {
+                    member.submissionTokenRaw = token.lowercased()
+                    linkOp = .idle
+                }
+            } catch let error as APIError {
+                await MainActor.run {
+                    if case .badStatus(409, _) = error {
+                        linkOp = .error("A link already exists for this player on another device. Revoke it there first, or ask your manager.")
+                    } else {
+                        linkOp = .error("Couldn't get a link. Try again.")
+                    }
+                }
+            } catch {
+                await MainActor.run { linkOp = .error("Couldn't get a link. Try again.") }
+            }
+        }
+    }
+
+    /// Revoke the old token, then mint a fresh one — properly sequenced (not
+    /// fire-and-forget) so a failed mint after a successful revoke is reported
+    /// distinctly rather than silently leaving the player linkless.
+    private func regenerateLink() {
+        guard !isBusy, let oldToken = member.submissionTokenRaw else { return }
+        linkOp = .revoking
+        let name = member.name
+        let trimmedManagerName = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            do {
+                try await SubmissionsClient.shared.revokeLink(token: oldToken)
+            } catch {
+                await MainActor.run {
+                    linkOp = .error("Couldn't create a new link — the old one is still active. Try again.")
+                }
+                return
+            }
+            await MainActor.run { member.submissionTokenRaw = nil }
+            do {
+                let newToken = try await SubmissionsClient.shared.mintLink(playerName: name, managerName: trimmedManagerName)
+                await MainActor.run {
+                    member.submissionTokenRaw = newToken.lowercased()
+                    linkOp = .idle
+                }
+            } catch {
+                await MainActor.run {
+                    linkOp = .error("The old link stopped working, but we couldn't create a new one. Tap Get Submission Link to try again.")
+                }
+            }
+        }
+    }
+}
+
+private enum LinkOpState: Equatable {
+    case idle
+    case revoking
+    case minting
+    case error(String)
+}
+
+/// Toggle which groups a player belongs to — presented as a sheet from the
+/// player detail's Groups section.
+private struct GroupMembershipEditorView: View {
+    @Bindable var member: RosterMember
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
+
+    var body: some View {
+        NavigationStack {
+            List {
                 if groups.isEmpty {
-                    Text("No groups yet — create one on the Players screen.")
+                    Text("No groups yet — create one in Settings.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(groups) { group in
@@ -293,57 +426,13 @@ struct MemberGroupsView: View {
                     }
                 }
             }
-
-            if pwaEnabled {
-                Section {
-                    if let url = linkURL {
-                        Button {
-                            linkShareItem = PlayerLinkShareItem(playerName: member.name, url: url)
-                        } label: {
-                            Label("Share Link", systemImage: "square.and.arrow.up")
-                        }
-                        Button(role: .destructive) { pendingRevoke = true } label: {
-                            Label("Revoke Link", systemImage: "link.badge.minus")
-                        }
-                    } else if isMintingLink {
-                        HStack {
-                            ProgressView()
-                            Text("Getting link…").foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Button {
-                            mintError = nil
-                            mintLink()
-                        } label: {
-                            Label("Get Submission Link", systemImage: "link.badge.plus")
-                        }
-                        if let mintError {
-                            Text(mintError).font(.caption).foregroundStyle(.red)
-                        }
-                    }
-                } header: {
-                    Text("Submission Link")
-                } footer: {
-                    Text(linkURL != nil
-                         ? "This player's personal link. Share it so they can submit picks from their phone."
-                         : "Mint a personal link for this player. One link works across all their games.")
+            .navigationTitle("Groups")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
-        }
-        .navigationTitle(member.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $linkShareItem) { item in
-            ActivityShareView(items: item.shareItems)
-        }
-        .confirmationDialog(
-            "Revoke link for \(member.name)?",
-            isPresented: $pendingRevoke,
-            titleVisibility: .visible
-        ) {
-            Button("Revoke", role: .destructive) { revokeLink() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The link stops working in all their games immediately. You can mint a new one at any time.")
         }
     }
 
@@ -357,44 +446,5 @@ struct MemberGroupsView: View {
         } else {
             member.groups.append(group)
         }
-    }
-
-    private func mintLink() {
-        guard !isMintingLink else { return }
-        isMintingLink = true
-        let name = member.name
-        let trimmedManagerName = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task {
-            do {
-                let token = try await SubmissionsClient.shared.mintLink(playerName: name, managerName: trimmedManagerName)
-                member.submissionTokenRaw = token.lowercased()
-                let url = SubmissionsClient.playerLinkURL(token: token)
-                await MainActor.run {
-                    isMintingLink = false
-                    linkShareItem = PlayerLinkShareItem(playerName: name, url: url)
-                }
-            } catch let error as APIError {
-                await MainActor.run {
-                    isMintingLink = false
-                    if case .badStatus(409, _) = error {
-                        mintError = "A link already exists for this player on another device. Revoke it there first, or ask your manager."
-                    } else {
-                        mintError = "Couldn't get a link. Try again."
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isMintingLink = false
-                    mintError = "Couldn't get a link. Try again."
-                }
-            }
-        }
-    }
-
-    private func revokeLink() {
-        guard let token = member.submissionTokenRaw else { return }
-        member.submissionTokenRaw = nil
-        let t = token
-        Task { try? await SubmissionsClient.shared.revokeLink(token: t) }
     }
 }
