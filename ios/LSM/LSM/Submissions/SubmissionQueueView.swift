@@ -214,11 +214,22 @@ private struct SubmissionRow: View {
 private struct StatusBadge: View {
     let status: String
     var body: some View {
-        Text(status.capitalized)
+        Text(label)
             .font(.caption2).fontWeight(.semibold)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(color.opacity(0.15), in: Capsule())
             .foregroundStyle(color)
+    }
+    /// `status.capitalized` on the raw API value ("pending"/"approved"/
+    /// "rejected") never localizes — `Text(String)` only localizes literals.
+    /// Route through `AppString` like the model-layer `.label` computed
+    /// properties do (`GameStatus.label`, `PlayerStatus.label`, etc.).
+    private var label: String {
+        switch status {
+        case "approved": return AppString("Approved")
+        case "rejected": return AppString("Rejected")
+        default: return AppString("Pending")
+        }
     }
     private var color: Color {
         switch status {

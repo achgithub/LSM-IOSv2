@@ -208,11 +208,14 @@ struct PredictorCardView: View {
         }
     }
 
+    /// Routed through `AppString` (not returned as a plain literal fed to
+    /// `Text(String)`) — a runtime value never localizes when passed to
+    /// `Text` as a variable, only literal `Text("…")` does.
     private func positionLabel(_ position: Int) -> String {
         switch position {
-        case 1: return "1st"
-        case 2: return "2nd"
-        default: return "3rd"
+        case 1: return AppString("1st")
+        case 2: return AppString("2nd")
+        default: return AppString("3rd")
         }
     }
 

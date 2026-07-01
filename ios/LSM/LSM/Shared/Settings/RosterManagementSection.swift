@@ -109,7 +109,10 @@ struct RosterManagementSection: View {
             defaultFilename: "players"
         ) { result in
             switch result {
-            case .success: message = AppString("Exported \(members.count) player\(members.count == 1 ? "" : "s").")
+            case .success:
+                message = members.count == 1
+                    ? AppString("Exported 1 player.")
+                    : AppString("Exported \(members.count) players.")
             case .failure(let error): message = AppString("Export failed: \(error.localizedDescription)")
             }
         }

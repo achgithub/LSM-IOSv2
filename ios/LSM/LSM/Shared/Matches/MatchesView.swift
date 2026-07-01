@@ -406,12 +406,14 @@ private struct MatchRow: View {
     }
 
     /// Live/finished indicator shown under the score; nil for upcoming matches
-    /// (their date/time already shows on the right).
+    /// (their date/time already shows on the right). Routed through
+    /// `AppString` (not passed to `Text` as a literal) since `Text(String)` —
+    /// a runtime value, not a literal — never localizes; only `Text("…")` does.
     private var liveStatus: (text: String, color: Color)? {
         switch item.status {
-        case "FINISHED":          return ("FT", .secondary)
-        case "IN_PLAY", "PAUSED": return (item.minute.map { "\($0)'" } ?? "LIVE", .green)
-        case "POSTPONED":         return ("Postp.", .orange)
+        case "FINISHED":          return (AppString("FT"), .secondary)
+        case "IN_PLAY", "PAUSED": return (item.minute.map { "\($0)'" } ?? AppString("LIVE"), .green)
+        case "POSTPONED":         return (AppString("Postp."), .orange)
         default:                  return nil
         }
     }
