@@ -25,6 +25,10 @@ struct PlayerLinkCardView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(palette.textSecondary)
                     .multilineTextAlignment(.center)
+                Text("⚠️ \(PlayerLinkShareItem.safetyWarning)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(palette.accent)
+                    .multilineTextAlignment(.center)
                 if let qrImage = QRCodeGenerator.image(for: url.absoluteString) {
                     Image(uiImage: qrImage)
                         .interpolation(.none)

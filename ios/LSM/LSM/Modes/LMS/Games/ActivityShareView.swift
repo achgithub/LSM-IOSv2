@@ -15,6 +15,12 @@ struct PlayerLinkShareItem: Identifiable {
     let url: URL
     var id: String { url.absoluteString }
 
+    /// Shown wherever the link is presented to a player — in-app, in the
+    /// share message, and on the card image — so the same phishing-style
+    /// caution is consistent everywhere, not just wherever we remembered to
+    /// add it.
+    static let safetyWarning = "Only tap this if you were expecting it — check with your manager first if you're not sure."
+
     /// Three separate items, not one string with the URL pasted in — a bare
     /// UUID link embedded in a paragraph reads as suspicious to less
     /// tech-savvy players, and burying the URL in text stops Messages/WhatsApp
@@ -30,7 +36,8 @@ struct PlayerLinkShareItem: Identifiable {
             items.append(image)
         }
         items.append("Hi \(playerName) 👋 Here's your personal link to submit your picks. "
-            + "Save it as a bookmark or add it to your Home Screen so you can find it each week.")
+            + "Save it as a bookmark or add it to your Home Screen so you can find it each week.\n\n"
+            + "⚠️ \(PlayerLinkShareItem.safetyWarning)")
         items.append(url)
         return items
     }

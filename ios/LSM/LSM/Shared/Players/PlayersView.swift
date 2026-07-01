@@ -209,6 +209,30 @@ struct PlayerDetailView: View {
                 } footer: {
                     if showMintFooter {
                         Text("Mint a personal link for this player. One link works across all their games.")
+                    } else if linkURL != nil {
+                        Text(PlayerLinkShareItem.safetyWarning)
+                    }
+                }
+
+                if let url = linkURL, let qrImage = QRCodeGenerator.image(for: url.absoluteString) {
+                    Section {
+                        HStack {
+                            Spacer()
+                            Image(uiImage: qrImage)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 180, height: 180)
+                                .padding(10)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            Spacer()
+                        }
+                        .listRowBackground(Color.clear)
+                    } header: {
+                        Text("Show In Person")
+                    } footer: {
+                        Text("Face to face with this player? Show them this screen and let them scan it with their own camera.")
                     }
                 }
 
