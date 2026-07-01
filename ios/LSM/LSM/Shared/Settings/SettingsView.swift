@@ -232,8 +232,8 @@ struct SettingsView: View {
         let n = gamesUsing(league).count
         switch n {
         case 0:  return AppString("Disabling \(league.name) removes its data from this device.")
-        case 1:  return AppString("Disabling \(league.name) removes its data from this device and deletes 1 game that uses it.")
-        default: return AppString("Disabling \(league.name) removes its data from this device and deletes \(n) games that use it.")
+        case 1:  return AppString("Disabling \(league.name) removes its data from this device and deletes 1 game that uses it — here and in the cloud.")
+        default: return AppString("Disabling \(league.name) removes its data from this device and deletes \(n) games that use it — here and in the cloud.")
         }
     }
 
@@ -243,8 +243,8 @@ struct SettingsView: View {
         let n = enabled.leagues.reduce(0) { $0 + gamesUsing($1).count }
         switch n {
         case 0:  return AppString("Switches from \(current) to \(target.name).")
-        case 1:  return AppString("Switches from \(current) to \(target.name), deleting 1 game that uses the old league.")
-        default: return AppString("Switches from \(current) to \(target.name), deleting \(n) games that use the old league.")
+        case 1:  return AppString("Switches from \(current) to \(target.name), deleting 1 game that uses the old league — here and in the cloud.")
+        default: return AppString("Switches from \(current) to \(target.name), deleting \(n) games that use the old league — here and in the cloud.")
         }
     }
 
@@ -288,14 +288,14 @@ struct SettingsView: View {
 
     private func swap(to target: LeagueOption) {
         for current in enabled.leagues {
-            for game in gamesUsing(current) { context.delete(game) }
+            for game in gamesUsing(current) { GameLogicService.deleteGame(game, context: context) }
         }
         enabled.setOnly(target)
         pendingSwap = nil
     }
 
     private func disable(_ league: LeagueOption) {
-        for game in gamesUsing(league) { context.delete(game) }
+        for game in gamesUsing(league) { GameLogicService.deleteGame(game, context: context) }
         enabled.disable(league)
         confirmDisable = nil
     }

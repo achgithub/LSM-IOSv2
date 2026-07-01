@@ -34,7 +34,7 @@ enum TutorialDataService {
     static func clearTutorialData(context: ModelContext) {
         let descriptor = FetchDescriptor<Game>(predicate: #Predicate { $0.isDemoData })
         guard let games = try? context.fetch(descriptor) else { return }
-        for game in games { context.delete(game) }
+        for game in games { GameLogicService.deleteGame(game, context: context) }
     }
 
     // MARK: - Shared player seeding

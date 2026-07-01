@@ -163,6 +163,15 @@ actor SubmissionsClient {
         _ = try await send(req)
     }
 
+    /// Removes this game's round/enrollment/submission rows from the cloud.
+    /// Call when the game is deleted on-device so cloud data doesn't linger.
+    func deleteGame(gameToken: UUID) async throws {
+        let req = try await request(
+            path: "/games/\(gameToken.uuidString.lowercased())", method: "DELETE"
+        )
+        _ = try await send(req)
+    }
+
     // ── Internals ─────────────────────────────────────────────────────────────
 
     private func request(path: String, method: String) async throws -> URLRequest {

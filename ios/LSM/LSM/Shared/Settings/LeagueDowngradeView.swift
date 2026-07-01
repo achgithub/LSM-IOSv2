@@ -34,8 +34,8 @@ struct LeagueDowngradeView: View {
         let n = gamesUsing(league).count
         switch n {
         case 0:  return AppString("Removes \(league.name) from this device.")
-        case 1:  return AppString("Removes \(league.name) from this device and permanently deletes 1 game that uses it.")
-        default: return AppString("Removes \(league.name) from this device and permanently deletes \(n) games that use it.")
+        case 1:  return AppString("Removes \(league.name) from this device and permanently deletes 1 game that uses it — here and in the cloud.")
+        default: return AppString("Removes \(league.name) from this device and permanently deletes \(n) games that use it — here and in the cloud.")
         }
     }
 
@@ -105,7 +105,7 @@ struct LeagueDowngradeView: View {
     }
 
     private func remove(_ league: LeagueOption) {
-        for game in gamesUsing(league) { context.delete(game) }
+        for game in gamesUsing(league) { GameLogicService.deleteGame(game, context: context) }
         enabled.disable(league)
         pendingRemove = nil
     }

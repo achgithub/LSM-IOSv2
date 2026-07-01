@@ -251,6 +251,20 @@ submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
   return c.json({ ok: true });
 });
 
+// DELETE /games/:gameToken
+// Called when the manager deletes the game on-device. Removes this game's
+// round/enrollment/submission rows. Does NOT touch player_tokens — those are
+// one global link per player, shared across all of a player's games.
+submissions.delete("/games/:gameToken", async (c) => {
+  const gameToken = c.req.param("gameToken").toLowerCase();
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM round_pushes WHERE game_token = ?`).bind(gameToken),
+    c.env.DB.prepare(`DELETE FROM game_enrollments WHERE game_token = ?`).bind(gameToken),
+    c.env.DB.prepare(`DELETE FROM submissions WHERE game_token = ?`).bind(gameToken),
+  ]);
+  return c.json({ ok: true });
+});
+
 // ─── Player-facing (PWA) ─────────────────────────────────────────────────────
 
 // GET /s/:token

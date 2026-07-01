@@ -12,6 +12,7 @@ struct GamesListView: View {
     @State private var showingTutorial = false
     @State private var showingGameLimit = false
     @State private var wizardGame: Game?
+    @State private var pendingDeleteOffsets: IndexSet?
 
     private var activeGameCount: Int {
         games.filter { $0.status != .complete }.count
@@ -58,7 +59,7 @@ struct GamesListView: View {
                                     .tint(.purple)
                                 }
                         }
-                        .onDelete(perform: delete)
+                        .onDelete { pendingDeleteOffsets = $0 }
                     }
                 }
             }
@@ -91,11 +92,33 @@ struct GamesListView: View {
             .fullScreenCover(isPresented: $showingWizard) { GameWizardView() }
             .fullScreenCover(item: $wizardGame) { GameWizardView(game: $0) }
             .fullScreenCover(isPresented: $showingTutorial) { TutorialContainerView() }
+            .confirmationDialog(
+                deleteTitle,
+                isPresented: Binding(get: { pendingDeleteOffsets != nil }, set: { if !$0 { pendingDeleteOffsets = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) { confirmDelete() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(deleteMessage)
+            }
         }
     }
 
-    private func delete(_ offsets: IndexSet) {
-        for index in offsets { context.delete(games[index]) }
+    private var deleteTitle: String {
+        (pendingDeleteOffsets?.count ?? 1) == 1 ? "Delete this game?" : "Delete \(pendingDeleteOffsets?.count ?? 0) games?"
+    }
+
+    private var deleteMessage: String {
+        (pendingDeleteOffsets?.count ?? 1) == 1
+            ? "This permanently deletes the game and its history — on this device and in the cloud, including any player picks or predictions submitted through their links."
+            : "This permanently deletes these games and their history — on this device and in the cloud, including any player picks or predictions submitted through their links."
+    }
+
+    private func confirmDelete() {
+        guard let offsets = pendingDeleteOffsets else { return }
+        for index in offsets { GameLogicService.deleteGame(games[index], context: context) }
+        pendingDeleteOffsets = nil
     }
 }
 

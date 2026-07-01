@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+import os
+
+private let gameLifecycleLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "game-lifecycle")
 
 /// Per-fixture result the manager enters (or pulls from the server).
 enum FixtureOutcome: String, CaseIterable, Identifiable {
@@ -26,6 +29,26 @@ struct RoundCloseResult {
 /// Adapter between SwiftData @Model objects and the pure `GameEngine`.
 /// Keeps the engine free of persistence concerns.
 enum GameLogicService {
+
+    // MARK: - Lifecycle
+
+    /// Deletes a game locally and, if it was ever pushed to the cloud, fires a
+    /// best-effort cleanup call so its round/enrollment/submission rows in the
+    /// worker-api don't linger indefinitely after the on-device copy is gone.
+    /// Player tokens are untouched — they're one global link per player,
+    /// shared across all of that player's games.
+    static func deleteGame(_ game: Game, context: ModelContext) {
+        let cloudToken = game.cloudGameToken
+        context.delete(game)
+        guard let cloudToken else { return }
+        Task {
+            do {
+                try await SubmissionsClient.shared.deleteGame(gameToken: cloudToken)
+            } catch {
+                gameLifecycleLog.warning("Cloud cleanup failed for deleted game \(cloudToken): \(error.localizedDescription)")
+            }
+        }
+    }
 
     // MARK: - Used teams & eligibility
 
