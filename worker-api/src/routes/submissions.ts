@@ -78,7 +78,7 @@ submissions.post("/links/:token/revoke", async (c) => {
 
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
-// Body: { mode, roundNumber, deadline?, fixtures, jokerEnabled?, managerSuffix?, players }
+// Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, managerSuffix?, players }
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   // fixtureId/opponentName are set when a team plays twice in the round
@@ -93,6 +93,7 @@ submissions.post("/games/:gameToken/push", async (c) => {
     mode: string;
     roundNumber: number;
     deadline?: string | null;
+    gameName?: string | null;
     fixtures: unknown[];
     jokerEnabled?: boolean;
     managerSuffix?: string | null;
@@ -100,7 +101,7 @@ submissions.post("/games/:gameToken/push", async (c) => {
     managerToken?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, fixtures, jokerEnabled, managerSuffix, managerName, managerToken, players } = body ?? {};
+  const { mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, managerSuffix, managerName, managerToken, players } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
@@ -109,17 +110,18 @@ submissions.post("/games/:gameToken/push", async (c) => {
   const mgrToken = managerToken?.toLowerCase() ?? null;
 
   await c.env.DB.prepare(
-    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, fixtures_json, joker_enabled, manager_token, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
        mode = excluded.mode,
        round_number = excluded.round_number,
        deadline = excluded.deadline,
+       game_name = excluded.game_name,
        fixtures_json = excluded.fixtures_json,
        joker_enabled = excluded.joker_enabled,
        manager_token = COALESCE(round_pushes.manager_token, excluded.manager_token),
        updated_at = excluded.updated_at`
-  ).bind(gameToken, mode, roundNumber, deadline ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts).run();
+  ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts).run();
 
   if (mgrToken) await ensureManagerLifecycle(c.env, mgrToken);
 
@@ -266,7 +268,7 @@ submissions.get("/s/:token", async (c) => {
 
   const enrollments = await c.env.DB.prepare(
     `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix,
-            rp.mode, rp.round_number, rp.deadline, rp.fixtures_json, rp.joker_enabled
+            rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled
      FROM game_enrollments ge
      JOIN round_pushes rp ON rp.game_token = ge.game_token
      WHERE ge.token = ?`
@@ -274,7 +276,7 @@ submissions.get("/s/:token", async (c) => {
 
   const games = await Promise.all((enrollments.results ?? []).map(async (row: any) => {
     const prior = await c.env.DB.prepare(
-      `SELECT round_number, status, submitted_at
+      `SELECT round_number, status, submitted_at, payload_json
        FROM submissions WHERE token = ? AND game_token = ? AND round_number = ?`
     ).bind(token, row.game_token, row.round_number).first<any>();
 
@@ -283,6 +285,7 @@ submissions.get("/s/:token", async (c) => {
       mode: row.mode,
       roundNumber: row.round_number,
       deadline: row.deadline,
+      gameName: row.game_name ?? null,
       fixtures: JSON.parse(row.fixtures_json),
       jokerEnabled: row.joker_enabled === 1,
       managerSuffix: row.manager_suffix ?? null,
@@ -295,6 +298,7 @@ submissions.get("/s/:token", async (c) => {
         roundNumber: prior.round_number,
         status: prior.status,
         submittedAt: prior.submitted_at,
+        payload: JSON.parse(prior.payload_json),
       };
     }
     return game;

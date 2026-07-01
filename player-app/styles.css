@@ -375,26 +375,18 @@ select:focus-visible {
   line-height: 1.45;
 }
 
-.status-banner {
+.game-body {
   display: grid;
-  gap: 0.18rem;
-  margin: clamp(0.75rem, 3vw, 1rem) clamp(0.85rem, 3.2vw, 1.05rem) 0;
-  padding: 0.7rem;
-  border: 1px solid var(--line);
-  border-left-width: 5px;
-  border-radius: var(--radius);
-  background: rgba(248, 250, 252, 0.06);
 }
 
-.status-banner span {
-  color: var(--muted);
+.pick-line {
+  margin: 0;
+  padding: clamp(0.65rem, 2.5vw, 0.85rem);
 }
 
-.status-banner.approved { border-left-color: var(--success); }
-.status-banner.action { border-left-color: var(--error); }
-.status-banner.pending { border-left-color: var(--warning); }
-.status-banner.rejected,
-.status-banner.error { border-left-color: var(--error); }
+.pick-line.rejected {
+  color: #FCA5A5;
+}
 
 .team-list,
 .fixture-list {

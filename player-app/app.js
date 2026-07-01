@@ -9,6 +9,7 @@ const API_BASE = "https://api.uk.sportsmanager.site";
 const TOKEN_STORAGE_KEY = "lsm.playerSubmissionToken";
 const LARGE_TEXT_STORAGE_KEY = "lsm.largeText";
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MODE_LABELS = { lms: "Last Man Standing", predictor: "Predictor" };
 
 let _activeMode = null;
 let _deferredInstallPrompt = null;
@@ -274,10 +275,23 @@ function updateHeroSection(state) {
     filterRow.hidden = !show;
     if (show) {
       const modesPresent = new Set(games.map((g) => g.mode));
+      const modeOrder = ["lms", "predictor"];
+
+      // Only one game type shown at a time — default to whichever mode needs
+      // action, else the first mode the player actually has.
+      if (!modesPresent.has(_activeMode)) {
+        _activeMode = modeOrder.find((m) => modesPresent.has(m) && pendingGameCount(games, m) > 0)
+          ?? modeOrder.find((m) => modesPresent.has(m))
+          ?? null;
+      }
+
       for (const option of select.options) {
-        if (option.value) option.hidden = !modesPresent.has(option.value);
+        option.hidden = !modesPresent.has(option.value);
+        const pending = pendingGameCount(games, option.value);
+        option.textContent = pending > 0 ? `${MODE_LABELS[option.value]} (${pending})` : MODE_LABELS[option.value];
       }
       select.value = _activeMode ?? "";
+
       const pending = pendingGameCount(games);
       if (badge) {
         badge.hidden = pending === 0;
@@ -329,45 +343,49 @@ async function savePrivateLink() {
 function renderGame(game, token) {
   const modeClass = game.mode === "predictor" ? "mode-predictor" : "mode-lms";
   const card = el("article", `game-card ${modeClass}`);
+  const modeName = game.mode === "predictor" ? "PRED" : "LMS";
 
   const head = el("header", "game-head");
-  const headCopy = el("div", null);
-  const modeName = game.mode === "predictor" ? "PRED" : "LMS";
   const topLine = el("div", "card-topline");
-  topLine.appendChild(el("p", "eyebrow", modeName));
+  const roundLabel = `${game.mode === "predictor" ? "Matchday" : "Round"} ${game.roundNumber}`;
+  const title = game.gameName || roundLabel;
+  topLine.appendChild(el("h2", null, `${title} (${modeName})`));
   const status = gameStatus(game);
   topLine.appendChild(el("span", `card-status ${status.kind}`, status.label));
-  headCopy.appendChild(topLine);
-  const roundLabel = `${game.mode === "predictor" ? "Matchday" : "Round"} ${game.roundNumber}`;
-  headCopy.appendChild(el("h2", null, roundLabel));
+  head.appendChild(topLine);
   if (game.deadline) {
-    headCopy.appendChild(el("p", "cutoff-line muted small", `Cutoff ${formatDate(game.deadline)}`));
+    head.appendChild(el("p", "cutoff-line muted small", `Cutoff ${formatDate(game.deadline)}`));
   }
-  head.appendChild(headCopy);
   card.appendChild(head);
 
-  const priorStatus = renderPriorStatus(game);
-  if (priorStatus) card.appendChild(priorStatus);
+  const body = el("div", "game-body");
 
-  if (game._submitted) {
-    card.appendChild(renderStatusBanner("pending", "Submitted", "Awaiting approval."));
+  if (game._submitError) {
+    body.appendChild(el("p", "pick-line error small", game._submitError));
+  }
+
+  const prior = game.priorSubmission;
+  // Submitted and approved both just show what was picked — no separate
+  // boxed banner, one simple line under the header.
+  if (game._submitted || prior?.status === "pending" || prior?.status === "approved") {
+    body.appendChild(el("p", "pick-line muted", pickSummary(game)));
+    card.appendChild(body);
     return card;
   }
 
-  if (game._submitError) {
-    card.appendChild(renderStatusBanner("error", "Couldn't submit", game._submitError));
+  if (prior?.status === "rejected") {
+    body.appendChild(el("p", "pick-line rejected small", "Rejected — pick again."));
   }
-
-  if (game.priorSubmission?.status === "approved") return card;
 
   if (game.mode === "lms") {
-    renderLMS(card, game, token);
+    renderLMS(body, game, token);
   } else if (game.mode === "predictor") {
-    renderPredictor(card, game, token);
+    renderPredictor(body, game, token);
   } else {
-    card.appendChild(renderStatusBanner("error", "Unknown game mode", String(game.mode)));
+    body.appendChild(el("p", "pick-line error small", `Unknown game mode: ${game.mode}`));
   }
 
+  card.appendChild(body);
   return card;
 }
 
@@ -378,27 +396,15 @@ function gameStatus(game) {
   if (game.priorSubmission?.status === "approved") {
     return { kind: "status-approved", label: "Approved" };
   }
-  return { kind: "status-action", label: "Needs action" };
+  return { kind: "status-action", label: "Needs attention" };
 }
 
-function renderPriorStatus(game) {
-  const prior = game.priorSubmission;
-  if (!prior || game._submitted) return null;
-
-  if (prior.status === "approved") {
-    return renderStatusBanner("approved", "Approved", "No action needed.");
+function pickSummary(game) {
+  if (game.mode === "lms") {
+    const teamName = game._selectedTeamName ?? game.priorSubmission?.payload?.teamName;
+    if (teamName) return `Picked ${teamName}.`;
   }
-  if (prior.status === "pending") {
-    return renderStatusBanner("pending", "Submitted", "You can change it if needed.");
-  }
-  return renderStatusBanner("rejected", "Rejected", "Submit again.");
-}
-
-function renderStatusBanner(type, title, message) {
-  const banner = el("div", `status-banner ${type}`);
-  banner.appendChild(el("strong", null, title));
-  banner.appendChild(el("span", null, message));
-  return banner;
+  return "Your manager will review it before it goes live.";
 }
 
 // -- LMS ----------------------------------------------------------------------
@@ -445,9 +451,9 @@ function renderLMSFixtureRow(game, fixture, eligibleIdByName) {
   row.appendChild(fixtureKickoff(fixture.kickoff));
   const teams = el("div", "lms-fixture-teams");
   teams.append(
-    lmsTeamButton(game, fixture.home, eligibleIdByName.get(fixture.home), fixture.fixtureId),
+    lmsTeamButton(game, fixture.home, eligibleIdByName.get(fixture.home), fixture.fixtureId, fixture.away),
     el("span", "score-separator", "v"),
-    lmsTeamButton(game, fixture.away, eligibleIdByName.get(fixture.away), fixture.fixtureId)
+    lmsTeamButton(game, fixture.away, eligibleIdByName.get(fixture.away), fixture.fixtureId, fixture.home)
   );
   row.appendChild(teams);
   return row;
@@ -456,7 +462,7 @@ function renderLMSFixtureRow(game, fixture, eligibleIdByName) {
 // A team can play twice in a round (rearranged fixtures) — selection is keyed
 // on (teamId, fixtureId), not teamId alone, so picking a team in one fixture
 // doesn't also highlight it in the other (they could win one and lose the other).
-function lmsTeamButton(game, name, id, fixtureId = null) {
+function lmsTeamButton(game, name, id, fixtureId = null, opponentName = null) {
   const eligible = id != null;
   const selected = eligible && game._selectedTeamId === id && game._selectedFixtureId === fixtureId;
   const btn = el("button", `lms-team-btn${selected ? " selected" : ""}`, name);
@@ -469,6 +475,7 @@ function lmsTeamButton(game, name, id, fixtureId = null) {
         _selectedTeamId: id,
         _selectedTeamName: name,
         _selectedFixtureId: fixtureId,
+        _selectedOpponentName: opponentName,
         _submitError: null,
       });
     });
@@ -483,6 +490,7 @@ async function submitLMS(token, game) {
       teamId: game._selectedTeamId,
       teamName: game._selectedTeamName,
       fixtureId: game._selectedFixtureId ?? null,
+      opponentName: game._selectedOpponentName ?? null,
     });
     updateGameState(game, { _submitted: true, _submitError: null });
   } catch (e) {

@@ -44,6 +44,8 @@ struct SubmissionPayload: Decodable {
     let teamName: String?
     /// Which fixture this pick backs, when the team plays twice in the round.
     let fixtureId: Int?
+    /// The opponent in that fixture, so the queue can show "Liverpool v Everton".
+    let opponentName: String?
     // Predictor
     let scores: [PredictorScore]?
 }
@@ -106,6 +108,7 @@ actor SubmissionsClient {
         mode: String,
         roundNumber: Int,
         deadline: Date?,
+        gameName: String?,
         fixtures: [FixturePushItem],
         jokerEnabled: Bool,
         managerSuffix: String?,
@@ -116,6 +119,7 @@ actor SubmissionsClient {
             let mode: String
             let roundNumber: Int
             let deadline: String?
+            let gameName: String?
             let fixtures: [FixturePushItem]
             let jokerEnabled: Bool
             let managerSuffix: String?
@@ -128,7 +132,7 @@ actor SubmissionsClient {
             path: "/games/\(gameToken.uuidString.lowercased())/push", method: "POST"
         )
         req.httpBody = try encoder.encode(
-            Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr,
+            Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr, gameName: gameName,
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
                  managerSuffix: managerSuffix, managerName: managerName,
                  managerToken: ManagerToken.current, players: players)

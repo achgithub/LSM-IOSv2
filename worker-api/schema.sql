@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS round_pushes (
   mode          TEXT NOT NULL,            -- 'lms' | 'predictor'
   round_number  INTEGER NOT NULL,
   deadline      TEXT,                     -- ISO8601 UTC; null if unset
+  game_name     TEXT,                     -- the manager's game title, for the PWA card heading
   fixtures_json TEXT NOT NULL,
   joker_enabled INTEGER NOT NULL DEFAULT 0,
   manager_token TEXT,

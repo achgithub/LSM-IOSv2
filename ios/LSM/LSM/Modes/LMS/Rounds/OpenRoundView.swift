@@ -362,6 +362,7 @@ struct OpenRoundView: View {
         let mode = game.mode
         let roundNumber = round.roundNumber
         let deadline = round.deadline
+        let gameName = game.name
 
         // Resolve roster-member tokens synchronously before the async task
         // (avoids SwiftData main-actor access from a background context).
@@ -435,6 +436,7 @@ struct OpenRoundView: View {
                     mode: mode.rawValue,
                     roundNumber: roundNumber,
                     deadline: deadline,
+                    gameName: gameName,
                     fixtures: fixtureItems,
                     jokerEnabled: jokerEnabled,
                     managerSuffix: managerSuffix,

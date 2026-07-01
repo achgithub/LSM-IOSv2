@@ -184,21 +184,30 @@ private struct SubmissionRow: View {
                 Spacer()
                 StatusBadge(status: item.status)
             }
-            Text(payloadDescription).font(.caption).foregroundStyle(.secondary)
+            pickDetail
         }
         .padding(.vertical, 2)
     }
 
-    private var payloadDescription: String {
+    /// LMS shows the picked team big, its opponent small underneath (no
+    /// truncation — the row grows to fit rather than hiding it behind a tap).
+    @ViewBuilder
+    private var pickDetail: some View {
         if game.mode == .lms, let teamId = item.payload.teamId {
             let name = item.payload.teamName ?? "Team \(teamId)"
-            return "Pick: \(name)"
+            VStack(alignment: .leading, spacing: 0) {
+                Text(name).font(.subheadline).fontWeight(.semibold)
+                if let opponent = item.payload.opponentName {
+                    Text("v \(opponent)").font(.caption).foregroundStyle(.secondary)
+                }
+            }
         } else if let scores = item.payload.scores {
-            return scores.map { s in
+            Text(scores.map { s in
                 s.isJoker == true ? "\(s.home)–\(s.away) ★" : "\(s.home)–\(s.away)"
-            }.joined(separator: ", ")
+            }.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+        } else {
+            Text("—").font(.caption).foregroundStyle(.secondary)
         }
-        return "—"
     }
 }
 
