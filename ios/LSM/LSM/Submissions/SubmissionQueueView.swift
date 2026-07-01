@@ -150,7 +150,9 @@ struct SubmissionQueueView: View {
         guard let player else { return }
 
         if game.mode == .lms, let teamId = result.payload.teamId {
-            GameLogicService.setPick(player: player, round: round, teamId: teamId, context: context)
+            GameLogicService.setPick(
+                player: player, round: round, teamId: teamId, fixtureId: result.payload.fixtureId, context: context
+            )
         } else if game.mode == .predictor, let scores = result.payload.scores {
             for score in scores {
                 PredictorScoringService.setPrediction(

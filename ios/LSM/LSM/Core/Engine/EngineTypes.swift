@@ -5,10 +5,28 @@ import Foundation
 /// deterministic to unit-test. A thin adapter maps the @Model objects to these.
 
 /// A team in a round's fixtures, with its league position if standings are known.
+/// `fixtureId`/`opponentName` are set when this ref is scoped to one specific
+/// fixture — needed because a team can play twice in a round (rearranged
+/// fixtures), in which case it appears here once per fixture so a pick can
+/// record which occurrence it's backing.
 nonisolated struct TeamRef: Equatable, Sendable {
     let id: Int
     let name: String
     let position: Int?   // nil when standings are unavailable
+    let fixtureId: Int?
+    let opponentName: String?
+
+    init(id: Int, name: String, position: Int? = nil, fixtureId: Int? = nil, opponentName: String? = nil) {
+        self.id = id
+        self.name = name
+        self.position = position
+        self.fixtureId = fixtureId
+        self.opponentName = opponentName
+    }
+
+    /// Unique identity for a specific (team, fixture) occurrence — use as a
+    /// SwiftUI ForEach id so a team playing twice renders as two distinct rows.
+    var pickKey: String { "\(id)-\(fixtureId ?? -1)" }
 }
 
 /// An active player's state needed for auto-assign: which team ids they've used

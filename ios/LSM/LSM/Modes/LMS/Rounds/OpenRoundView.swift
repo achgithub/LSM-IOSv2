@@ -337,17 +337,26 @@ struct OpenRoundView: View {
         guard let gameToken = game.cloudGameToken else { return }
 
         // Build fixture-level TeamRefs for eligible-team computation (LMS only).
-        let fixtureTeamRefs: [TeamRef] = {
-            var seen = Set<Int>()
-            return round.fixtureIds.flatMap { fid -> [TeamRef] in
-                guard let m = ld.matches.first(where: { $0.id == fid }) else { return [] }
-                return [m.homeTeamId, m.awayTeamId].compactMap { tid in
-                    guard seen.insert(tid).inserted, let t = ld.teamsById[tid] else { return nil }
-                    return TeamRef(id: t.externalId, name: t.name,
-                                  position: ld.standingsByTeam[t.externalId]?.position)
-                }
+        // Scoped per fixture (not deduped by team) — a team playing twice in
+        // the round appears twice so the PWA/picker can record which fixture a
+        // pick is backing.
+        let fixtureTeamRefs: [TeamRef] = round.fixtureIds.flatMap { fid -> [TeamRef] in
+            guard let m = ld.matches.first(where: { $0.id == fid }) else { return [] }
+            let home = ld.teamsById[m.homeTeamId]
+            let away = ld.teamsById[m.awayTeamId]
+            var refs: [TeamRef] = []
+            if let home {
+                refs.append(TeamRef(id: home.externalId, name: home.name,
+                                     position: ld.standingsByTeam[home.externalId]?.position,
+                                     fixtureId: fid, opponentName: away?.name))
             }
-        }()
+            if let away {
+                refs.append(TeamRef(id: away.externalId, name: away.name,
+                                     position: ld.standingsByTeam[away.externalId]?.position,
+                                     fixtureId: fid, opponentName: home?.name))
+            }
+            return refs
+        }
         let standingsKnown = fixtureTeamRefs.contains { $0.position != nil }
         let allowRepeats = game.allowRepeats
         let mode = game.mode
@@ -405,9 +414,13 @@ struct OpenRoundView: View {
                         allowRepeats: allowRepeats,
                         standingsKnown: standingsKnown
                     )
-                    eligibleTeams = ordered.map { EligibleTeam(id: $0.id, name: $0.name) }
+                    eligibleTeams = ordered.map {
+                        EligibleTeam(id: $0.id, name: $0.name, fixtureId: $0.fixtureId, opponentName: $0.opponentName)
+                    }
                 } else {
-                    eligibleTeams = fixtureTeamRefs.map { EligibleTeam(id: $0.id, name: $0.name) }
+                    eligibleTeams = fixtureTeamRefs.map {
+                        EligibleTeam(id: $0.id, name: $0.name, fixtureId: $0.fixtureId, opponentName: $0.opponentName)
+                    }
                 }
                 playerItems.append(PlayerPushItem(
                     token: token,

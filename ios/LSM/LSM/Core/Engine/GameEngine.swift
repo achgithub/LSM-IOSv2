@@ -9,11 +9,13 @@ nonisolated enum GameEngine {
     /// Assign one team to each active player when the deadline passes.
     /// Standings-aware: the bottom-of-table available team is assigned first.
     /// Each player is independent — two players may receive the same team.
-    /// Returns a map of player id → assigned team id. A player with no eligible
-    /// team (repeats off and all fixture teams used) is omitted.
-    static func autoAssign(_ input: AutoAssignInput) -> [UUID: Int] {
+    /// Returns a map of player id → assigned `TeamRef` (its `fixtureId` records
+    /// which fixture the assignment is scoped to, when the team plays twice in
+    /// the round). A player with no eligible team (repeats off and all fixture
+    /// teams used) is omitted.
+    static func autoAssign(_ input: AutoAssignInput) -> [UUID: TeamRef] {
         let standingsKnown = input.fixtureTeams.contains { $0.position != nil }
-        var assignments: [UUID: Int] = [:]
+        var assignments: [UUID: TeamRef] = [:]
         for player in input.players {
             let ordered = orderedAvailableTeams(
                 fixtureTeams: input.fixtureTeams,
@@ -22,7 +24,7 @@ nonisolated enum GameEngine {
                 standingsKnown: standingsKnown
             )
             if let first = ordered.first {
-                assignments[player.id] = first.id
+                assignments[player.id] = first
             }
         }
         return assignments

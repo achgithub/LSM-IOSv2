@@ -156,6 +156,7 @@ struct ResultsEntryView: View {
         for fixture in roundFixtures {
             if let outcome = outcomes[fixture.id] {
                 GameLogicService.applyResult(
+                    fixtureId: fixture.id,
                     homeTeamId: fixture.homeTeamId,
                     awayTeamId: fixture.awayTeamId,
                     outcome: outcome,

@@ -6,13 +6,18 @@ import SwiftData
 final class Pick {
     @Attribute(.unique) var id: UUID
     var teamId: Int
+    /// Which fixture this pick's team result should come from, when that team
+    /// plays twice in the round (rearranged fixtures). nil for picks made
+    /// before this field existed, or when the team only plays once.
+    var fixtureId: Int?
     var resultRaw: String?
     var player: Player?
     var round: Round?
 
-    init(teamId: Int, player: Player? = nil, round: Round? = nil) {
+    init(teamId: Int, fixtureId: Int? = nil, player: Player? = nil, round: Round? = nil) {
         self.id = UUID()
         self.teamId = teamId
+        self.fixtureId = fixtureId
         self.resultRaw = nil
         self.player = player
         self.round = round

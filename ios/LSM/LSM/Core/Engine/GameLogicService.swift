@@ -40,7 +40,10 @@ enum GameLogicService {
         return used
     }
 
-    /// Distinct teams playing in a round, as engine `TeamRef`s (with positions).
+    /// Teams playing in a round, as engine `TeamRef`s (with positions). Each
+    /// `TeamRef` is scoped to the specific fixture it came from — a team
+    /// playing twice in the round (rearranged fixtures) appears twice, once
+    /// per fixture, so a pick can record which occurrence it's backing.
     static func teamRefs(
         forFixtureIds ids: [Int],
         fixtures: [MatchDTO],
@@ -48,21 +51,24 @@ enum GameLogicService {
         standingsByTeam: [Int: StandingDTO]
     ) -> [TeamRef] {
         let idSet = Set(ids)
-        var ordered: [Int] = []
-        var seen: Set<Int> = []
+        var refs: [TeamRef] = []
         for fixture in fixtures where idSet.contains(fixture.id) {
-            for teamId in [fixture.homeTeamId, fixture.awayTeamId] where !seen.contains(teamId) {
-                seen.insert(teamId)
-                ordered.append(teamId)
-            }
+            let home = teamsById[fixture.homeTeamId]
+            let away = teamsById[fixture.awayTeamId]
+            let homeName = home?.shortName ?? home?.name ?? "Team \(fixture.homeTeamId)"
+            let awayName = away?.shortName ?? away?.name ?? "Team \(fixture.awayTeamId)"
+            refs.append(TeamRef(
+                id: fixture.homeTeamId, name: homeName,
+                position: standingsByTeam[fixture.homeTeamId]?.position,
+                fixtureId: fixture.id, opponentName: awayName
+            ))
+            refs.append(TeamRef(
+                id: fixture.awayTeamId, name: awayName,
+                position: standingsByTeam[fixture.awayTeamId]?.position,
+                fixtureId: fixture.id, opponentName: homeName
+            ))
         }
-        return ordered.map { teamId in
-            TeamRef(
-                id: teamId,
-                name: teamsById[teamId]?.shortName ?? teamsById[teamId]?.name ?? "Team \(teamId)",
-                position: standingsByTeam[teamId]?.position
-            )
-        }
+        return refs
     }
 
     static func pick(for player: Player, in round: Round) -> Pick? {
@@ -102,11 +108,11 @@ enum GameLogicService {
     /// the old team until the screen is re-entered), whereas inserting a fresh
     /// `Pick` and wiring its relationships does update synchronously — so
     /// changing a pick (e.g. overriding an auto-assign) reuses that same path.
-    static func setPick(player: Player, round: Round, teamId: Int, context: ModelContext) {
+    static func setPick(player: Player, round: Round, teamId: Int, fixtureId: Int? = nil, context: ModelContext) {
         if let existing = pick(for: player, in: round) {
             context.delete(existing)
         }
-        let newPick = Pick(teamId: teamId)
+        let newPick = Pick(teamId: teamId, fixtureId: fixtureId)
         context.insert(newPick)
         newPick.player = player
         newPick.round = round
@@ -119,13 +125,14 @@ enum GameLogicService {
     }
 
     /// Engine-driven auto-assign for active players who have no pick yet.
-    /// Returns the proposed assignments (player → team id) without committing,
-    /// so the UI can preview before confirming.
+    /// Returns the proposed assignments (player → team, with the specific
+    /// fixture it was assigned from) without committing, so the UI can preview
+    /// before confirming.
     static func proposeAutoAssign(
         round: Round,
         game: Game,
         teamRefs: [TeamRef]
-    ) -> [(player: Player, teamId: Int)] {
+    ) -> [(player: Player, team: TeamRef)] {
         let unpicked = game.activePlayers.filter { pick(for: $0, in: round) == nil }
         let states = unpicked.map {
             PlayerAssignmentState(id: $0.id, usedTeamIds: usedTeamIds(for: $0))
@@ -140,13 +147,20 @@ enum GameLogicService {
     // MARK: - Results
 
     /// Apply a fixture result to every pick on either of its two teams (§6.5).
+    /// A pick with a `fixtureId` only reacts to that exact fixture — needed
+    /// because a team can play twice in a round (rearranged fixtures), so a
+    /// win in one and a loss in the other must not overwrite each other.
+    /// Picks made before `fixtureId` existed (nil) fall back to matching by
+    /// team alone, same as before.
     static func applyResult(
+        fixtureId: Int,
         homeTeamId: Int,
         awayTeamId: Int,
         outcome: FixtureOutcome,
         round: Round
     ) {
         for pick in round.picks {
+            guard pick.fixtureId == nil || pick.fixtureId == fixtureId else { continue }
             if pick.teamId == homeTeamId {
                 pick.result = homeResult(outcome)
             } else if pick.teamId == awayTeamId {

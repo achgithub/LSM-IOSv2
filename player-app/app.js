@@ -59,6 +59,32 @@ function setupTextSizeToggle() {
   applyLargeTextPreference();
 }
 
+function setupRefreshAction() {
+  const btn = document.getElementById("refresh-action");
+  if (!btn) return;
+  btn.addEventListener("click", refreshData);
+}
+
+async function refreshData() {
+  if (!_token || _state?.loading) return;
+  const btn = document.getElementById("refresh-action");
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("spinning");
+  }
+  try {
+    _state = await fetchPlayer(_token);
+  } catch (e) {
+    _state = { error: e.message || "Couldn't refresh. Try again." };
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("spinning");
+    }
+    render(_state, _token);
+  }
+}
+
 function setupSaveLinkAction() {
   const btn = document.getElementById("save-link-action");
   if (!btn) return;
@@ -225,7 +251,9 @@ function pendingGameCount(games, mode = null) {
 
 function updateHeroSection(state) {
   const greetingDiv = document.getElementById("hero-greeting");
-  const modeRow = document.getElementById("mode-row");
+  const filterRow = document.getElementById("games-filter-row");
+  const select = document.getElementById("mode-select");
+  const badge = document.getElementById("games-pending-badge");
 
   if (greetingDiv) {
     const children = [];
@@ -240,30 +268,32 @@ function updateHeroSection(state) {
     greetingDiv.replaceChildren(...children);
   }
 
-  if (modeRow) {
+  if (filterRow && select) {
     const games = state.games ?? [];
     const show = !state.loading && !state.error && games.length > 0;
-    modeRow.hidden = !show;
+    filterRow.hidden = !show;
     if (show) {
-      modeRow.replaceChildren(
-        modePill("LMS", pendingGameCount(games, "lms"), "lms"),
-        modePill("PRED", pendingGameCount(games, "predictor"), "predictor"),
-      );
+      const modesPresent = new Set(games.map((g) => g.mode));
+      for (const option of select.options) {
+        if (option.value) option.hidden = !modesPresent.has(option.value);
+      }
+      select.value = _activeMode ?? "";
+      const pending = pendingGameCount(games);
+      if (badge) {
+        badge.hidden = pending === 0;
+        badge.textContent = String(pending);
+      }
     }
   }
 }
 
-function modePill(label, count, mode) {
-  const pill = el("button", `mode-count-pill ${mode}`);
-  pill.type = "button";
-  pill.setAttribute("aria-pressed", String(_activeMode === mode));
-  pill.setAttribute("aria-label", `${label}: ${count} pending`);
-  pill.append(el("span", null, label), el("strong", null, String(count)));
-  pill.addEventListener("click", () => {
-    _activeMode = _activeMode === mode ? null : mode;
+function setupModeFilter() {
+  const select = document.getElementById("mode-select");
+  if (!select) return;
+  select.addEventListener("change", () => {
+    _activeMode = select.value || null;
     render(_state, _token);
   });
-  return pill;
 }
 
 function renderNotice(title, message, type = "") {
@@ -309,7 +339,10 @@ function renderGame(game, token) {
   topLine.appendChild(el("span", `card-status ${status.kind}`, status.label));
   headCopy.appendChild(topLine);
   const roundLabel = `${game.mode === "predictor" ? "Matchday" : "Round"} ${game.roundNumber}`;
-  headCopy.appendChild(el("h2", null, game.deadline ? `${roundLabel} · ${formatDate(game.deadline)}` : roundLabel));
+  headCopy.appendChild(el("h2", null, roundLabel));
+  if (game.deadline) {
+    headCopy.appendChild(el("p", "cutoff-line muted small", `Cutoff ${formatDate(game.deadline)}`));
+  }
   head.appendChild(headCopy);
   card.appendChild(head);
 
@@ -380,38 +413,67 @@ function renderLMS(container, game, token) {
     return;
   }
 
-  const picker = el("label", "team-picker");
-  picker.appendChild(el("span", "section-title", "Team"));
-  const select = el("select", "team-select");
-  select.setAttribute("aria-label", "Choose team");
-  select.appendChild(el("option", null, "Choose team"));
-  select.options[0].value = "";
-  select.options[0].disabled = true;
-  select.options[0].selected = game._selectedTeamId == null;
-  for (const team of eligibleTeams) {
-    const option = el("option", null, team.name);
-    option.value = String(team.id);
-    option.selected = game._selectedTeamId === team.id;
-    select.appendChild(option);
+  section.appendChild(el("span", "section-title", "Pick a team"));
+
+  const eligibleIdByName = new Map(eligibleTeams.map((team) => [team.name, team.id]));
+  const fixtures = game.fixtures ?? [];
+  const list = el("div", "lms-fixture-list fixture-list");
+  if (fixtures.length > 0) {
+    for (const fixture of fixtures) {
+      list.appendChild(renderLMSFixtureRow(game, fixture, eligibleIdByName));
+    }
+  } else {
+    for (const team of eligibleTeams) {
+      const row = el("div", "lms-fixture-row");
+      row.appendChild(lmsTeamButton(game, team.name, team.id));
+      list.appendChild(row);
+    }
   }
-  select.addEventListener("change", () => {
-    const team = eligibleTeams.find((item) => String(item.id) === select.value);
-    updateGameState(game, {
-      _selectedTeamId: team?.id ?? null,
-      _selectedTeamName: team?.name ?? null,
-      _submitError: null,
-    });
-  });
-  picker.appendChild(select);
+  section.appendChild(list);
 
   const submit = el("button", "btn btn-primary lms-submit", "Submit pick");
   submit.type = "button";
   submit.disabled = game._selectedTeamId == null;
   submit.addEventListener("click", () => submitLMS(token, game));
-
-  section.appendChild(picker);
   section.appendChild(submit);
+
   container.appendChild(section);
+}
+
+function renderLMSFixtureRow(game, fixture, eligibleIdByName) {
+  const row = el("div", "lms-fixture-row");
+  row.appendChild(fixtureKickoff(fixture.kickoff));
+  const teams = el("div", "lms-fixture-teams");
+  teams.append(
+    lmsTeamButton(game, fixture.home, eligibleIdByName.get(fixture.home), fixture.fixtureId),
+    el("span", "score-separator", "v"),
+    lmsTeamButton(game, fixture.away, eligibleIdByName.get(fixture.away), fixture.fixtureId)
+  );
+  row.appendChild(teams);
+  return row;
+}
+
+// A team can play twice in a round (rearranged fixtures) — selection is keyed
+// on (teamId, fixtureId), not teamId alone, so picking a team in one fixture
+// doesn't also highlight it in the other (they could win one and lose the other).
+function lmsTeamButton(game, name, id, fixtureId = null) {
+  const eligible = id != null;
+  const selected = eligible && game._selectedTeamId === id && game._selectedFixtureId === fixtureId;
+  const btn = el("button", `lms-team-btn${selected ? " selected" : ""}`, name);
+  btn.type = "button";
+  btn.disabled = !eligible;
+  btn.setAttribute("aria-pressed", String(selected));
+  if (eligible) {
+    btn.addEventListener("click", () => {
+      updateGameState(game, {
+        _selectedTeamId: id,
+        _selectedTeamName: name,
+        _selectedFixtureId: fixtureId,
+        _submitError: null,
+      });
+    });
+  }
+  return btn;
 }
 
 async function submitLMS(token, game) {
@@ -420,6 +482,7 @@ async function submitLMS(token, game) {
     await postSubmission(token, game.gameToken, {
       teamId: game._selectedTeamId,
       teamName: game._selectedTeamName,
+      fixtureId: game._selectedFixtureId ?? null,
     });
     updateGameState(game, { _submitted: true, _submitError: null });
   } catch (e) {
@@ -527,6 +590,8 @@ async function main() {
   applyLargeTextPreference();
   setupTextSizeToggle();
   setupSaveLinkAction();
+  setupRefreshAction();
+  setupModeFilter();
 
   const token = getToken() ?? getRememberedToken();
   if (!token) {

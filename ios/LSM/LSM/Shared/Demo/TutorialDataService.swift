@@ -114,6 +114,7 @@ enum TutorialDataService {
     private static func applyResults(_ fixtures: [TutorialDataGenerator.ScriptedFixture], to round: Round) {
         for f in fixtures {
             GameLogicService.applyResult(
+                fixtureId: f.matchId,
                 homeTeamId: f.homeTeamId, awayTeamId: f.awayTeamId,
                 outcome: f.outcome, round: round
             )

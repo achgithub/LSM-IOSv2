@@ -13,7 +13,7 @@ struct AutoAssignTests {
         let result = GameEngine.autoAssign(
             AutoAssignInput(fixtureTeams: fixtures, players: [p], allowRepeats: false)
         )
-        #expect(result[p.id] == bottom.id)
+        #expect(result[p.id] == bottom)
     }
 
     @Test func excludesUsedTeamsWhenRepeatsOff() {
@@ -38,7 +38,7 @@ struct AutoAssignTests {
         let result = GameEngine.autoAssign(
             AutoAssignInput(fixtureTeams: fixtures, players: [p], allowRepeats: false)
         )
-        #expect(result[p.id] == mid.id)
+        #expect(result[p.id] == mid)
     }
 
     @Test func noAssignmentWhenAllUsedAndRepeatsOff() {
@@ -54,7 +54,7 @@ struct AutoAssignTests {
         let result = GameEngine.autoAssign(
             AutoAssignInput(fixtureTeams: fixtures, players: [p], allowRepeats: true)
         )
-        #expect(result[p.id] == bottom.id)
+        #expect(result[p.id] == bottom)
     }
 
     @Test func fallsBackToAlphabeticalWhenStandingsUnknown() {
@@ -72,7 +72,7 @@ struct AutoAssignTests {
         let result = GameEngine.autoAssign(
             AutoAssignInput(fixtureTeams: fixtures, players: [p1, p2], allowRepeats: false)
         )
-        #expect(result[p1.id] == bottom.id)
-        #expect(result[p2.id] == bottom.id)
+        #expect(result[p1.id] == bottom)
+        #expect(result[p2.id] == bottom)
     }
 }

@@ -81,7 +81,9 @@ submissions.post("/links/:token/revoke", async (c) => {
 // Body: { mode, roundNumber, deadline?, fixtures, jokerEnabled?, managerSuffix?, players }
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
-  interface EligibleTeam { id: number; name: string }
+  // fixtureId/opponentName are set when a team plays twice in the round
+  // (rearranged fixtures) — disambiguates which fixture occurrence this is.
+  interface EligibleTeam { id: number; name: string; fixtureId?: number; opponentName?: string }
   interface PushPlayer {
     token: string;
     localPlayerId: string;
@@ -303,7 +305,8 @@ submissions.get("/s/:token", async (c) => {
 
 // POST /s/:token/games/:gameToken
 // Submit (or resubmit) for one specific game.
-// LMS body: { teamId }
+// LMS body: { teamId, teamName?, fixtureId? } — fixtureId disambiguates a team
+// playing twice in the round.
 // Predictor body: { scores: [{fixtureId, home, away, isJoker?}] }
 submissions.post("/s/:token/games/:gameToken", async (c) => {
   const token = c.req.param("token").toLowerCase();

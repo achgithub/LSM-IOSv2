@@ -12,6 +12,11 @@ struct FixturePushItem: Encodable {
 struct EligibleTeam: Encodable {
     let id: Int
     let name: String
+    /// Which fixture this team occurrence belongs to, and its opponent's name
+    /// — set when the team plays twice in the round so the PWA can show which
+    /// match a pick is backing (mirrors `TeamRef.fixtureId`/`opponentName`).
+    let fixtureId: Int?
+    let opponentName: String?
 }
 
 struct PlayerPushItem: Encodable {
@@ -37,6 +42,8 @@ struct SubmissionPayload: Decodable {
     // LMS
     let teamId: Int?
     let teamName: String?
+    /// Which fixture this pick backs, when the team plays twice in the round.
+    let fixtureId: Int?
     // Predictor
     let scores: [PredictorScore]?
 }

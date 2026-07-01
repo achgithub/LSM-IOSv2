@@ -190,7 +190,11 @@ struct PicksEntryView: View {
     private func commitAutoAssign() {
         let proposals = GameLogicService.proposeAutoAssign(round: round, game: game, teamRefs: teamRefs)
         for proposal in proposals {
-            GameLogicService.setPick(player: proposal.player, round: round, teamId: proposal.teamId, context: context)
+            GameLogicService.setPick(
+                player: proposal.player, round: round,
+                teamId: proposal.team.id, fixtureId: proposal.team.fixtureId,
+                context: context
+            )
         }
     }
 }
@@ -239,9 +243,10 @@ private struct PlayerPickRow: View {
                 playerName: player.name,
                 eligible: eligible,
                 currentTeamId: currentPick?.teamId,
+                currentFixtureId: currentPick?.fixtureId,
                 teamsById: teamsById,
-                onSelect: { teamId in
-                    GameLogicService.setPick(player: player, round: round, teamId: teamId, context: context)
+                onSelect: { teamId, fixtureId in
+                    GameLogicService.setPick(player: player, round: round, teamId: teamId, fixtureId: fixtureId, context: context)
                     showPicker = false
                 },
                 onClear: currentPick == nil ? nil : {
@@ -254,14 +259,24 @@ private struct PlayerPickRow: View {
 }
 
 /// Team picker for one player — a tappable list of eligible teams with tiles.
+/// A team playing twice in the round appears once per fixture (each with a
+/// distinct `pickKey`), labelled with its opponent so the manager can tell
+/// them apart and pick the specific fixture they're backing.
 private struct TeamPickSheet: View {
     @Environment(\.dismiss) private var dismiss
     let playerName: String
     let eligible: [TeamRef]
     let currentTeamId: Int?
+    let currentFixtureId: Int?
     let teamsById: [Int: TeamDTO]
-    let onSelect: (Int) -> Void
+    let onSelect: (Int, Int?) -> Void
     let onClear: (() -> Void)?
+
+    private var duplicateTeamIds: Set<Int> {
+        var counts: [Int: Int] = [:]
+        for team in eligible { counts[team.id, default: 0] += 1 }
+        return Set(counts.filter { $0.value > 1 }.keys)
+    }
 
     var body: some View {
         NavigationStack {
@@ -277,14 +292,21 @@ private struct TeamPickSheet: View {
                     // Sorted alphabetically for easy scanning here — the underlying
                     // `eligible` order (bottom-of-table-first) is what auto-assign uses,
                     // not relevant when a manager is picking manually.
-                    ForEach(eligible.sorted { $0.name < $1.name }, id: \.id) { team in
+                    ForEach(eligible.sorted { $0.name < $1.name }, id: \.pickKey) { team in
                         Button {
-                            onSelect(team.id)
+                            onSelect(team.id, team.fixtureId)
                         } label: {
                             HStack(spacing: 10) {
-                                Text(team.name).foregroundStyle(.primary)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(team.name).foregroundStyle(.primary)
+                                    if duplicateTeamIds.contains(team.id), let opponentName = team.opponentName {
+                                        Text("vs \(opponentName)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
-                                if team.id == currentTeamId {
+                                if team.id == currentTeamId && team.fixtureId == currentFixtureId {
                                     Image(systemName: "checkmark").foregroundStyle(.tint)
                                 }
                             }
