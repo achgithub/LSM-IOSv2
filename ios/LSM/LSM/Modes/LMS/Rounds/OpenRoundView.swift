@@ -42,6 +42,31 @@ struct OpenRoundView: View {
 
     private var allFixtures: [MatchDTO] { data?.matches ?? [] }
 
+    /// Active players who'd have zero eligible team among the currently
+    /// selected fixtures (LMS only — Predictor has no "used teams" concept
+    /// to strand anyone with). Without this check the manager could open a
+    /// round no team is left for them to pick in; auto-assign and the manual
+    /// picker would both come up empty, and the round would close with them
+    /// silently un-eliminated.
+    private var strandedPlayers: [Player] {
+        guard game.mode == .lms, let data else { return [] }
+        let refs = GameLogicService.teamRefs(
+            forFixtureIds: Array(selectedFixtureIds),
+            fixtures: data.matches,
+            teamsById: data.teamsById,
+            standingsByTeam: data.standingsByTeam
+        )
+        guard !refs.isEmpty else { return [] }
+        return game.activePlayers.filter { player in
+            GameEngine.orderedAvailableTeams(
+                fixtureTeams: refs,
+                used: GameLogicService.usedTeamIds(for: player),
+                allowRepeats: false,
+                standingsKnown: false
+            ).isEmpty
+        }
+    }
+
     /// True when the held match data is more than the courtesy threshold old —
     /// shows a "refresh?" nudge rather than silently serving it forever. This
     /// is a courtesy, not a gate of its own: accepting goes through the exact
@@ -82,7 +107,8 @@ struct OpenRoundView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Open") { create() }.disabled(selectedFixtureIds.isEmpty || !enoughPlayers)
+                    Button("Open") { create() }
+                        .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty)
                 }
             }
             .task { await load() }
@@ -178,6 +204,19 @@ struct OpenRoundView: View {
                         .font(.caption.weight(.semibold))
                         .textCase(nil)
                     }
+                }
+            }
+
+            if !strandedPlayers.isEmpty {
+                Section {
+                    ForEach(strandedPlayers) { player in
+                        Label(player.name, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("No team left to pick")
+                } footer: {
+                    Text("These players have already used every team in the selected fixtures. Add more fixtures, or remove one of the ones above, before opening.")
                 }
             }
 
