@@ -67,6 +67,17 @@ struct LeagueData {
             if let matchDate { oldestMatches = min(oldestMatches ?? matchDate, matchDate) }
         }
 
+        // A manual (manager-typed) league can go stale if a real team is later
+        // added or renamed to the same name — see `ManualFixtureService`. Check
+        // once per load and re-merge if anything needed purging, so a stale
+        // manual entry never coexists with its real twin for long.
+        if let manualLeague = targets.first(where: { Leagues.isManual($0.id) }) {
+            let realNames = Set(teamsById.values.filter { $0.leagueId != manualLeague.id }.map(\.name))
+            if ManualFixtureService.reconcile(realTeamNames: realNames, leagueId: manualLeague.id) {
+                return try await load(for: targets)
+            }
+        }
+
         return LeagueData(
             matches: matches,
             teamsById: teamsById,

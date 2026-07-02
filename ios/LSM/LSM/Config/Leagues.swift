@@ -159,11 +159,43 @@ enum Leagues {
         all.first { $0.id == id }
     }
 
-    /// Like `byId`, but also resolves the local demo league (which is intentionally
-    /// absent from `all`). Used by `Game.leagues`/`Round.leagues` so a demo game
-    /// resolves to the demo league instead of falling back to the home league.
+    /// Prefix for a game's synthetic manual-fixtures league id (see
+    /// `ManualFixtureService`) — a one-off team/fixture a manager types in by
+    /// hand, e.g. a local pub team dropping in for a laugh, or a stand-in if
+    /// the real fixture provider is unavailable. One per game, derived from
+    /// the game's own id so it's stable but never reusable across games —
+    /// deliberately never in `leagues.json`/`all`, so there's no path to it
+    /// from New Game or Settings; it only ever exists once a manager adds a
+    /// fixture from inside an already-open game.
+    private static let manualPrefix = "MANUAL:"
+
+    static func manualLeagueId(for gameId: UUID) -> String { manualPrefix + gameId.uuidString }
+
+    static func isManual(_ id: String) -> Bool { id.hasPrefix(manualPrefix) }
+
+    /// Like `byId`, but also resolves the local demo league and any game's
+    /// manual-fixtures league (both intentionally absent from `all`). Used by
+    /// `Game.leagues`/`Round.leagues` so those resolve to themselves instead
+    /// of falling back to the home league.
     static func lookup(_ id: String) -> LeagueOption? {
-        id == demoLeagueId ? demo : byId(id)
+        if id == demoLeagueId { return demo }
+        if isManual(id) { return manualLeagueOption(id) }
+        return byId(id)
+    }
+
+    /// Synthesized on the fly — the "team count" is however many manual teams
+    /// the manager has actually typed in so far, read straight from the same
+    /// on-disk cache `ManualFixtureService` writes to.
+    private static func manualLeagueOption(_ id: String) -> LeagueOption {
+        let count = LeagueDataCache.load(LeagueDataCache.Teams.self, key: LeagueDataCache.teamsKey(id))?.items.count ?? 0
+        return LeagueOption(
+            id: id,
+            name: AppString("Manual Fixtures"),
+            shortName: AppString("Manual"),
+            workerBaseURL: "https://manual.invalid",
+            teamsCount: max(count, 1),
+            devOnly: false
+        )
     }
 
     /// Resolve a league by id, falling back to home for unknown/legacy ids.

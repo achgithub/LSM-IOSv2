@@ -35,6 +35,7 @@ struct OpenRoundView: View {
 
     @State private var selectedFixtureIds: Set<Int> = []
     @State private var deadline = Date()
+    @State private var showAddManualFixture = false
 
     /// The league(s) this game runs in — fixtures are pooled across them.
     private var gameLeagues: [LeagueOption] { game.leagues }
@@ -81,14 +82,28 @@ struct OpenRoundView: View {
         return !LeagueDataCache.isFresh(date, ttl: CacheTTL.fixturesCourtesyAge)
     }
 
-    /// Fixtures after every active filter, sorted by kickoff.
+    /// Fixtures after every active filter, sorted by kickoff. Manual fixtures
+    /// skip the date-range filter — the manager already deliberately chose
+    /// its kick-off when adding it by hand, so a filter tuned for the real
+    /// schedule shouldn't be able to hide it again.
     private var visibleFixtures: [MatchDTO] {
-        allFixtures.filter { f in
+        let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        return allFixtures.filter { f in
             (f.leagueId.map { selectedLeagueIds.contains($0) } ?? false)
                 && (!unplayedOnly || Self.isUnplayed(f))
-                && (!dateFilterOn || dateInRange(f))
+                && (f.leagueId == manualLeagueId || !dateFilterOn || dateInRange(f))
         }
         .sorted { $0.kickoff < $1.kickoff }
+    }
+
+    /// Names of every real (non-manual) team already loaded for this game's
+    /// league(s) — passed to the manual-fixture sheet so it can block an
+    /// obvious duplicate up front (see `ManualFixtureService.reconcile` for
+    /// the ongoing safety net if a real team is added/renamed to match later).
+    private var realTeamNames: Set<String> {
+        let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        guard let data else { return [] }
+        return Set(data.teamsById.values.filter { $0.leagueId != manualLeagueId }.map(\.name))
     }
 
     var body: some View {
@@ -118,6 +133,15 @@ struct OpenRoundView: View {
                         title: "Tutorial fixtures loaded",
                         detail: "All fixtures are pre-selected. Tap Open ↑ to continue."
                     )
+                }
+            }
+            .sheet(isPresented: $showAddManualFixture) {
+                AddManualFixtureSheet(
+                    game: game,
+                    realTeamNames: realTeamNames,
+                    existingManualTeams: ManualFixtureService.manualTeams(for: game)
+                ) { home, away, kickoff in
+                    addManualFixture(home: home, away: away, kickoff: kickoff)
                 }
             }
         }
@@ -182,7 +206,7 @@ struct OpenRoundView: View {
                                 Image(systemName: selectedFixtureIds.contains(fixture.id) ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(selectedFixtureIds.contains(fixture.id) ? .green : .secondary)
                                 FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
-                                if isBlended, let lid = fixture.leagueId, let l = Leagues.byId(lid) {
+                                if isBlended, let lid = fixture.leagueId, let l = Leagues.lookup(lid) {
                                     Text(l.shortName)
                                         .font(.caption2.weight(.bold))
                                         .padding(.horizontal, 5).padding(.vertical, 2)
@@ -192,6 +216,11 @@ struct OpenRoundView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+                Button {
+                    showAddManualFixture = true
+                } label: {
+                    Label("Add Manual Fixture", systemImage: "plus.circle")
                 }
             } header: {
                 HStack {
@@ -340,6 +369,16 @@ struct OpenRoundView: View {
                 await load()
             }
         }
+    }
+
+    /// Commits a manually-typed fixture, folds its synthetic league into the
+    /// current filter/selection state, and reloads so it appears immediately.
+    private func addManualFixture(home: TeamDTO, away: TeamDTO, kickoff: Date) {
+        let match = ManualFixtureService.addFixture(homeTeam: home, awayTeam: away, kickoff: kickoff, for: game)
+        try? context.save()
+        selectedFixtureIds.insert(match.id)
+        if let leagueId = match.leagueId { selectedLeagueIds.insert(leagueId) }
+        Task { await load() }
     }
 
     private func create() {
