@@ -139,11 +139,14 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "PredictorGameDetail")
     }
 
-    /// Phase-2 Cloud Backup/Publish render smoke: flips the DEBUG-only cloud
-    /// entitlement toggle in Settings (no network/purchase needed), confirms
-    /// the gated UI actually renders both there and inside a Predictor game's
-    /// detail screen — i.e. `@Environment(Entitlements.self)` really is
-    /// injected at both call sites and the views don't crash on appear.
+    /// Phase-2 Cloud Backup/Publish render smoke: flips the DEBUG-only
+    /// "Simulate tier" picker to a cloud-entitled tier (no network/purchase
+    /// needed), confirms the gated UI actually renders both there and inside
+    /// a Predictor game's detail screen — i.e. `@Environment(Entitlements.self)`
+    /// really is injected at both call sites and the views don't crash on
+    /// appear. Settings is now a list of pushed sub-screens (Apple-style),
+    /// so this drills into Subscription (to flip the tier) and Backup & Cloud
+    /// (to see the gated UI) rather than reading a flat Settings screen.
     @MainActor
     func testCloudBundleUIRendersWhenEntitled() {
         let app = XCUIApplication()
@@ -160,13 +163,21 @@ final class LMSSmokeUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 15))
         app.tabBars.buttons["Settings"].tap()
 
+        app.staticTexts["Backup & Cloud"].tap()
         // Not entitled yet — the upsell row should be showing.
         XCTAssertTrue(app.buttons["Unlock Cloud Backup"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.firstMatch.tap()   // back to Settings
 
-        let toggle = app.switches["Simulate Cloud Backup entitlement"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Dev cloud-entitlement toggle never appeared")
-        toggle.tap()
+        app.staticTexts["Subscription"].tap()
+        let tierPicker = app.buttons["Simulate tier, Free"]
+        XCTAssertTrue(tierPicker.waitForExistence(timeout: 10), "Dev tier simulator never appeared")
+        tierPicker.tap()
+        let leagues3Option = app.buttons["3 Leagues"]
+        XCTAssertTrue(leagues3Option.waitForExistence(timeout: 10), "3 Leagues tier option never appeared")
+        leagues3Option.tap()
+        app.navigationBars.buttons.firstMatch.tap()   // back to Settings
 
+        app.staticTexts["Backup & Cloud"].tap()
         XCTAssertTrue(app.buttons["Back Up Now"].waitForExistence(timeout: 10), "Cloud Backup section didn't switch to the entitled state")
         XCTAssertTrue(app.buttons["Restore…"].exists)
         attachScreenshot(named: "CloudBackupEntitled")
