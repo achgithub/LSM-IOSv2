@@ -20,7 +20,20 @@ renders whatever the player's token says is actionable right now.
 
 ## Status
 
-SKELETON. Static shell + a stubbed API client pointing at the v2 Worker's
-`/s/:token` endpoints (themselves stubbed — see `worker/src/routes/submissions.ts`).
-No build step yet; plain HTML/JS so it can be served from anywhere (Cloudflare
-Pages / the existing `web/` host) without tooling.
+Vite + React + Tailwind PWA (`vite-plugin-pwa`, `injectManifest` strategy).
+Deployed as a Cloudflare Pages static build with `functions/s/[token]/manifest.webmanifest.js`
+still handling the per-token, per-manager dynamic manifest — that Function is
+independent of the Vite build (`manifest: false` in `vite.config.ts`; the
+plugin only owns the service worker).
+
+No offline storage — this app is a thin online client of `/s/:token`.
+
+Push notifications are wired client-side (`src/hooks/usePushSubscription.ts`)
+but call `/s/:token/push/*` routes on worker-api that don't exist yet. That
+needs a token-keyed `push_subscriptions` table (not `user_id`-keyed, since
+this app is deliberately login-less) plus matching routes before `enable()`
+will succeed — until then it degrades safely.
+
+Dev: `npm run dev`. Build: `npm run build` (outputs to `dist/`; deploy with
+`wrangler pages deploy dist` run from this directory so `functions/` is
+picked up).
