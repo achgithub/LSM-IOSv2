@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// Colored rounded-square icon badge, matching the visual language of Apple's
-/// own Settings app — used so the top-level Settings list reads as a set of
-/// scannable destinations rather than a wall of text.
+/// Rounded-square icon badge for a top-level Settings row, in the app's one
+/// brand blue (see `Brand.sharedBlue`) rather than Apple's per-row rainbow —
+/// this app reserves color for status (green/orange/red), so every tile
+/// shares a single accent instead of a different color each.
 struct SettingsIcon: View {
     let systemName: String
-    let color: Color
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(color.gradient)
+            .fill(Brand.sharedBlue.gradient)
             .frame(width: 29, height: 29)
             .overlay {
                 Image(systemName: systemName)
@@ -24,13 +24,12 @@ struct SettingsIcon: View {
 /// `NavigationLink` label.
 struct SettingsRow: View {
     let systemName: String
-    let color: Color
     let title: LocalizedStringKey
     var value: String?
 
     var body: some View {
         HStack(spacing: 12) {
-            SettingsIcon(systemName: systemName, color: color)
+            SettingsIcon(systemName: systemName)
             Text(title)
             Spacer()
             if let value {

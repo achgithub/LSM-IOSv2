@@ -17,32 +17,29 @@ struct SettingsView: View {
                         ProfileSettingsView()
                     } label: {
                         SettingsRow(
-                            systemName: "person.crop.circle.fill", color: .gray,
+                            systemName: "person.crop.circle.fill",
                             title: "Profile", value: managerName.isEmpty ? nil : managerName
                         )
                     }
-                }
-
-                Section {
                     NavigationLink {
                         SubscriptionSettingsView()
                     } label: {
-                        SettingsRow(systemName: "star.fill", color: .orange, title: "Subscription", value: entitlements.tier.label)
+                        SettingsRow(systemName: "star.fill", title: "Subscription", value: entitlements.tier.label)
                     }
                     NavigationLink {
                         LeagueSettingsView()
                     } label: {
-                        SettingsRow(systemName: "trophy.fill", color: .green, title: "Leagues", value: "\(enabled.ids.count)/\(entitlements.leagueAllowance)")
+                        SettingsRow(systemName: "trophy.fill", title: "Leagues", value: "\(enabled.ids.count)/\(entitlements.leagueAllowance)")
                     }
                     NavigationLink {
                         BackupSettingsView()
                     } label: {
-                        SettingsRow(systemName: "icloud.fill", color: .blue, title: "Backup & Cloud")
+                        SettingsRow(systemName: "icloud.fill", title: "Backup & Cloud")
                     }
                     NavigationLink {
                         RosterSettingsView()
                     } label: {
-                        SettingsRow(systemName: "person.2.fill", color: .purple, title: "Roster")
+                        SettingsRow(systemName: "person.2.fill", title: "Roster")
                     }
                 }
 
@@ -50,15 +47,16 @@ struct SettingsView: View {
                     NavigationLink {
                         LanguageSettingsView()
                     } label: {
-                        SettingsRow(systemName: "globe", color: .blue, title: "Language", value: localization.language.displayName)
+                        SettingsRow(systemName: "globe", title: "Language", value: localization.language.displayName)
                     }
                     NavigationLink {
                         AboutView()
                     } label: {
-                        SettingsRow(systemName: "info.circle.fill", color: .gray, title: "About")
+                        SettingsRow(systemName: "info.circle.fill", title: "About")
                     }
                 }
             }
+            .listSectionSpacing(.compact)
             .appBackground()
             .navigationTitle("Settings")
         }
