@@ -21,6 +21,19 @@ import Foundation
 /// the ceiling: some leagues (Bundesliga especially) simply haven't
 /// published dates that far out yet, and there's nothing to open early —
 /// see `eligibleIds` below.
+///
+/// **The window is anchored to the earliest available fixture, not to
+/// today's calendar date.** Anchoring to "now" zeroes out every fixture
+/// during close season (next ball can be 6+ weeks away) or shortchanges a
+/// blend where one league's season starts later than another's. Anchoring
+/// to the first fixture instead means the manager always sees a normal
+/// 3-5-week window measured from whenever football next actually happens,
+/// never nothing at all. For a blended (multi-league) game the anchor is
+/// shared across the whole blend (the earliest fixture over every league
+/// combined) — clustering itself still happens per league (see
+/// `eligibleFixtureIds`), only the target/ceiling reference point is shared,
+/// so one league's later start doesn't strand it behind its own separate
+/// clock.
 enum FixtureHorizon {
     struct Config {
         var targetDays: Double = 28
@@ -37,10 +50,11 @@ enum FixtureHorizon {
     /// kickoff (the league hasn't confirmed a date that far out yet) is
     /// never eligible — skipped, not defaulted to some placeholder date.
     static func eligibleFixtureIds(fixtures: [MatchDTO], now: Date = .now, config: Config = .default) -> Set<Int> {
+        let anchor = horizonAnchor(fixtures: fixtures, now: now)
         var result: Set<Int> = []
         for (leagueId, leagueFixtures) in Dictionary(grouping: fixtures, by: { $0.leagueId }) {
             guard leagueId != nil else { continue }
-            result.formUnion(eligibleIds(in: leagueFixtures, now: now, config: config))
+            result.formUnion(eligibleIds(in: leagueFixtures, anchor: anchor, config: config))
         }
         return result
     }
@@ -48,9 +62,12 @@ enum FixtureHorizon {
     /// The furthest kickoff date currently open for one league — for display
     /// ("fixtures open through 4 Aug") and for capping a manual date-range
     /// picker. Nil if the league has no eligible dated fixtures right now.
+    /// `fixtures` should be the full blended pool (every league in the
+    /// game), same as `eligibleFixtureIds`, so the anchor matches.
     static func horizonEnd(leagueId: String, fixtures: [MatchDTO], now: Date = .now, config: Config = .default) -> Date? {
+        let anchor = horizonAnchor(fixtures: fixtures, now: now)
         let leagueFixtures = fixtures.filter { $0.leagueId == leagueId }
-        let ids = eligibleIds(in: leagueFixtures, now: now, config: config)
+        let ids = eligibleIds(in: leagueFixtures, anchor: anchor, config: config)
         guard !ids.isEmpty else { return nil }
         return leagueFixtures
             .filter { ids.contains($0.id) }
@@ -58,9 +75,20 @@ enum FixtureHorizon {
             .max()
     }
 
+    /// The earliest upcoming (>= `now`) kickoff across every league in
+    /// `fixtures` — the shared reference point target/ceiling count from.
+    /// Falls back to `now` itself if nothing upcoming is dated at all (then
+    /// behaves exactly as a now-anchored window would).
+    private static func horizonAnchor(fixtures: [MatchDTO], now: Date) -> Date {
+        fixtures
+            .compactMap { FixtureFormat.kickoffDate($0.kickoff) }
+            .filter { $0 >= now }
+            .min() ?? now
+    }
+
     // MARK: - Core algorithm (one league's worth of fixtures)
 
-    private static func eligibleIds(in fixtures: [MatchDTO], now: Date, config: Config) -> Set<Int> {
+    private static func eligibleIds(in fixtures: [MatchDTO], anchor: Date, config: Config) -> Set<Int> {
         let dated = fixtures
             .compactMap { f -> (id: Int, date: Date)? in
                 guard let date = FixtureFormat.kickoffDate(f.kickoff) else { return nil }
@@ -69,8 +97,8 @@ enum FixtureHorizon {
             .sorted { $0.date < $1.date }
         guard !dated.isEmpty else { return [] }
 
-        let targetEnd = now.addingTimeInterval(config.targetDays * 86400)
-        let ceilingEnd = now.addingTimeInterval(config.ceilingDays * 86400)
+        let targetEnd = anchor.addingTimeInterval(config.targetDays * 86400)
+        let ceilingEnd = anchor.addingTimeInterval(config.ceilingDays * 86400)
 
         var admitted: [Int] = []
         for cluster in cluster(dated, gapDays: config.clusterGapDays) {

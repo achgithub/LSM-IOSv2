@@ -3,8 +3,9 @@ import Foundation
 @testable import LSM
 
 /// Covers the shared fixture-visibility horizon (see fixture-horizon-logic
-/// design memory): date-clustering (not matchday labels), the target/ceiling
-/// snap, and the two real-world reschedule shapes it's built to survive.
+/// design memory): date-clustering (not matchday labels), the anchor-to-
+/// first-fixture target/ceiling snap, and the real-world reschedule shapes
+/// it's built to survive.
 struct FixtureHorizonTests {
 
     private let league = "TEST"
@@ -34,44 +35,60 @@ struct FixtureHorizonTests {
         #expect(eligible == Set(1...5))
     }
 
-    @Test func outlierPushedSixWeeksOutDoesNotDragOrBlockItsMatchday() {
-        // MD2: four fixtures at ~12 days, one rearranged 6 weeks (42 days) out.
+    @Test func outlierRearrangedWellBeyondTheAnchoredCeilingDoesNotDragOrBlockItsMatchday() {
+        // MD2: four fixtures near the anchor (~12 days), one rearranged so
+        // far out (60 days) that it's still beyond the ceiling even once the
+        // ceiling is measured from the anchor (~12 + 35 = ~47), not from
+        // today.
         var fixtures = (1...4).map { fixture($0, daysFromNow: 12 + Double($0) * 0.1) }
-        fixtures.append(fixture(5, daysFromNow: 42))
+        fixtures.append(fixture(5, daysFromNow: 60))
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: fixtures)
-        // The near cluster opens now; the outlier does not (it's 42 days out —
-        // beyond even the 35-day ceiling).
         #expect(eligible == Set(1...4))
     }
 
-    @Test func fixtureBroughtForwardJoinsWhicheverClusterItsNewDateFallsInto() {
-        // MD8's real cluster sits ~40 days out (beyond the horizon), but one
-        // of its fixtures was brought forward to 15 days — it should open
-        // with whatever's near, on its own schedule, independent of the
-        // label "MD8".
-        var fixtures = (1...4).map { fixture($0, daysFromNow: 40 + Double($0) * 0.1) } // rest of MD8
+    @Test func fixtureBroughtForwardBecomesTheAnchorWithoutPullingInItsOldMatchday() {
+        // One MD8 fixture is brought forward to 15 days — it becomes the
+        // anchor. The rest of MD8 sits at 60 days, still beyond the anchored
+        // ceiling (15 + 35 = 50), so it stays closed; only the brought-
+        // forward fixture opens, on its own schedule.
+        var fixtures = (1...4).map { fixture($0, daysFromNow: 60 + Double($0) * 0.1) } // rest of MD8
         fixtures.append(fixture(5, daysFromNow: 15)) // brought forward
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: fixtures)
         #expect(eligible == Set([5]))
     }
 
-    @Test func nextClusterWithinCeilingIsIncludedWhole() {
-        // First cluster ends at 20 days (within target). Second cluster ends
-        // at 30 days — past the 28-day target, but still within the 35-day
-        // ceiling, so it's admitted whole rather than cut.
-        let near = (1...3).map { fixture($0, daysFromNow: 18 + Double($0) * 0.1) }
-        let next = (4...6).map { fixture($0, daysFromNow: 30 + Double($0) * 0.1) }
+    @Test func nextClusterWithinTheAnchoredCeilingIsIncludedWhole() {
+        // Anchor is the near cluster (~day 3). Target = anchor+28 (~31),
+        // ceiling = anchor+35 (~38). The next cluster sits at ~35 days —
+        // past target, still within the anchored ceiling — so it's admitted
+        // whole rather than cut.
+        let near = (1...3).map { fixture($0, daysFromNow: 3 + Double($0) * 0.1) }
+        let next = (4...6).map { fixture($0, daysFromNow: 35 + Double($0) * 0.1) }
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: near + next)
         #expect(eligible == Set(1...6))
     }
 
-    @Test func clusterBeyondCeilingIsCutEvenIfShortOfTarget() {
-        // Only cluster available ends at 40 days — past the 35-day ceiling.
-        // Nothing opens rather than including it, even though that leaves
-        // the window at 0 days (there's simply nothing eligible yet).
+    @Test func horizonAnchorsToTheFirstAvailableFixtureNotToday() {
+        // Close season: the only cluster available is 40 days out (past a
+        // now-anchored 35-day ceiling — e.g. next season doesn't kick off
+        // for 6 weeks). It must still open: the window is measured from the
+        // first available fixture, so the ceiling becomes 40+35=75, not
+        // today+35. Regression test for a real bug — without an anchor tied
+        // to the first fixture, close season zeroed out fixtures app-wide.
         let far = (1...3).map { fixture($0, daysFromNow: 40 + Double($0) * 0.1) }
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: far)
-        #expect(eligible.isEmpty)
+        #expect(eligible == Set(1...3))
+    }
+
+    @Test func clusterBeyondTheAnchoredCeilingIsStillExcluded() {
+        // Nearest cluster (the anchor) at 40 days; a further cluster at 80
+        // days is beyond even the anchored ceiling (40+35=75), so it's
+        // excluded — anchoring to the first fixture widens the window, it
+        // doesn't remove the cap on how much *more* it can reach.
+        let nearest = (1...2).map { fixture($0, daysFromNow: 40 + Double($0) * 0.1) }
+        let further = (3...4).map { fixture($0, daysFromNow: 80 + Double($0) * 0.1) }
+        let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: nearest + further)
+        #expect(eligible == Set(1...2))
     }
 
     @Test func undatedFixturesAreExcludedNotDefaulted() {
@@ -91,27 +108,31 @@ struct FixtureHorizonTests {
         #expect(eligible == Set(1...3))
     }
 
-    @Test func multipleLeaguesAreClusteredIndependently() {
-        // League A has a near matchday; league B's nearest is far out. Each
-        // league's own horizon should apply independently.
+    @Test func blendedLeaguesShareOneAnchorNotIndependentClocks() {
+        // League A's nearest fixture (day 10) becomes the SHARED anchor for
+        // the whole blend. League B's own nearest fixture is day 40 — beyond
+        // a now-anchored ceiling, but within 35 days of the shared anchor
+        // (10+35=45), so it still opens. Clustering stays per-league; only
+        // the anchor is shared.
         let leagueA = (1...2).map { fixture($0, daysFromNow: 10, leagueId: "A") }
         let leagueB = (3...4).map { fixture($0, daysFromNow: 40, leagueId: "B") }
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: leagueA + leagueB)
-        #expect(eligible == Set(1...2))
+        #expect(eligible == Set(1...4))
     }
 
-    @Test func gapWithNoGamesStretchesCalendarReachToStillCaptureTargetRoundsOfGames() {
-        // Weekly rounds at day 7 and 14, then a 2-week gap with no fixtures
-        // at all (nothing at day 21), resuming at day 35. The walk only ever
-        // sees real cluster dates, so the blank fortnight isn't charged
-        // against the 28-day target — it just means reaching 3 real rounds
-        // of games takes 5 calendar weeks instead of 3.
-        var fixtures = (1...2).map { fixture($0, daysFromNow: 7, leagueId: league) } // day 7
-        fixtures += (3...4).map { fixture($0, daysFromNow: 14, leagueId: league) }   // day 14
-        // (deliberately nothing around day 21/28 — the gap)
-        fixtures += (5...6).map { fixture($0, daysFromNow: 35, leagueId: league) }   // day 35, right at the ceiling
+    @Test func gapWithNoGamesStretchesTheAnchoredCeilingToStillCaptureRealRounds() {
+        // Anchor is day 5 (nearest fixture); target = 33, ceiling = 40.
+        // Rounds at day 5 and day 12 fit within target. Then a blank
+        // stretch with no fixtures at all, resuming at day 40 — past target
+        // but exactly at the anchored ceiling, so it's still admitted: the
+        // gap doesn't shrink the real number of rounds on offer, it just
+        // uses more of the calendar allowance to reach them.
+        var fixtures = (1...2).map { fixture($0, daysFromNow: 5, leagueId: league) }
+        fixtures += (3...4).map { fixture($0, daysFromNow: 12, leagueId: league) }
+        // (deliberately nothing between day 19 and day 33 — the gap)
+        fixtures += (5...6).map { fixture($0, daysFromNow: 40, leagueId: league) }
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: fixtures)
-        #expect(eligible == Set(1...6)) // all 3 real rounds admitted, gap absorbed for free
+        #expect(eligible == Set(1...6))
     }
 
     @Test func horizonEndReportsTheFurthestAdmittedKickoff() {
