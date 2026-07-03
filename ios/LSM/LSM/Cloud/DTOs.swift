@@ -78,14 +78,18 @@ struct StandingDTO: Codable, Identifiable {
     /// results exist. The one case it isn't: pre-season, when every row is
     /// 0-0-0 and some providers return those ties in ID order rather than
     /// the alphabetical convention used league-wide for level teams — so
-    /// that specific all-zero case is re-sorted alphabetically and
-    /// renumbered client-side; any other table is passed through untouched.
+    /// that specific all-zero case is re-sorted alphabetically (by the same
+    /// shortName the row displays, not the provider's full official name)
+    /// and renumbered client-side; any other table is passed through
+    /// untouched.
     nonisolated static func displayOrder(rows: [StandingDTO], teamsById: [Int: TeamDTO]) -> [StandingDTO] {
         let allScoreless = rows.allSatisfy { $0.points == 0 && $0.goalDifference == 0 && $0.goalsFor == 0 }
         guard allScoreless else { return rows }
         let sorted = rows.sorted { a, b in
-            let nameA = teamsById[a.teamId]?.name ?? ""
-            let nameB = teamsById[b.teamId]?.name ?? ""
+            let teamA = teamsById[a.teamId]
+            let teamB = teamsById[b.teamId]
+            let nameA = teamA?.shortName ?? teamA?.name ?? ""
+            let nameB = teamB?.shortName ?? teamB?.name ?? ""
             return nameA.localizedCaseInsensitiveCompare(nameB) == .orderedAscending
         }
         return sorted.enumerated().map { index, row in
