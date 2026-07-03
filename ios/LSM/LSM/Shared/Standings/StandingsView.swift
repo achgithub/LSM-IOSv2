@@ -136,8 +136,8 @@ struct StandingsView: View {
         let key = LeagueDataCache.standingsKey(league.id)
         switch LeagueDataCache.read(LeagueDataCache.Standings.self, key: key) {
         case .hit(let cached) where LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.standings):
-            standings = cached.rows
             teamsById = Dictionary(cached.teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            standings = cached.rows.sorted(by: StandingDTO.byTableOrder(teamsById: teamsById))
             lastRefreshed = cached.date
         case .corrupt:
             Task { await load(force: true) }
@@ -154,8 +154,8 @@ struct StandingsView: View {
         errorMessage = nil
         let key = LeagueDataCache.standingsKey(league.id)
         if !force, let cached = LeagueDataCache.load(LeagueDataCache.Standings.self, key: key) {
-            standings = cached.rows
             teamsById = Dictionary(cached.teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            standings = cached.rows.sorted(by: StandingDTO.byTableOrder(teamsById: teamsById))
             lastRefreshed = cached.date
             freshUntil = standingsThrottleUntil()
             isLoading = false
@@ -166,8 +166,8 @@ struct StandingsView: View {
             async let standingsReq = client.standings()
             async let teamsReq = client.teams()
             let (rows, teams) = try await (standingsReq, teamsReq)
-            standings = rows
             teamsById = Dictionary(teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            standings = rows.sorted(by: StandingDTO.byTableOrder(teamsById: teamsById))
             let now = Date()
             lastRefreshed = now
             LeagueDataCache.save(LeagueDataCache.Standings(date: now, rows: rows, teams: teams), key: key)

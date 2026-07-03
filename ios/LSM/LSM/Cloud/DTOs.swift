@@ -73,6 +73,23 @@ struct StandingDTO: Codable, Identifiable {
     let updatedAt: String
 
     var id: Int { teamId }
+
+    /// Points desc, then goal difference desc, then goals scored desc, then
+    /// team name asc — the standard "form" tiebreak, falling back to the
+    /// alphabetical convention used league-wide when teams are level (most
+    /// visibly at 0 points before a ball is kicked). The Worker's own
+    /// `position` order isn't sorted client-side elsewhere, so this is the
+    /// one place table order is decided.
+    nonisolated static func byTableOrder(teamsById: [Int: TeamDTO]) -> (StandingDTO, StandingDTO) -> Bool {
+        { a, b in
+            if a.points != b.points { return a.points > b.points }
+            if a.goalDifference != b.goalDifference { return a.goalDifference > b.goalDifference }
+            if a.goalsFor != b.goalsFor { return a.goalsFor > b.goalsFor }
+            let nameA = teamsById[a.teamId]?.name ?? ""
+            let nameB = teamsById[b.teamId]?.name ?? ""
+            return nameA.localizedCaseInsensitiveCompare(nameB) == .orderedAscending
+        }
+    }
 }
 
 struct ScoreDTO: Decodable, Identifiable {
