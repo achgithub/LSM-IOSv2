@@ -16,26 +16,29 @@ struct AppRootView: View {
     @StateObject private var maintenance = MaintenanceState.shared
 
     var body: some View {
-        ZStack(alignment: .top) {
-            RootTabView(splashActive: showSplash, selection: $selectedTab)
-                .environment(EnabledLeagues.shared)
-
-            if showSplash {
-                SplashView {
-                    withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
-                }
-                .transition(.opacity)
-                .zIndex(1)
-            }
-        }
-        // A top overlay would sit on top of (and block) each tab's own
-        // navigation bar buttons — e.g. Matches' refresh button. A safe-area
-        // inset instead reserves its own space above the bar, pushing
-        // everything else down rather than covering it.
-        .safeAreaInset(edge: .top, spacing: 0) {
+        // The banner is a VStack sibling ABOVE the tab content, not a top
+        // overlay/safeAreaInset on it — RootTabView's ad banner hit the same
+        // problem (see its comment) and settled on plain sibling stacking
+        // because a TabView's UIKit-backed nav bar doesn't reliably shift for
+        // a SwiftUI safe-area inset injected above it, so the injected inset
+        // just sat on top of (and blocked) the nav bar's buttons instead.
+        VStack(spacing: 0) {
             if maintenance.isActive && !showSplash {
                 MaintenanceBanner(message: maintenance.message)
                     .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            ZStack(alignment: .top) {
+                RootTabView(splashActive: showSplash, selection: $selectedTab)
+                    .environment(EnabledLeagues.shared)
+
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
+                    }
+                    .transition(.opacity)
+                    .zIndex(1)
+                }
             }
         }
         .animation(.easeInOut, value: maintenance.isActive)
