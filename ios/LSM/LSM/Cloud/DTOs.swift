@@ -61,7 +61,7 @@ struct MatchDTO: Codable, Identifiable {
 
 struct StandingDTO: Codable, Identifiable {
     let teamId: Int
-    let position: Int
+    var position: Int
     let played: Int
     let won: Int
     let drawn: Int
@@ -74,20 +74,24 @@ struct StandingDTO: Codable, Identifiable {
 
     var id: Int { teamId }
 
-    /// Points desc, then goal difference desc, then goals scored desc, then
-    /// team name asc — the standard "form" tiebreak, falling back to the
-    /// alphabetical convention used league-wide when teams are level (most
-    /// visibly at 0 points before a ball is kicked). The Worker's own
-    /// `position` order isn't sorted client-side elsewhere, so this is the
-    /// one place table order is decided.
-    nonisolated static func byTableOrder(teamsById: [Int: TeamDTO]) -> (StandingDTO, StandingDTO) -> Bool {
-        { a, b in
-            if a.points != b.points { return a.points > b.points }
-            if a.goalDifference != b.goalDifference { return a.goalDifference > b.goalDifference }
-            if a.goalsFor != b.goalsFor { return a.goalsFor > b.goalsFor }
+    /// The Worker's own `position`/row order is authoritative once any real
+    /// results exist. The one case it isn't: pre-season, when every row is
+    /// 0-0-0 and some providers return those ties in ID order rather than
+    /// the alphabetical convention used league-wide for level teams — so
+    /// that specific all-zero case is re-sorted alphabetically and
+    /// renumbered client-side; any other table is passed through untouched.
+    nonisolated static func displayOrder(rows: [StandingDTO], teamsById: [Int: TeamDTO]) -> [StandingDTO] {
+        let allScoreless = rows.allSatisfy { $0.points == 0 && $0.goalDifference == 0 && $0.goalsFor == 0 }
+        guard allScoreless else { return rows }
+        let sorted = rows.sorted { a, b in
             let nameA = teamsById[a.teamId]?.name ?? ""
             let nameB = teamsById[b.teamId]?.name ?? ""
             return nameA.localizedCaseInsensitiveCompare(nameB) == .orderedAscending
+        }
+        return sorted.enumerated().map { index, row in
+            var row = row
+            row.position = index + 1
+            return row
         }
     }
 }
