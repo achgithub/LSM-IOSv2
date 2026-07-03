@@ -83,17 +83,38 @@ struct OpenRoundView: View {
     }
 
     /// Fixtures after every active filter, sorted by kickoff. Manual fixtures
-    /// skip the date-range filter — the manager already deliberately chose
-    /// its kick-off when adding it by hand, so a filter tuned for the real
-    /// schedule shouldn't be able to hide it again.
+    /// skip the date-range filter and the horizon — the manager already
+    /// deliberately chose its kick-off when adding it by hand, so a filter
+    /// tuned for the real schedule shouldn't be able to hide it again.
     private var visibleFixtures: [MatchDTO] {
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        let eligible = horizonEligibleIds
         return allFixtures.filter { f in
             (f.leagueId.map { selectedLeagueIds.contains($0) } ?? false)
                 && (!unplayedOnly || Self.isUnplayed(f))
-                && (f.leagueId == manualLeagueId || !dateFilterOn || dateInRange(f))
+                && (f.leagueId == manualLeagueId
+                    || (eligible.contains(f.id) && (!dateFilterOn || dateInRange(f))))
         }
         .sorted { $0.kickoff < $1.kickoff }
+    }
+
+    /// Real (non-manual) fixture ids the shared fixture horizon currently
+    /// allows into a new round — a hard cap, not something the date-range
+    /// filter above can widen past. See `FixtureHorizon`.
+    private var horizonEligibleIds: Set<Int> {
+        let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        return FixtureHorizon.eligibleFixtureIds(fixtures: allFixtures.filter { $0.leagueId != manualLeagueId })
+    }
+
+    /// The furthest kickoff date currently open across this game's leagues —
+    /// used to default/cap the date-range "To" picker. Nil before fixtures
+    /// have loaded or if none are eligible yet.
+    private var horizonEnd: Date? {
+        let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        let realFixtures = allFixtures.filter { $0.leagueId != manualLeagueId }
+        return gameLeagues
+            .compactMap { FixtureHorizon.horizonEnd(leagueId: $0.id, fixtures: realFixtures) }
+            .max()
     }
 
     /// Names of every real (non-manual) team already loaded for this game's
@@ -173,7 +194,7 @@ struct OpenRoundView: View {
                 }
             }
 
-            Section("Filters") {
+            Section {
                 // Only show the league control when there's an actual choice — a
                 // single-league game uses that league silently (matches New Game).
                 if isBlended {
@@ -190,7 +211,17 @@ struct OpenRoundView: View {
                 Toggle("Filter by date", isOn: $dateFilterOn.animation())
                 if dateFilterOn {
                     DatePicker("From", selection: $dateFrom, displayedComponents: .date)
-                    DatePicker("To", selection: $dateTo, in: dateFrom..., displayedComponents: .date)
+                    DatePicker(
+                        "To", selection: $dateTo,
+                        in: dateFrom...max(dateFrom, horizonEnd ?? dateTo),
+                        displayedComponents: .date
+                    )
+                }
+            } header: {
+                Text("Filters")
+            } footer: {
+                if let horizonEnd {
+                    Text("Fixtures open through \(horizonEnd.formatted(date: .abbreviated, time: .omitted)) — later matchdays open closer to kick-off.")
                 }
             }
 
@@ -331,6 +362,7 @@ struct OpenRoundView: View {
     private func load() async {
         isLoading = true
         errorMessage = nil
+        let isFirstLoad = data == nil
         do {
             let fresh = try await LeagueData.load(for: gameLeagues)
             data = fresh
@@ -340,6 +372,12 @@ struct OpenRoundView: View {
         isLoading = false
         if selectedLeagueIds.isEmpty {
             selectedLeagueIds = Set(gameLeagues.map(\.id))
+        }
+        // Default the "To" filter to the horizon boundary rather than a fixed
+        // +14 days — only on the very first load, so a manager's own edit
+        // (or a later refresh) doesn't get silently overwritten.
+        if isFirstLoad, let horizonEnd {
+            dateTo = horizonEnd
         }
         if game.isDemoData { setupForTutorial() }
     }
@@ -385,6 +423,7 @@ struct OpenRoundView: View {
         let round = GameLogicService.openRound(
             in: game,
             fixtureIds: Array(selectedFixtureIds),
+            fixtures: allFixtures,
             deadline: deadline,
             roundType: roundType,
             context: context

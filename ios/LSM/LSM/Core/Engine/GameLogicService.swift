@@ -104,18 +104,33 @@ enum GameLogicService {
         (game.rounds.map(\.roundNumber).max() ?? 0) + 1
     }
 
+    /// Opens a round, admitting only fixtures within the shared
+    /// `FixtureHorizon` (see fixture-horizon-logic design). `fixtures` is the
+    /// caller's loaded fixture pool, used to look up each requested id's
+    /// league/kickoff for that check — pass `[]` (the default) for synthetic
+    /// callers like the tutorial, whose scripted fixture ids won't be found
+    /// in the pool and so pass through untouched, same as a manual fixture.
+    /// This is the actual enforcement point (not the round-open UI), since
+    /// every mode's round creation funnels through here.
     @discardableResult
     static func openRound(
         in game: Game,
         fixtureIds: [Int],
+        fixtures: [MatchDTO] = [],
         deadline: Date,
         roundType: RoundType = .normal,
         context: ModelContext
     ) -> Round {
+        let manualLeagueId = ManualFixtureService.leagueId(for: game)
+        let realFixtures = fixtures.filter { $0.leagueId != manualLeagueId }
+        let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: realFixtures)
+        let knownRealIds = Set(realFixtures.map(\.id))
+        let admittedIds = fixtureIds.filter { !knownRealIds.contains($0) || eligible.contains($0) }
+
         let round = Round(
             roundNumber: nextRoundNumber(for: game),
             deadline: deadline,
-            fixtureIds: fixtureIds,
+            fixtureIds: admittedIds,
             roundType: roundType,
             game: game
         )
