@@ -17,21 +17,58 @@
 <body>
 <a class="back" href="/lsm/">← Back</a>
 <h1>Privacy Policy</h1>
-<p class="updated">Last Stand Manager (Sports Manager) — last updated 21 June 2026</p>
+<p class="updated">Last Stand Manager (Sports Manager) — last updated 3 July 2026</p>
 
-<p>Last Stand Manager ("the app") is published by Sports Manager. This policy
-explains what data the app collects and why.</p>
+<p>Last Stand Manager ("the app") is published by Sports Manager. It includes
+two game modes — Last Man Standing pools and Predictor prediction leagues —
+both covered by this one policy. This policy explains what data the app
+collects and why.</p>
 
 <h2>No account, no sign-in</h2>
-<p>The app does not require you to create an account or sign in. Your games,
-players, picks and settings are stored locally on your device and are not
-sent to us.</p>
+<p>The app does not require you to create an account or sign in. By default,
+your games, players, picks and predictions are stored locally on your device
+and are not sent to us. If you switch on the optional Cloud Backup, Cloud
+Publish or player-link features described below, some of that data leaves
+your device — see those sections for details.</p>
 
 <h2>League data</h2>
 <p>Fixtures, scores, standings and team data are fetched from our server,
 which in turn sources data from football-data.org. These requests don't
 include any personal information about you — they're anonymous reads of
 public sports data.</p>
+
+<h2>Cloud Backup (optional, paid tiers)</h2>
+<p>On the 3+ league subscription tiers, you can turn on Cloud Backup to
+protect your games against a lost or replaced phone. When you do, the app
+uploads a snapshot of the game(s) you choose — including player names,
+picks, predictions and results — to our storage (Cloudflare R2), identified
+by a restore code generated on your device. Your device also holds a
+persistent identifier which is sent with backup requests so we can find and
+retire old backups (we keep a small number of your most recent backups per
+device, not an unlimited history). Anyone with your restore code can restore
+that data to a device, so treat it like a password. Turning Cloud Backup off,
+or deleting the app, does not delete backups already stored with us — email
+us if you'd like a backup removed.</p>
+
+<h2>Cloud Publish (Predictor standings pages, optional, paid tiers)</h2>
+<p>For Predictor leagues, the 3+ league tiers let you publish a standings
+page that your players can view on the web — recent results, the league
+table and each player's points. You choose what to publish; nothing is
+published automatically. The page sits behind a PIN that you set and share
+separately from the link, and the page itself is only reachable via an
+unguessable web address. Player names are only shown to someone who has both
+the link and the correct PIN.</p>
+
+<h2>Player links and submissions (PWA, optional, paid tiers)</h2>
+<p>You can send individual players a personal link they can save to their
+phone's home screen to submit their own picks or predictions each round,
+instead of you entering them by hand. When a player submits through that
+link, their name and pick/prediction are sent to our server and held
+temporarily so you can review and approve them in the app; approved
+submissions are then copied into your local game data. We keep a rolling
+window of recent submissions on our server (older ones are pruned once a
+round is a few rounds old) and don't otherwise use this data. You can revoke
+a player's link at any time from within the app, which invalidates it.</p>
 
 <h2>Data availability between seasons</h2>
 <p>For each league, there is normally a short window of around one to two
@@ -55,7 +92,9 @@ for details on what AdMob collects.</p>
 
 <h2>Subscriptions</h2>
 <p>Paid tiers (No Ads / 3 Leagues / 5 Leagues / 7 Leagues) are sold as auto-renewing
-subscriptions through Apple's In-App Purchase system. Purchases are
+subscriptions through Apple's In-App Purchase system. Cloud Backup, Cloud
+Publish and player links are bundled into the 3+ league tiers at no extra
+charge — there's no separate cloud purchase. Purchases are
 processed by Apple and managed on our behalf by RevenueCat, which receives
 an anonymous purchase/subscription identifier to validate your purchase
 and restore it across devices — we never see your card details. See
@@ -68,7 +107,11 @@ collect data from them.</p>
 
 <h2>Your choices</h2>
 <ul>
-  <li>Deleting the app removes all locally-stored game data.</li>
+  <li>Deleting the app removes all locally-stored game data, but not any
+  Cloud Backup or published pages already stored with us — email us to have
+  those removed.</li>
+  <li>You can revoke a player's submission link at any time from within
+  the app.</li>
   <li>You can opt out of personalised ads at any time via your device's
   tracking settings.</li>
   <li>To cancel a subscription, use the App Store under your Apple ID →

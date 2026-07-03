@@ -79,7 +79,7 @@ Items that must be done before a TestFlight build is distributed.
 
 - [ ] **Confirm RevenueCat package and entitlement IDs**
   - Comments updated to "verify against dashboard" — identifiers cannot be confirmed without dashboard access.
-  - Action needed: log into RevenueCat dashboard and verify `cloud_bundle` (entitlement), `cloud_bundle_monthly` (package), `no_ads`, `leagues_3_monthly`, `leagues_5_monthly`, `leagues_7_monthly` package IDs match exactly.
+  - Action needed: log into RevenueCat dashboard and verify entitlement IDs `no_ads` / `leagues_3` / `leagues_5` / `leagues_7`, and package IDs `no_ads`, `leagues_3_monthly`, `leagues_5_monthly`, `leagues_7_monthly` match exactly. (`cloud_bundle` was removed — cloud is bundled into league tiers, no standalone SKU.)
 
 - [x] **Add explicit `context.save()` around commit actions**
   - Added `try? context.save()` to: Predictor Close Round (with error handling), Predictor Save Scores, LMS Close Round, Open Round, Declare Winners, and Approve Submission.

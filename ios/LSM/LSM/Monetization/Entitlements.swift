@@ -44,11 +44,11 @@ enum Tier: String, CaseIterable, Identifiable {
         case .noAds:
             return AppString("No ads · 1 league · 3 games")
         case .leagues3:
-            return AppString("No ads · 3 leagues · 9 games · Cloud backup, publish & PWA")
+            return AppString("No ads · 3 leagues · 9 games · Cloud backup, publish & PWA (60 links)")
         case .leagues5:
-            return AppString("No ads · 5 leagues · 15 games · 100 PWA links")
+            return AppString("No ads · 5 leagues · 15 games · Cloud backup, publish & PWA (100 links)")
         case .leagues7:
-            return AppString("No ads · 7 leagues · 21 games · 140 PWA links")
+            return AppString("No ads · 7 leagues · 21 games · Cloud backup, publish & PWA (140 links)")
         }
     }
 
