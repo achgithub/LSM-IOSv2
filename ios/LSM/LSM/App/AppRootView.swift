@@ -27,11 +27,15 @@ struct AppRootView: View {
                 .transition(.opacity)
                 .zIndex(1)
             }
-
+        }
+        // A top overlay would sit on top of (and block) each tab's own
+        // navigation bar buttons — e.g. Matches' refresh button. A safe-area
+        // inset instead reserves its own space above the bar, pushing
+        // everything else down rather than covering it.
+        .safeAreaInset(edge: .top, spacing: 0) {
             if maintenance.isActive && !showSplash {
                 MaintenanceBanner(message: maintenance.message)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(2)
             }
         }
         .animation(.easeInOut, value: maintenance.isActive)

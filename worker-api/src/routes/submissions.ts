@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 
 // ── Submissions (the anonymous PWA approval queue) — Phase 5 ─────────────────
 //
@@ -20,11 +19,8 @@ import { cors } from "hono/cors";
 export const submissions = new Hono<{ Bindings: Env }>();
 
 // CORS for player-facing PWA routes (cross-origin from submit.sportsmanager.site)
-submissions.use("/s/*", cors({
-  origin: "https://submit.sportsmanager.site",
-  allowMethods: ["GET", "POST", "OPTIONS"],
-  allowHeaders: ["Content-Type"],
-}));
+// is registered in index.ts, ahead of the global outage gate — see the comment
+// there for why it can't live here.
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 

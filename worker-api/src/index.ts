@@ -12,6 +12,7 @@
 // and only verify the JWTs this Worker issues.
 
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { admin } from "./routes/admin";
 import { attest } from "./routes/attest";
 import { backup } from "./routes/backup";
@@ -32,6 +33,18 @@ app.get("/health", async (c) => {
   ).first<{ n: number }>();
   return c.json({ ok: true, region: c.env.REGION, devices: row?.n ?? 0 });
 });
+
+// CORS for player-facing PWA routes (cross-origin from submit.sportsmanager.site)
+// must be registered before the outage gate, not inside routes/submissions.ts —
+// Hono composes middleware in registration order, so a 503 short-circuit from
+// the gate below would otherwise ship with no Access-Control-Allow-Origin
+// header and the browser would surface it as an opaque network failure
+// instead of a readable maintenance response.
+app.use("/s/*", cors({
+  origin: "https://submit.sportsmanager.site",
+  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowHeaders: ["Content-Type"],
+}));
 
 // Global outage gate — bypasses /health and /admin/* so ops tooling and the
 // toggle itself never lock out. See middleware/outage.ts.

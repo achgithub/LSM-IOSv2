@@ -255,8 +255,10 @@ struct MatchesView: View {
             teamsById = (try? await LeagueData.load(for: enabled.leagues))?.teamsById ?? teamsById
             lastRefreshed = dates.max()
         } catch {
+            // Keep whatever was already loaded/cached rather than wiping a
+            // screen that was showing fine just because this refresh failed
+            // (e.g. maintenance mode) — matches StandingsView's same pattern.
             errorMessage = error.localizedDescription
-            items = []
         }
         // Re-arm the throttle from the now-current caches (greyed if all fresh).
         // Sync `now` first so the initial countdown render is accurate rather than
