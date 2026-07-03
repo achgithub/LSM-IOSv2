@@ -100,19 +100,30 @@ enum PredictorScoringService {
 
     /// Apply final scores to every `Prediction` in the round, score them, and
     /// close the round. `finalScores` maps fixture id → (home, away) goals for
-    /// every fixture the manager entered a result for.
+    /// every fixture the manager entered a result for; `voidFixtureIds` marks
+    /// fixtures that didn't happen (postponed/cancelled after predictions were
+    /// already submitted) — these are excluded from scoring entirely rather
+    /// than defaulted to a 0-0 result, which would otherwise award points
+    /// against a game that never took place. A voided fixture's predictions
+    /// keep `actualHome`/`actualAway` nil (distinct from a genuinely finished
+    /// 0-0) and score 0.
     /// - Throws: `PredictorScoringError.incompleteScores` if any fixture in the
-    ///   round has no score in `finalScores`.
+    ///   round has no score in `finalScores` and isn't in `voidFixtureIds`.
     static func closeRound(
         _ round: Round,
         game: Game,
         finalScores: [Int: (home: Int, away: Int)],
+        voidFixtureIds: Set<Int> = [],
         context: ModelContext
     ) throws {
-        guard round.fixtureIds.allSatisfy({ finalScores[$0] != nil }) else {
+        guard round.fixtureIds.allSatisfy({ finalScores[$0] != nil || voidFixtureIds.contains($0) }) else {
             throw PredictorScoringError.incompleteScores
         }
         for prediction in round.predictions {
+            if voidFixtureIds.contains(prediction.fixtureId) {
+                prediction.pointsAwarded = 0
+                continue
+            }
             guard let final = finalScores[prediction.fixtureId] else { continue }
             prediction.actualHome = final.home
             prediction.actualAway = final.away

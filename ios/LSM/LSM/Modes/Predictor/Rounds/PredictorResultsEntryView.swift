@@ -16,6 +16,7 @@ struct PredictorResultsEntryView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var scores: [Int: (home: Int, away: Int)] = [:]
+    @State private var voided: Set<Int> = []
     @State private var refresh = LiveMatchRefreshState()
     @State private var closeError: String?
 
@@ -26,7 +27,11 @@ struct PredictorResultsEntryView: View {
     }
 
     private var allScoresSet: Bool {
-        !roundFixtures.isEmpty && roundFixtures.allSatisfy { scores[$0.id] != nil }
+        !roundFixtures.isEmpty && roundFixtures.allSatisfy { scores[$0.id] != nil || voided.contains($0.id) }
+    }
+
+    private static func isPostponedOrCancelled(_ f: MatchDTO) -> Bool {
+        f.status == "POSTPONED" || f.status == "CANCELLED"
     }
 
     var body: some View {
@@ -78,7 +83,18 @@ struct PredictorResultsEntryView: View {
 
     @ViewBuilder
     private func scoreRow(for fixture: MatchDTO) -> some View {
-        if scores[fixture.id] != nil {
+        if voided.contains(fixture.id) {
+            HStack {
+                Text("Voided — no result").foregroundStyle(.secondary).font(.subheadline)
+                Spacer()
+                Button {
+                    voided.remove(fixture.id)
+                } label: {
+                    Image(systemName: "xmark.circle").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        } else if scores[fixture.id] != nil {
             HStack {
                 scoreField(for: fixture, isHome: true)
                 Text("–").foregroundStyle(.secondary)
@@ -93,14 +109,25 @@ struct PredictorResultsEntryView: View {
                 .buttonStyle(.plain)
             }
         } else {
-            Button {
-                scores[fixture.id] = (home: 0, away: 0)
-            } label: {
-                Text("Enter result")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
+            HStack {
+                Button {
+                    scores[fixture.id] = (home: 0, away: 0)
+                } label: {
+                    Text("Enter result")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Button {
+                    voided.insert(fixture.id)
+                } label: {
+                    Text("Void")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -189,11 +216,13 @@ struct PredictorResultsEntryView: View {
     }
 
     /// Seeds scores in priority order: previously-saved actual scores from
-    /// predictions first (so partial saves survive), then FINISHED fixture
-    /// scores from the API cache for any that are still nil.
+    /// predictions first (so partial saves survive), then a postponed/
+    /// cancelled status from the API (auto-voided, mirrors how LMS's
+    /// `ResultsEntryView` auto-seeds `.postponed`), then FINISHED fixture
+    /// scores from the API cache for any that are still undecided.
     private func seedScores() {
         // Restore any scores the manager already saved to predictions.
-        for fixture in roundFixtures where scores[fixture.id] == nil {
+        for fixture in roundFixtures where scores[fixture.id] == nil && !voided.contains(fixture.id) {
             let saved = round.predictions.first {
                 $0.fixtureId == fixture.id && $0.actualHome != nil
             }
@@ -201,8 +230,15 @@ struct PredictorResultsEntryView: View {
                 scores[fixture.id] = (home: h, away: a)
             }
         }
+        // Auto-void postponed/cancelled fixtures rather than leaving them to
+        // default to a fabricated scoreline.
+        for fixture in roundFixtures where scores[fixture.id] == nil && !voided.contains(fixture.id) {
+            if Self.isPostponedOrCancelled(fixture) {
+                voided.insert(fixture.id)
+            }
+        }
         // Fill remaining from the API cache (FINISHED fixtures with known scores).
-        for fixture in roundFixtures where scores[fixture.id] == nil {
+        for fixture in roundFixtures where scores[fixture.id] == nil && !voided.contains(fixture.id) {
             if let home = fixture.homeScore, let away = fixture.awayScore {
                 scores[fixture.id] = (home: home, away: away)
             }
@@ -211,7 +247,9 @@ struct PredictorResultsEntryView: View {
 
     private func close() {
         do {
-            try PredictorScoringService.closeRound(round, game: game, finalScores: scores, context: context)
+            try PredictorScoringService.closeRound(
+                round, game: game, finalScores: scores, voidFixtureIds: voided, context: context
+            )
             try context.save()
             dismiss()
         } catch {

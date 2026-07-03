@@ -184,6 +184,54 @@ struct PredictorScoringTests {
         #expect(round.status == .open)
     }
 
+    @Test func voidedFixtureScoresZeroAndLeavesActualScoreNil() throws {
+        let context = try makeContext()
+        let g = game()
+        context.insert(g)
+        let round = Round(roundNumber: 1, deadline: .now, fixtureIds: [101, 102], game: g)
+        context.insert(round)
+        let player = Player(name: "Alice", game: g)
+        context.insert(player)
+        // Predicted 0-0 on the voided fixture — must NOT score exact points
+        // against a fabricated result once it's postponed/cancelled.
+        let voidedPrediction = Prediction(fixtureId: 101, predictedHome: 0, predictedAway: 0, isJoker: false, player: player, round: round)
+        let playedPrediction = Prediction(fixtureId: 102, predictedHome: 1, predictedAway: 0, isJoker: false, player: player, round: round)
+        context.insert(voidedPrediction); context.insert(playedPrediction)
+        round.predictions = [voidedPrediction, playedPrediction]
+
+        try PredictorScoringService.closeRound(
+            round, game: g,
+            finalScores: [102: (home: 1, away: 0)],
+            voidFixtureIds: [101],
+            context: context
+        )
+
+        #expect(round.status == .closed)
+        #expect(voidedPrediction.pointsAwarded == 0)
+        #expect(voidedPrediction.actualHome == nil && voidedPrediction.actualAway == nil)
+        #expect(playedPrediction.pointsAwarded == g.predictorExactPoints)
+    }
+
+    @Test func closeRoundRequiresEveryFixtureScoredOrVoided() throws {
+        let context = try makeContext()
+        let g = game()
+        context.insert(g)
+        let round = Round(roundNumber: 1, deadline: .now, fixtureIds: [101, 102], game: g)
+        context.insert(round)
+        let player = Player(name: "Alice", game: g)
+        context.insert(player)
+        let p1 = Prediction(fixtureId: 101, predictedHome: 1, predictedAway: 0, isJoker: false, player: player, round: round)
+        context.insert(p1)
+        round.predictions = [p1]
+
+        // Fixture 102 is neither scored nor voided — must still throw.
+        #expect(throws: PredictorScoringError.incompleteScores) {
+            try PredictorScoringService.closeRound(
+                round, game: g, finalScores: [101: (home: 2, away: 1)], voidFixtureIds: [], context: context
+            )
+        }
+    }
+
     @Test func zeroZeroCountsAsEnteredScore() throws {
         let context = try makeContext()
         let g = game()
