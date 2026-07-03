@@ -123,7 +123,7 @@ actor AppAttestService {
         req.setValue(challenge, forHTTPHeaderField: "X-Attest-Challenge")
         req.setValue(assertion, forHTTPHeaderField: "X-Attest-Assertion")
         let (data, response) = try await URLSession.shared.data(for: req)
-        try Self.check(response, data: data)
+        try await Self.check(response, data: data)
         let parsed = try JSONDecoder().decode(AssertResponse.self, from: data)
         cachedToken    = parsed.token
         tokenExpiresAt = ISO8601DateFormatter().date(from: parsed.expiresAt)
@@ -186,7 +186,7 @@ actor AppAttestService {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         let (data, response) = try await URLSession.shared.data(for: req)
-        try Self.check(response, data: data)
+        try await Self.check(response, data: data)
         return try JSONDecoder().decode(ChallengeResponse.self, from: data).challenge
     }
 
@@ -201,16 +201,16 @@ actor AppAttestService {
             "keyId": keyId, "attestation": attestation, "challenge": challenge,
         ])
         let (data, response) = try await URLSession.shared.data(for: req)
-        try Self.check(response, data: data)
+        try await Self.check(response, data: data)
     }
 
-    private static func check(_ response: URLResponse, data: Data) throws {
+    private static func check(_ response: URLResponse, data: Data) async throws {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw APIError.badStatus(
-                (response as? HTTPURLResponse)?.statusCode ?? -1,
-                body: String(data: data, encoding: .utf8)
-            )
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            try await MaintenanceCheck.check(status: status, data: data)
+            throw APIError.badStatus(status, body: String(data: data, encoding: .utf8))
         }
+        await MaintenanceState.shared.clear()
     }
 
     // MARK: - Key persistence (single key, not per-host)

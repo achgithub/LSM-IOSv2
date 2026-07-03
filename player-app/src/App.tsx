@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Game, GameMode, PlayerState } from './types';
-import { fetchPlayer } from './api';
+import { fetchPlayer, MaintenanceError } from './api';
 import { useUpdateAvailable } from './hooks/useUpdateAvailable';
 import { usePushSubscription } from './hooks/usePushSubscription';
 import { GameCard } from './components/GameCard';
@@ -63,7 +63,11 @@ export default function App() {
       const data = await fetchPlayer(token);
       setState(data);
     } catch (e) {
-      setState({ error: e instanceof Error ? e.message : t('error.loadFailed') });
+      if (e instanceof MaintenanceError) {
+        setState({ maintenance: true, error: e.message });
+      } else {
+        setState({ error: e instanceof Error ? e.message : t('error.loadFailed') });
+      }
     }
   }
 
@@ -245,6 +249,8 @@ export default function App() {
         <section aria-live="polite" className="grid gap-3">
           {state.loading ? (
             <Notice title={t('notice.loadingTitle')} message={t('notice.loadingBody')} />
+          ) : state.maintenance ? (
+            <Notice title={t('notice.maintenanceTitle')} message={state.error || t('notice.maintenanceBody')} />
           ) : state.error ? (
             <Notice title={t('notice.errorTitle')} message={state.error} error />
           ) : games.length === 0 ? (

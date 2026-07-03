@@ -6,11 +6,13 @@
 //   • Cloud backup                                /backup/*
 //   • Manager lifecycle                           /manager/*
 //   • Region migration stubs                      /manager/export, /manager/import
+//   • Global outage flag (ops-only)                /admin/outage
 //
 // Sports data shards (worker/) are NOT here — they stay in their own codebase
 // and only verify the JWTs this Worker issues.
 
 import { Hono } from "hono";
+import { admin } from "./routes/admin";
 import { attest } from "./routes/attest";
 import { backup } from "./routes/backup";
 import { manager } from "./routes/manager";
@@ -18,6 +20,7 @@ import { publish } from "./routes/publish";
 import { submissions } from "./routes/submissions";
 import { migrate } from "./routes/migrate";
 import { requireJWT } from "./middleware/jwt";
+import { outageGate } from "./middleware/outage";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -29,6 +32,12 @@ app.get("/health", async (c) => {
   ).first<{ n: number }>();
   return c.json({ ok: true, region: c.env.REGION, devices: row?.n ?? 0 });
 });
+
+// Global outage gate — bypasses /health and /admin/* so ops tooling and the
+// toggle itself never lock out. See middleware/outage.ts.
+app.use("*", outageGate);
+
+app.route("/admin", admin);
 
 // ── Public ────────────────────────────────────────────────────────────────────
 

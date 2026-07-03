@@ -43,6 +43,7 @@ export interface PlayerData {
 export interface PlayerState extends Partial<PlayerData> {
   loading?: boolean;
   error?: string;
+  maintenance?: boolean;
 }
 
 export interface LMSSelection {

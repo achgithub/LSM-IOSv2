@@ -5,14 +5,28 @@ import type { LMSSelection, PlayerData, PredictorScore } from './types';
 // production origin, so a direct cross-origin fetch from localhost is blocked.
 const API_BASE = import.meta.env.DEV ? '/api' : 'https://api.uk.sportsmanager.site';
 
-async function parseErrorBody(res: Response): Promise<string> {
-  const body = await res.json().catch(() => ({}) as { error?: string });
-  return body.error || `Server error ${res.status}`;
+// Thrown when the backend's global outage flag is on (see worker-api's
+// src/outage.ts). Distinguishable from a generic Error so callers can render
+// a dedicated "under maintenance" state instead of the generic error banner.
+export class MaintenanceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MaintenanceError';
+  }
+}
+
+async function throwIfError(res: Response): Promise<void> {
+  if (res.ok) return;
+  const body = await res.json().catch(() => ({}) as { error?: string; message?: string });
+  if (res.status === 503 && body.error === 'maintenance') {
+    throw new MaintenanceError(body.message || "We're doing scheduled maintenance — back shortly.");
+  }
+  throw new Error(body.error || `Server error ${res.status}`);
 }
 
 export async function fetchPlayer(token: string): Promise<PlayerData> {
   const res = await fetch(`${API_BASE}/s/${token}`);
-  if (!res.ok) throw new Error(await parseErrorBody(res));
+  await throwIfError(res);
   return res.json();
 }
 
@@ -22,7 +36,7 @@ export async function submitLMS(token: string, gameToken: string, selection: LMS
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(selection),
   });
-  if (!res.ok) throw new Error(await parseErrorBody(res));
+  await throwIfError(res);
 }
 
 export async function submitPredictor(token: string, gameToken: string, scores: PredictorScore[]): Promise<void> {
@@ -31,7 +45,7 @@ export async function submitPredictor(token: string, gameToken: string, scores: 
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scores }),
   });
-  if (!res.ok) throw new Error(await parseErrorBody(res));
+  await throwIfError(res);
 }
 
 export { API_BASE };

@@ -29,6 +29,8 @@ const nl: Translations = {
     errorTitle: "We couldn't open this link",
     noGamesTitle: 'No active rounds right now',
     noGamesBody: 'Check back when your manager opens the next round.',
+    maintenanceTitle: 'Down for maintenance',
+    maintenanceBody: "We're doing scheduled maintenance — back shortly.",
   },
   error: {
     missingToken: 'This link is missing its token. Check the URL and try again.',

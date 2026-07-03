@@ -61,6 +61,13 @@
 
       "r2_buckets": [
         { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
+      ],
+
+      // Same namespace as worker/wrangler.jsonc's uk-shard SCORES binding —
+      // the global outage flag (src/outage.ts) is one KV key shared across
+      // both Worker types so a single write reaches every route in the region.
+      "kv_namespaces": [
+        { "binding": "FLAGS", "id": "c65ea1d30cb345f2b39e4c0a48a5f39d" }
       ]
     },
 
@@ -91,6 +98,12 @@
 
       "r2_buckets": [
         { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
+      ],
+
+      // Same namespace as worker/wrangler.jsonc's eu-shard SCORES binding —
+      // see the uk env's FLAGS binding above for why.
+      "kv_namespaces": [
+        { "binding": "FLAGS", "id": "37b6e5767a0a4ed4bdc48deba5a31e61" }
       ]
     }
   }

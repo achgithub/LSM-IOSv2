@@ -237,7 +237,14 @@ enum Leagues {
         var request = URLRequest(url: registryURL)
         request.timeoutInterval = 5
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return }
+              let http = response as? HTTPURLResponse else { return }
+        guard (200..<300).contains(http.statusCode) else {
+            // Still silently ignored (fire-and-forget), but a maintenance response
+            // is worth surfacing globally — see MaintenanceState.
+            try? await MaintenanceCheck.check(status: http.statusCode, data: data)
+            return
+        }
+        await MaintenanceState.shared.clear()
         guard let fetched = try? JSONDecoder().decode(Manifest.self, from: data), !fetched.leagues.isEmpty else { return }
         LeagueDataCache.save(fetched, key: manifestCacheKey)
     }

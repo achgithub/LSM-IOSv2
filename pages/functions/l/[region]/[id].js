@@ -267,6 +267,13 @@ export async function onRequestPost({ request, params }) {
   if (resp.status === 401) return html(pinFormPage({ error: "Incorrect PIN" }, n), n, 401);
   if (resp.status === 404) return html(pinFormPage({ error: "This link no longer exists" }, n), n, 404);
   if (resp.status === 429) return html(pinFormPage({ error: "Too many attempts — try again later" }, n), n, 429);
+  if (resp.status === 503) {
+    const body = await resp.json().catch(() => ({}));
+    const message = body.error === "maintenance"
+      ? (body.message || "We're doing scheduled maintenance — back shortly.")
+      : "Something went wrong — please try again";
+    return html(pinFormPage({ error: message }, n), n, 503);
+  }
   if (!resp.ok) return html(pinFormPage({ error: "Something went wrong — please try again" }, n), n, 502);
 
   const snapshot = await resp.json();

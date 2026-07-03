@@ -10,6 +10,8 @@
 //   POST /admin/sync-if-due            (OPS_SYNC_TOKEN — orchestrator)
 //   GET  /admin/phase?league=PL
 //   POST /admin/phase?league=PL&value=live|closed
+//   GET  /admin/outage
+//   POST /admin/outage?value=on|off&message=...
 //   GET  /admin/leagues
 //   Authorization: Bearer <ADMIN_TOKEN>  (or OPS_SYNC_TOKEN for sync-if-due)
 
@@ -20,6 +22,7 @@ import { FootballDataProvider } from "../football";
 import { refreshMatchData, refreshStandings } from "../refresh";
 import { currentSeasonYear, getSeasonPhase, setSeasonPhase, type SeasonPhase } from "../seasonPhase";
 import { runMaintenance, syncTeams } from "../sync";
+import { getOutageFlag, setOutageFlag } from "../outage";
 
 export const admin = new Hono<{ Bindings: Env }>();
 
@@ -97,6 +100,26 @@ admin.post("/phase", async (c) => {
   if (value !== "live" && value !== "closed") return c.json({ error: "value must be live|closed" }, 400);
   await setSeasonPhase(c.env.SCORES, leagueId, value as SeasonPhase);
   return c.json({ ok: true, league: leagueId, phase: value });
+});
+
+// ── Global outage flag ───────────────────────────────────────────────────────
+// Client-facing "service is down" toggle — distinct from the sync-if-due
+// cron's own "maintenance" terminology below. See outage.ts.
+//   GET  /admin/outage
+//   POST /admin/outage?value=on|off&message=...
+
+admin.get("/outage", async (c) => {
+  if (!requireAdmin(c.env, c.req.header("Authorization"))) return c.json({ error: "unauthorized" }, 401);
+  return c.json(await getOutageFlag(c.env.SCORES));
+});
+
+admin.post("/outage", async (c) => {
+  if (!requireAdmin(c.env, c.req.header("Authorization"))) return c.json({ error: "unauthorized" }, 401);
+  const value = c.req.query("value");
+  if (value !== "on" && value !== "off") return c.json({ error: "value must be on|off" }, 400);
+  const message = c.req.query("message");
+  await setOutageFlag(c.env.SCORES, value === "on", message ?? undefined);
+  return c.json({ ok: true, ...(await getOutageFlag(c.env.SCORES)) });
 });
 
 // ── Self-gating maintenance trigger ─────────────────────────────────────────

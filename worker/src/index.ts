@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import { admin } from "./routes/admin";
 import { runDailyCleanup, runDailySync } from "./cron";
 import { data } from "./routes/data";
+import { outageGate } from "./outage";
 // Sports data shard — league discovery + read-only data (teams, fixtures,
 // standings, scores). All lifecycle, backup, submissions, publish and attest
 // now live in the regional authority Worker (worker-api/). JWT verification
@@ -28,6 +29,10 @@ app.get("/health", async (c) => {
   const row = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM leagues").first<{ n: number }>();
   return c.json({ ok: true, leagues: row?.n ?? 0 });
 });
+
+// Global outage gate — bypasses /health and /admin/* so ops tooling and the
+// toggle itself never lock out. See outage.ts.
+app.use("*", outageGate);
 
 // Layer 1 — league discovery + read-only sports data.
 // /scores and /fixtures are JWT-gated (requireJWT applied inside data.ts).

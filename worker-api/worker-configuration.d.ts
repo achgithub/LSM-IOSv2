@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	BACKUPS: R2Bucket;
 	DB: D1Database;
+	FLAGS: KVNamespace;
 	REGION: string;
 	APP_ATTEST_TEAM_ID: string;
 	APP_ATTEST_BUNDLE_ID: string;

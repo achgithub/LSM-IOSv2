@@ -61,6 +61,31 @@ async function fetchPhase(kv: KVNamespace, leagueId: string): Promise<SeasonPhas
   return v === "closed" ? v : "live";
 }
 
+// Global client-facing outage flag, shared with worker/'s + worker-api/'s
+// src/outage.ts via the same underlying KV namespace per shard — writing it
+// here (UK_KV + EU_KV) reaches every route in both Worker types at once.
+// Deliberately global, not per-league — see docs/app-attest-status.md.
+type OutageFlag = { on: boolean; message?: string };
+const OUTAGE_KEY = "outage:flag";
+
+async function fetchOutage(env: Env): Promise<OutageFlag> {
+  const raw = await env.UK_KV.get(OUTAGE_KEY);
+  if (!raw) return { on: false };
+  try {
+    const parsed = JSON.parse(raw);
+    return { on: !!parsed.on, message: typeof parsed.message === "string" ? parsed.message : undefined };
+  } catch {
+    return { on: false };
+  }
+}
+
+async function setOutage(env: Env, on: boolean, message: string | undefined): Promise<OutageFlag> {
+  const flag: OutageFlag = { on, message };
+  const value = JSON.stringify(flag);
+  await Promise.all([env.UK_KV.put(OUTAGE_KEY, value), env.EU_KV.put(OUTAGE_KEY, value)]);
+  return flag;
+}
+
 function seasonOfDate(d: Date): number {
   const month = d.getUTCMonth() + 1;
   return month >= 7 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
@@ -226,12 +251,20 @@ function shellHtml(): Response {
     input, select { background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px;
             padding: 0.3rem 0.5rem; font-family: inherit; font-size: 12px; }
     .season-msg { font-size: 11px; color: #888; white-space: pre-wrap; }
+    .outage-bar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;
+                  flex-wrap: wrap; padding: 0.6rem; border: 1px solid #260d0d; border-radius: 6px; }
+    #outage-message { flex: 1; min-width: 14em; }
     .detail-row td { padding-top: 0.8rem; padding-bottom: 1rem; background: #111; }
     .count { color: #555; font-size: 12px; margin-left: 0.4rem; }
   </style>
 </head>
 <body>
   <h1>⚽ LMS Dashboard <span style="color:#444;font-size:0.75rem">v2</span></h1>
+  <div class="outage-bar">
+    <button id="outage-toggle" class="api-toggle" onclick="toggleOutage()">…</button>
+    <input id="outage-message" type="text" placeholder="Message shown to clients (optional)">
+    <span id="outage-msg" class="season-msg"></span>
+  </div>
   <div class="toolbar">
     <input id="filter" type="text" placeholder="Filter by league, code or shard…" oninput="applyFilter()">
     <select id="shardFilter" onchange="applyFilter()">
@@ -268,6 +301,42 @@ function shellHtml(): Response {
     function fmtSeason(season) {
       if (season === null || season === undefined) return '—';
       return season + '/' + String(season + 1).slice(-2);
+    }
+
+    function setOutageButton(on) {
+      const btn = document.getElementById('outage-toggle');
+      btn.textContent = on ? '🔴 OUTAGE ON — click to end' : '🟢 Service normal — click to start outage';
+      btn.className = 'api-toggle ' + (on ? 'closed' : 'live');
+      btn.dataset.on = on ? '1' : '';
+    }
+
+    async function loadOutage() {
+      try {
+        const d = await fetch('/outage').then(r => r.json());
+        setOutageButton(d.on);
+        document.getElementById('outage-message').value = d.message || '';
+      } catch (e) {
+        document.getElementById('outage-msg').textContent = 'Error loading outage state: ' + e.message;
+      }
+    }
+
+    async function toggleOutage() {
+      const btn = document.getElementById('outage-toggle');
+      const next = btn.dataset.on ? 'off' : 'on';
+      const message = document.getElementById('outage-message').value.trim();
+      if (next === 'on' && !confirm('This blocks every client (iOS + PWA + web) across every league right now. Continue?')) return;
+      btn.disabled = true;
+      const msg = document.getElementById('outage-msg');
+      try {
+        const q = '?value=' + next + (message ? '&message=' + encodeURIComponent(message) : '');
+        const r = await fetch('/action/outage' + q, { method: 'POST' }).then(r => r.json());
+        setOutageButton(r.on);
+        msg.textContent = r.on ? 'Outage is ON — all clients are seeing a maintenance message.' : 'Outage is OFF — normal service.';
+      } catch (e) {
+        msg.textContent = 'Error: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function loadOverview() {
@@ -421,6 +490,7 @@ function shellHtml(): Response {
     }
 
     loadOverview();
+    loadOutage();
   </script>
 </body>
 </html>`;
@@ -480,6 +550,17 @@ export default {
     if (pathname === "/manifest.json") return manifestJson();
     if (pathname === "/sw.js")         return serviceWorkerJs();
     if (pathname === "/icon.svg")      return iconSvg();
+
+    if (pathname === "/outage") return Response.json(await fetchOutage(env));
+
+    if (pathname === "/action/outage" && req.method === "POST") {
+      const value = searchParams.get("value");
+      if (value !== "on" && value !== "off") {
+        return Response.json({ ok: false, error: "value must be on|off" }, { status: 400 });
+      }
+      const flag = await setOutage(env, value === "on", searchParams.get("message") ?? undefined);
+      return Response.json({ ok: true, ...flag });
+    }
 
     // Overview: one KV read + one indexed D1 lookup per league, in parallel.
     if (pathname === "/overview") {
