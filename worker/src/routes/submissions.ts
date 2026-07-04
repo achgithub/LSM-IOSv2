@@ -85,6 +85,9 @@ submissions.post("/games/:gameToken/push", async (c) => {
   interface PushPlayer {
     token: string;
     localPlayerId: string;
+    // Roster member's current name — carried on every push so an in-app
+    // rename refreshes player_tokens.player_name without a dedicated call.
+    playerName?: string | null;
     eligibleTeams?: EligibleTeam[] | null;
   }
   const body = await c.req.json<{
@@ -150,10 +153,19 @@ submissions.post("/games/:gameToken/push", async (c) => {
            manager_suffix = excluded.manager_suffix`
       ).bind(tk, gameToken, pid, eligJson, suffix).run();
 
-      if (mgrName) {
+      const newName = p.playerName?.trim() || null;
+      if (mgrName && newName) {
+        await c.env.DB.prepare(
+          `UPDATE player_tokens SET manager_name = ?, player_name = ? WHERE token = ?`
+        ).bind(mgrName, newName, tk).run();
+      } else if (mgrName) {
         await c.env.DB.prepare(
           `UPDATE player_tokens SET manager_name = ? WHERE token = ?`
         ).bind(mgrName, tk).run();
+      } else if (newName) {
+        await c.env.DB.prepare(
+          `UPDATE player_tokens SET player_name = ? WHERE token = ?`
+        ).bind(newName, tk).run();
       }
     }
   }

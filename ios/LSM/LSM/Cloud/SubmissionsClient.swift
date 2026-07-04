@@ -22,6 +22,10 @@ struct EligibleTeam: Encodable {
 struct PlayerPushItem: Encodable {
     let token: String
     let localPlayerId: String
+    /// Current roster-member name, sent on every push so a rename made
+    /// in-app rides along on the next round push and refreshes the
+    /// backend's `player_tokens.player_name` without a dedicated call.
+    let playerName: String?
     let eligibleTeams: [EligibleTeam]?
 }
 

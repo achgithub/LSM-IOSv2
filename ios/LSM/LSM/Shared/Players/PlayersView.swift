@@ -176,6 +176,9 @@ struct PlayerDetailView: View {
     @State private var linkShareItem: PlayerLinkShareItem?
     @State private var showGroupEditor = false
     @State private var pendingRemove = false
+    @State private var renaming = false
+    @State private var renameText = ""
+    @Query private var allMembers: [RosterMember]
 
     private var linkURL: URL? {
         member.submissionToken.map { SubmissionsClient.playerLinkURL(token: $0.uuidString) }
@@ -185,7 +188,16 @@ struct PlayerDetailView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(member.name).font(.headline)
+                    HStack {
+                        Text(member.name).font(.headline)
+                        Spacer()
+                        Button("Rename") {
+                            renameText = member.name
+                            renaming = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderless)
+                    }
                     if pwaEnabled {
                         if linkURL != nil {
                             Label("Link active", systemImage: "link")
@@ -281,6 +293,11 @@ struct PlayerDetailView: View {
         }
         .navigationTitle(member.name)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Rename player", isPresented: $renaming) {
+            TextField("Player name", text: $renameText)
+            Button("Rename") { commitRename() }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(item: $linkShareItem) { item in
             ActivityShareView(items: item.shareItems)
         }
@@ -299,6 +316,28 @@ struct PlayerDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This also deactivates their submission link, if they have one.")
+        }
+    }
+
+    /// Renames the roster member and cascades the new name to every per-game
+    /// `Player` stamped from them, across every game and mode — the roster
+    /// member is the one global player identity; games just copy its name in.
+    /// Shares/pushes read the name live, so nothing else needs to change here;
+    /// the backend's cached copy self-heals on the next round push instead of
+    /// a dedicated network call (see `OpenRoundView` push, `submissions.ts`).
+    private func commitRename() {
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let isDuplicate = allMembers.contains {
+            $0.id != member.id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+        guard !isDuplicate else { return }
+        member.name = name
+
+        let memberId = member.id
+        let fd = FetchDescriptor<Player>(predicate: #Predicate { $0.rosterMemberId == memberId })
+        if let players = try? context.fetch(fd) {
+            for player in players { player.name = name }
         }
     }
 

@@ -485,25 +485,28 @@ struct OpenRoundView: View {
         // (avoids SwiftData main-actor access from a background context).
         // Self-heal: players added before rosterMemberId was tracked get it
         // written here so subsequent pushes use the UUID directly.
-        let playerTokenMap: [UUID: String] = {
-            var dict: [UUID: String] = [:]
-            for player in game.activePlayers where !player.isManager {
-                let member: RosterMember?
-                if let memberId = player.rosterMemberId {
-                    let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
-                    member = (try? context.fetch(fd))?.first
-                } else {
-                    let name = player.name
-                    let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.name == name })
-                    member = (try? context.fetch(fd))?.first
-                    if let m = member { player.rosterMemberId = m.id }  // self-heal
-                }
-                if let rawToken = member?.submissionTokenRaw {
-                    dict[player.id] = rawToken.lowercased()
-                }
+        // Also carries the roster member's *current* name so a rename made
+        // after the link was minted rides along on this push and refreshes
+        // the backend's `player_tokens.player_name` — no dedicated rename
+        // call needed, it self-heals on the next natural push.
+        var playerTokenMap: [UUID: String] = [:]
+        var playerNameMap: [UUID: String] = [:]
+        for player in game.activePlayers where !player.isManager {
+            let member: RosterMember?
+            if let memberId = player.rosterMemberId {
+                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
+                member = (try? context.fetch(fd))?.first
+            } else {
+                let name = player.name
+                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.name == name })
+                member = (try? context.fetch(fd))?.first
+                if let m = member { player.rosterMemberId = m.id }  // self-heal
             }
-            return dict
-        }()
+            if let rawToken = member?.submissionTokenRaw {
+                playerTokenMap[player.id] = rawToken.lowercased()
+                playerNameMap[player.id] = member?.name ?? player.name
+            }
+        }
 
         // Last 8 hex chars of the manager's player UUID — used by the PWA to
         // identify which manager owns each game.
@@ -543,6 +546,7 @@ struct OpenRoundView: View {
                 playerItems.append(PlayerPushItem(
                     token: token,
                     localPlayerId: player.id.uuidString.lowercased(),
+                    playerName: playerNameMap[player.id],
                     eligibleTeams: eligibleTeams.isEmpty ? nil : eligibleTeams
                 ))
             }
