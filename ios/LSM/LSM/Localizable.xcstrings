@@ -18440,6 +18440,108 @@
           }
         }
       }
+    },
+    "Check the scores are correct": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prüfe, ob die Ergebnisse stimmen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprueba que los resultados sean correctos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifie que les scores sont corrects"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controlla che i risultati siano corretti"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controleer of de scores kloppen"
+          }
+        }
+      }
+    },
+    "Closing this round will score every prediction. This can't be changed afterwards, so make sure each result is final and entered correctly.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beim Schließen der Runde werden alle Vorhersagen gewertet. Das lässt sich danach nicht mehr ändern – stelle daher sicher, dass jedes Ergebnis endgültig und korrekt eingegeben ist."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al cerrar la ronda se puntuarán todas las predicciones. Esto no se puede cambiar después, así que asegúrate de que cada resultado sea definitivo y esté introducido correctamente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La clôture de cette manche attribue les points de toutes les prédictions. C'est irréversible, alors vérifie que chaque résultat est définitif et correctement saisi."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiudendo il turno verranno assegnati i punti a tutte le previsioni. L'operazione non è reversibile, quindi assicurati che ogni risultato sia definitivo e inserito correttamente."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Als je deze ronde sluit, worden alle voorspellingen gescoord. Dit kan daarna niet meer worden gewijzigd, dus controleer of elke uitslag definitief en juist is ingevoerd."
+          }
+        }
+      }
+    },
+    "Don't show this again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht mehr anzeigen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No volver a mostrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus afficher"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non mostrare più"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niet meer weergeven"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

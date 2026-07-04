@@ -19,6 +19,11 @@ struct PredictorResultsEntryView: View {
     @State private var voided: Set<Int> = []
     @State private var refresh = LiveMatchRefreshState()
     @State private var closeError: String?
+    @State private var showingCloseWarning = false
+    @State private var suppressCloseWarning = false
+    /// Persisted opt-out for the "check your scores" confirmation. Once the
+    /// manager ticks "Don't show again" it stays dismissed on this device.
+    @AppStorage("predictorCloseRoundWarningSuppressed") private var closeWarningSuppressed = false
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -165,7 +170,7 @@ struct PredictorResultsEntryView: View {
                 .buttonStyle(.bordered)
                 .disabled(round.status == .closed || scores.isEmpty)
 
-                Button { close() } label: {
+                Button { attemptClose() } label: {
                     Text("Close Round").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -184,6 +189,27 @@ struct PredictorResultsEntryView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(closeError ?? "")
+        }
+        .sheet(isPresented: $showingCloseWarning) {
+            CloseRoundWarningSheet(dontShowAgain: $suppressCloseWarning) {
+                if suppressCloseWarning { closeWarningSuppressed = true }
+                showingCloseWarning = false
+                close()
+            } onCancel: {
+                showingCloseWarning = false
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    /// Show the "check your scores" confirmation before closing, unless the
+    /// manager has previously opted out. Closing writes points and cannot be undone.
+    private func attemptClose() {
+        if closeWarningSuppressed {
+            close()
+        } else {
+            suppressCloseWarning = false
+            showingCloseWarning = true
         }
     }
 
@@ -254,6 +280,57 @@ struct PredictorResultsEntryView: View {
             dismiss()
         } catch {
             closeError = error.localizedDescription
+        }
+    }
+}
+
+/// Confirmation shown before closing a Predictor round. Closing scores every
+/// prediction and cannot be undone, so the manager is asked to double-check the
+/// scorelines first. A "Don't show again" tick lets experienced managers opt out.
+private struct CloseRoundWarningSheet: View {
+    @Binding var dontShowAgain: Bool
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.orange)
+                    .padding(.top, 8)
+
+                Text("Check the scores are correct")
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text("Closing this round will score every prediction. This can't be changed afterwards, so make sure each result is final and entered correctly.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Don't show this again", isOn: $dontShowAgain)
+                    .font(.subheadline)
+
+                Spacer(minLength: 0)
+
+                VStack(spacing: 10) {
+                    Button(action: onConfirm) {
+                        Text("Close Round").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button(role: .cancel, action: onCancel) {
+                        Text("Cancel").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+            }
         }
     }
 }

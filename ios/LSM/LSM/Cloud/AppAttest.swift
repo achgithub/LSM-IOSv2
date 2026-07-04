@@ -126,8 +126,21 @@ actor AppAttestService {
         try await Self.check(response, data: data)
         let parsed = try JSONDecoder().decode(AssertResponse.self, from: data)
         cachedToken    = parsed.token
-        tokenExpiresAt = ISO8601DateFormatter().date(from: parsed.expiresAt)
+        tokenExpiresAt = Self.parseExpiry(parsed.expiresAt)
         return parsed.token
+    }
+
+    /// Parses the authority's `expiresAt`, which is emitted via JS
+    /// `Date.toISOString()` and so carries fractional seconds (`…T12:00:00.000Z`).
+    /// A bare `ISO8601DateFormatter` only understands `.withInternetDateTime` and
+    /// silently returns nil on the `.000` — which left `tokenExpiresAt` nil and
+    /// re-ran the full attest mint on every cloud call. Try fractional first, then
+    /// fall back to the plain form so we're robust if the server format ever drifts.
+    static func parseExpiry(_ string: String) -> Date? {
+        let withFractional = ISO8601DateFormatter()
+        withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFractional.date(from: string) { return date }
+        return ISO8601DateFormatter().date(from: string)
     }
 
     // MARK: - Key enrolment (once per authority)
