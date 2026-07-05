@@ -37,6 +37,18 @@ struct OpenRoundView: View {
     @State private var deadline = Date()
     @State private var showAddManualFixture = false
 
+    // Horizon results cached at load time (see `recomputeHorizon()`) rather
+    // than recomputed as plain `var`s on every render. Both depend only on
+    // `allFixtures`, not on any selection/filter state, but each involves a
+    // full-season ISO8601 parse + per-league sort/cluster pass — cheap once,
+    // but SwiftUI re-evaluates plain computed properties on every state
+    // change, so left uncached this reran on *every fixture tap* and was
+    // the main cause of a visible per-tap stall with a full season loaded
+    // (see 2026-07-05 investigation). Recomputing only in `load()` hides the
+    // cost behind the "Loading fixtures…" screen instead.
+    @State private var cachedEligibleIds: Set<Int> = []
+    @State private var cachedHorizonEnd: Date?
+
     /// The league(s) this game runs in — fixtures are pooled across them.
     private var gameLeagues: [LeagueOption] { game.leagues }
     private var isBlended: Bool { gameLeagues.count > 1 }
@@ -88,31 +100,26 @@ struct OpenRoundView: View {
     /// tuned for the real schedule shouldn't be able to hide it again.
     private var visibleFixtures: [MatchDTO] {
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
-        let eligible = horizonEligibleIds
         return allFixtures.filter { f in
             (f.leagueId.map { selectedLeagueIds.contains($0) } ?? false)
                 && (!unplayedOnly || Self.isUnplayed(f))
                 && (f.leagueId == manualLeagueId
-                    || (eligible.contains(f.id) && (!dateFilterOn || dateInRange(f))))
+                    || (cachedEligibleIds.contains(f.id) && (!dateFilterOn || dateInRange(f))))
         }
         .sorted { $0.kickoff < $1.kickoff }
     }
 
-    /// Real (non-manual) fixture ids the shared fixture horizon currently
-    /// allows into a new round — a hard cap, not something the date-range
-    /// filter above can widen past. See `FixtureHorizon`.
-    private var horizonEligibleIds: Set<Int> {
-        let manualLeagueId = ManualFixtureService.leagueId(for: game)
-        return FixtureHorizon.eligibleFixtureIds(fixtures: allFixtures.filter { $0.leagueId != manualLeagueId })
-    }
-
-    /// The furthest kickoff date currently open across this game's leagues —
-    /// used to default/cap the date-range "To" picker. Nil before fixtures
-    /// have loaded or if none are eligible yet.
-    private var horizonEnd: Date? {
+    /// Recomputes `cachedEligibleIds`/`cachedHorizonEnd` from the current
+    /// `allFixtures` — called only from `load()`, so the cost (a full-season
+    /// ISO8601 parse + sort/cluster pass per league) happens once behind the
+    /// "Loading fixtures…" screen rather than on every fixture-selection tap.
+    /// Both depend only on the fixture data, not on any filter/selection
+    /// state, so nothing is lost by not recomputing in between loads.
+    private func recomputeHorizon() {
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
         let realFixtures = allFixtures.filter { $0.leagueId != manualLeagueId }
-        return gameLeagues
+        cachedEligibleIds = FixtureHorizon.eligibleFixtureIds(fixtures: realFixtures)
+        cachedHorizonEnd = gameLeagues
             .compactMap { FixtureHorizon.horizonEnd(leagueId: $0.id, fixtures: realFixtures) }
             .max()
     }
@@ -213,15 +220,15 @@ struct OpenRoundView: View {
                     DatePicker("From", selection: $dateFrom, displayedComponents: .date)
                     DatePicker(
                         "To", selection: $dateTo,
-                        in: dateFrom...max(dateFrom, horizonEnd ?? dateTo),
+                        in: dateFrom...max(dateFrom, cachedHorizonEnd ?? dateTo),
                         displayedComponents: .date
                     )
                 }
             } header: {
                 Text("Filters")
             } footer: {
-                if let horizonEnd {
-                    Text("Fixtures open through \(horizonEnd.formatted(date: .abbreviated, time: .omitted)) — later matchdays open closer to kick-off.")
+                if let cachedHorizonEnd {
+                    Text("Fixtures open through \(cachedHorizonEnd.formatted(date: .abbreviated, time: .omitted)) — later matchdays open closer to kick-off.")
                 }
             }
 
@@ -369,6 +376,7 @@ struct OpenRoundView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+        recomputeHorizon()
         isLoading = false
         if selectedLeagueIds.isEmpty {
             selectedLeagueIds = Set(gameLeagues.map(\.id))
@@ -376,8 +384,8 @@ struct OpenRoundView: View {
         // Default the "To" filter to the horizon boundary rather than a fixed
         // +14 days — only on the very first load, so a manager's own edit
         // (or a later refresh) doesn't get silently overwritten.
-        if isFirstLoad, let horizonEnd {
-            dateTo = horizonEnd
+        if isFirstLoad, let cachedHorizonEnd {
+            dateTo = cachedHorizonEnd
         }
         if game.isDemoData { setupForTutorial() }
     }
