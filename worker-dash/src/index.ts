@@ -1,4 +1,9 @@
-// No auth here — Cloudflare Access handles it at the edge before this Worker runs.
+// Cloudflare Access gates this at the edge, but that policy lives outside
+// this repo (Zero Trust dashboard config, not version-controlled) — verify
+// its JWT in-code too, so a misconfigured/disabled Access policy fails
+// closed instead of silently exposing the outage kill-switch and
+// league-data sync/wipe actions below. See access-auth.ts.
+import { verifyAccessJWT } from "./access-auth";
 
 interface Env {
   UK_DB: D1Database;
@@ -11,6 +16,12 @@ interface Env {
   // go direct to KV and don't require these.
   WRK_UK_ADMIN_TOKEN?: string;
   WRK_EU_ADMIN_TOKEN?: string;
+  // This Access application's team domain + Audience (AUD) tag — both from
+  // the Zero Trust dashboard (Access > Applications > this app > Overview).
+  // Team domain isn't secret (it's in the login redirect URL); AUD is set
+  // via `wrangler secret put CF_ACCESS_AUD`.
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  CF_ACCESS_AUD?: string;
 }
 
 type Shard = "uk" | "eu";
@@ -545,6 +556,11 @@ async function proxyProbe(url: string, token: string | undefined, leagueId: stri
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const accessJwt = req.headers.get("Cf-Access-Jwt-Assertion");
+    if (!(await verifyAccessJWT(accessJwt, env.CF_ACCESS_TEAM_DOMAIN, env.CF_ACCESS_AUD))) {
+      return new Response("Unauthorized", { status: 403 });
+    }
+
     const { pathname, searchParams } = new URL(req.url);
 
     if (pathname === "/manifest.json") return manifestJson();

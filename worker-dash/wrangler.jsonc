@@ -4,9 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-14",
 
-  // workers_dev: true — no custom domain set yet; access via
-  // lsm-v2-dash-worker.<account>.workers.dev. Lock down with Cloudflare
-  // Access before sharing the URL (same policy as v1 dash.sportsmanager.site).
+  // Superseded v1's dash.sportsmanager.site — this Worker has owned the
+  // route since 2026-06-27. Gated by a Cloudflare Access policy (Zero Trust
+  // dashboard, not version-controlled) at the edge, AND verified in-code
+  // (see access-auth.ts) so a disabled/misconfigured Access policy fails
+  // closed rather than exposing the outage kill-switch / league-data
+  // sync-wipe actions below.
   "routes": [{ "pattern": "dash.sportsmanager.site", "custom_domain": true }],
   "workers_dev": false,
   "preview_urls": false,
@@ -14,6 +17,15 @@
   "observability": {
     "enabled": true,
     "logs": { "head_sampling_rate": 1 }
+  },
+
+  // Team domain from the Access login redirect — not secret. AUD tag is
+  // secret (it's the credential that scopes verifyAccessJWT to THIS Access
+  // application specifically): Zero Trust dashboard > Access > Applications
+  // > the app for dash.sportsmanager.site > Overview > "Audience (AUD) Tag".
+  //   pnpm wrangler secret put CF_ACCESS_AUD
+  "vars": {
+    "CF_ACCESS_TEAM_DOMAIN": "audleyhome.cloudflareaccess.com"
   },
 
   // Two D1 shards (one per region, each holding many leagues).
