@@ -106,6 +106,20 @@ actor SubmissionsClient {
         _ = try await send(req)
     }
 
+    /// Self-heal path for when the local record of a token is gone (e.g. an
+    /// app reinstall wipes the on-device roster, but the Keychain-backed
+    /// `ManagerToken` survives) — mint then 409s with no local token to
+    /// revoke via `revokeLink`. Scoped server-side to this device's own
+    /// `managerToken`, so it can only revoke a link minted by this manager,
+    /// never an arbitrary player's link.
+    func revokeLinkByName(playerName: String) async throws {
+        struct Body: Encodable { let playerName: String; let managerToken: String }
+        var req = try await request(path: "/links/revoke-by-name", method: "POST")
+        req.httpBody = try encoder.encode(Body(playerName: playerName, managerToken: ManagerToken.current))
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        _ = try await send(req)
+    }
+
     // swiftlint:disable:next function_parameter_count
     func pushRound(
         gameToken: UUID,

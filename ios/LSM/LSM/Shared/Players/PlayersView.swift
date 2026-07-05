@@ -407,15 +407,36 @@ struct PlayerDetailView: View {
                     linkOp = .idle
                 }
             } catch let error as APIError {
-                await MainActor.run {
-                    if case .badStatus(409, _) = error {
-                        linkOp = .error("A link already exists for this player on another device. Revoke it there first, or ask your manager.")
-                    } else {
-                        linkOp = .error("Couldn't get a link. Try again.")
-                    }
+                if case .badStatus(409, _) = error {
+                    // The 409 means the server still has an active link for
+                    // this player name — most commonly a stale one this same
+                    // manager minted before an app reinstall wiped the local
+                    // record of its token (the Keychain-backed ManagerToken
+                    // survives reinstall; the SwiftData record doesn't). Self
+                    // -heal: revoke by name (server-scoped to our own
+                    // managerToken, so this can't touch another manager's
+                    // link) and retry the mint once before surfacing an error.
+                    await retryMintAfterRevokeByName(name: name, managerName: trimmedManagerName)
+                } else {
+                    await MainActor.run { linkOp = .error("Couldn't get a link. Try again.") }
                 }
             } catch {
                 await MainActor.run { linkOp = .error("Couldn't get a link. Try again.") }
+            }
+        }
+    }
+
+    private func retryMintAfterRevokeByName(name: String, managerName: String) async {
+        do {
+            try await SubmissionsClient.shared.revokeLinkByName(playerName: name)
+            let token = try await SubmissionsClient.shared.mintLink(playerName: name, managerName: managerName)
+            await MainActor.run {
+                member.submissionTokenRaw = token.lowercased()
+                linkOp = .idle
+            }
+        } catch {
+            await MainActor.run {
+                linkOp = .error("A link already exists for this player under a different manager — ask them to revoke it, or use a different player name.")
             }
         }
     }

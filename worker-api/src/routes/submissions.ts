@@ -72,6 +72,29 @@ submissions.post("/links/:token/revoke", async (c) => {
   return c.json({ ok: true });
 });
 
+// POST /links/revoke-by-name
+// Self-heal path for a manager who has lost their local record of a token
+// (e.g. app reinstall wipes the on-device roster, but the Keychain-backed
+// managerToken survives, so /links still 409s on remint). Scoped to the
+// caller's own managerToken — a manager can only revoke a link that was
+// minted with that same managerToken, never an arbitrary player's link.
+submissions.post("/links/revoke-by-name", async (c) => {
+  const body = await c.req.json<{ playerName: string; managerToken?: string }>();
+  const playerName = body?.playerName?.trim();
+  const managerToken = body?.managerToken?.toLowerCase().trim();
+  if (!playerName) return c.json({ error: "playerName is required" }, 400);
+  if (!managerToken) return c.json({ error: "managerToken is required" }, 400);
+
+  const result = await c.env.DB.prepare(
+    `UPDATE player_tokens SET revoked_at = ?
+     WHERE player_name = ? AND manager_token = ? AND revoked_at IS NULL`
+  ).bind(now(), playerName, managerToken).run();
+  if (result.meta.changes === 0) {
+    return c.json({ error: "No active link for this player under this manager" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
 // Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, managerSuffix?, players }
