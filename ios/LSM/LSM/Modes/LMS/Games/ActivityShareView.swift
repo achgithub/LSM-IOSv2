@@ -21,56 +21,81 @@ struct PlayerLinkShareItem: Identifiable {
     /// add it.
     static let safetyWarning = "Only tap this if you were expecting it — check with your manager first if you're not sure."
 
-    /// Three separate items, not one string with the URL pasted in — a bare
-    /// UUID link embedded in a paragraph reads as suspicious to less
-    /// tech-savvy players, and burying the URL in text stops Messages/WhatsApp
-    /// from rendering their own rich link preview. Sharing the URL as its own
-    /// `URL` value gets that preview back; the branded card image (with a QR
-    /// code as a face-to-face bonus, see `PlayerLinkCardView`) gives it visual
-    /// trust context, especially useful for a bare AirDrop with no chat UI.
-    ///
-    /// Built asynchronously from a `.task` (see `PlayerLinkShareSheet`), not
-    /// read synchronously off `ImageRenderer` the instant the sheet needs
-    /// items — that pattern produced a corrupted image on-device that AirDrop
-    /// rejected mid-transfer (`SFAirDropSend.Failure` badRequest, reported
-    /// size 0). `SummaryShareView`/`PredictorShareView` render inside an
-    /// already-appeared view's `.task`, which doesn't hit this; this mirrors
-    /// that.
-    @MainActor
-    func buildShareItems() async -> [Any] {
-        var items: [Any] = []
+    /// Message text shared alongside the card image and URL — a bare UUID
+    /// link embedded in a paragraph reads as suspicious to less tech-savvy
+    /// players, and burying the URL in text stops Messages/WhatsApp from
+    /// rendering their own rich link preview, hence sharing it as its own
+    /// separate `URL` value too.
+    func message() -> String {
+        "Hi \(playerName) 👋 Here's your personal link to submit your picks. "
+            + "Save it as a bookmark or add it to your Home Screen so you can find it each week.\n\n"
+            + "⚠️ \(PlayerLinkShareItem.safetyWarning)"
+    }
+}
+
+/// Renders the player-link card, previews it, then offers the system share
+/// sheet — the same preview-then-share pattern as `SummaryShareView`/
+/// `PredictorShareView`, which has never had trouble sharing over AirDrop.
+/// The player-link flow used to skip the preview and hand the freshly
+/// rendered `UIImage` straight to the share sheet; that turned out to
+/// matter — an unpreviewed image was serialized as a corrupted/oversized
+/// bitmap that AirDrop rejected (`SFAirDropSend.Failure` badRequest).
+struct PlayerLinkShareView: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: PlayerLinkShareItem
+
+    @State private var rendered: UIImage?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let rendered {
+                    ScrollView {
+                        Image(uiImage: rendered)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 390)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(radius: 8)
+                            .padding()
+                    }
+                    .frame(maxWidth: .infinity)
+                } else if let errorMessage {
+                    ContentUnavailableView("Couldn't build card", systemImage: "photo.badge.exclamationmark",
+                                           description: Text(errorMessage))
+                } else {
+                    ProgressView("Rendering card…")
+                }
+            }
+            .navigationTitle("Submission Link")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                if let rendered {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            ImageSharePresenter.present(items: [rendered, item.message(), item.url])
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
+            }
+            .task { await build() }
+        }
+    }
+
+    private func build() async {
         let renderer = ImageRenderer(
-            content: PlayerLinkCardView(playerName: playerName, url: url)
+            content: PlayerLinkCardView(playerName: item.playerName, url: item.url)
                 .environment(\.locale, Bundle.appLocale)
         )
         renderer.scale = 3.0
         if let image = renderer.uiImage {
-            items.append(image)
-        }
-        items.append("Hi \(playerName) 👋 Here's your personal link to submit your picks. "
-            + "Save it as a bookmark or add it to your Home Screen so you can find it each week.\n\n"
-            + "⚠️ \(PlayerLinkShareItem.safetyWarning)")
-        items.append(url)
-        return items
-    }
-}
-
-/// Renders the share-card image in a `.task` (after this view has had a real
-/// SwiftUI render pass) before presenting the system share sheet — see
-/// `PlayerLinkShareItem.buildShareItems()` for why that ordering matters.
-struct PlayerLinkShareSheet: View {
-    let item: PlayerLinkShareItem
-
-    @State private var items: [Any]?
-
-    var body: some View {
-        Group {
-            if let items {
-                ActivityShareView(items: items)
-            } else {
-                ProgressView()
-                    .task { items = await item.buildShareItems() }
-            }
+            rendered = image
+        } else {
+            errorMessage = AppString("The card image could not be generated.")
         }
     }
 }

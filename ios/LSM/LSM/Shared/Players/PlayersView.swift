@@ -299,7 +299,7 @@ struct PlayerDetailView: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(item: $linkShareItem) { item in
-            PlayerLinkShareSheet(item: item)
+            PlayerLinkShareView(item: item)
         }
         .sheet(isPresented: $showGroupEditor) {
             GroupMembershipEditorView(member: member)

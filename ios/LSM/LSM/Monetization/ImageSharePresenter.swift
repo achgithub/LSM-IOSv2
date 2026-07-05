@@ -7,7 +7,13 @@ import UIKit
 @MainActor
 enum ImageSharePresenter {
     static func present(image: UIImage, title: String) {
-        let vc = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        present(items: [image])
+    }
+
+    /// Same presentation, for callers sharing the image alongside other
+    /// items (e.g. a message and a URL) rather than the image alone.
+    static func present(items: [Any]) {
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
         guard let top = topViewController() else { return }
         // iPad: anchor the popover to the centre of the presenting view.
         if let pop = vc.popoverPresentationController {
