@@ -75,7 +75,19 @@ struct PlayerLinkShareView: View {
                 if let rendered {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            ImageSharePresenter.present(items: [rendered, item.message(), item.url])
+                            // AirDrop specifically rejects any multi-item
+                            // share from this app (confirmed on-device: 2 or
+                            // 3 items both fail with SFAirDropSend.Failure
+                            // badRequest; 1 item succeeds) — exclude just
+                            // AirDrop here rather than drop the message/link
+                            // for every channel. Messages/WhatsApp/Mail all
+                            // handle the full 3-item share fine. Face-to-face
+                            // handoff is covered separately by the in-app QR
+                            // (PlayersView "Show In Person").
+                            ImageSharePresenter.present(
+                                items: [rendered, item.message(), item.url],
+                                excludedActivityTypes: [.airDrop]
+                            )
                         } label: {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }

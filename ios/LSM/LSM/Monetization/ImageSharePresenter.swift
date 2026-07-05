@@ -12,8 +12,17 @@ enum ImageSharePresenter {
 
     /// Same presentation, for callers sharing the image alongside other
     /// items (e.g. a message and a URL) rather than the image alone.
-    static func present(items: [Any]) {
+    ///
+    /// `excludedActivityTypes` exists because AirDrop specifically (not
+    /// Messages/WhatsApp/Mail) rejects any multi-item share from this app
+    /// with `SFAirDropSend.Failure` badRequest — confirmed on-device: a
+    /// single-item share succeeds, two or three items both fail identically.
+    /// Rather than lose the message/link items for every channel, exclude
+    /// just AirDrop where a multi-item share is offered (see
+    /// `PlayerLinkShareView`).
+    static func present(items: [Any], excludedActivityTypes: [UIActivity.ActivityType] = []) {
         let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        vc.excludedActivityTypes = excludedActivityTypes
         guard let top = topViewController() else { return }
         // iPad: anchor the popover to the centre of the presenting view.
         if let pop = vc.popoverPresentationController {
