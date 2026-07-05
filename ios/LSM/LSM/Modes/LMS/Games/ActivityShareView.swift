@@ -28,9 +28,21 @@ struct PlayerLinkShareItem: Identifiable {
     /// `URL` value gets that preview back; the branded card image (with a QR
     /// code as a face-to-face bonus, see `PlayerLinkCardView`) gives it visual
     /// trust context, especially useful for a bare AirDrop with no chat UI.
-    var shareItems: [Any] {
+    ///
+    /// Built asynchronously from a `.task` (see `PlayerLinkShareSheet`), not
+    /// read synchronously off `ImageRenderer` the instant the sheet needs
+    /// items — that pattern produced a corrupted image on-device that AirDrop
+    /// rejected mid-transfer (`SFAirDropSend.Failure` badRequest, reported
+    /// size 0). `SummaryShareView`/`PredictorShareView` render inside an
+    /// already-appeared view's `.task`, which doesn't hit this; this mirrors
+    /// that.
+    @MainActor
+    func buildShareItems() async -> [Any] {
         var items: [Any] = []
-        let renderer = ImageRenderer(content: PlayerLinkCardView(playerName: playerName, url: url))
+        let renderer = ImageRenderer(
+            content: PlayerLinkCardView(playerName: playerName, url: url)
+                .environment(\.locale, Bundle.appLocale)
+        )
         renderer.scale = 3.0
         if let image = renderer.uiImage {
             items.append(image)
@@ -40,6 +52,26 @@ struct PlayerLinkShareItem: Identifiable {
             + "⚠️ \(PlayerLinkShareItem.safetyWarning)")
         items.append(url)
         return items
+    }
+}
+
+/// Renders the share-card image in a `.task` (after this view has had a real
+/// SwiftUI render pass) before presenting the system share sheet — see
+/// `PlayerLinkShareItem.buildShareItems()` for why that ordering matters.
+struct PlayerLinkShareSheet: View {
+    let item: PlayerLinkShareItem
+
+    @State private var items: [Any]?
+
+    var body: some View {
+        Group {
+            if let items {
+                ActivityShareView(items: items)
+            } else {
+                ProgressView()
+                    .task { items = await item.buildShareItems() }
+            }
+        }
     }
 }
 
