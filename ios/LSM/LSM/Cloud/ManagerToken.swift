@@ -8,7 +8,14 @@ import Security
 ///
 /// Migration: if a value exists in UserDefaults under the old key, it is moved
 /// to the Keychain on first access and deleted from UserDefaults.
-enum ManagerToken {
+///
+/// `nonisolated` because this project defaults every type to MainActor
+/// isolation, but every call site here is from a background `actor` (the
+/// various Cloud clients) — Keychain access is thread-safe and has nothing to
+/// do with the main thread, so isolating it to MainActor was never correct,
+/// just unannotated. Left un-fixed, this becomes a hard compile error under
+/// Swift 6's strict concurrency mode, not just a warning.
+nonisolated enum ManagerToken {
     private static let keychainService = "com.sportsmanager.LSM"
     private static let keychainAccount = "managerCloudToken"
     private static let legacyDefaultsKey = "lsmManagerCloudToken"
