@@ -2,12 +2,12 @@ import SwiftUI
 
 /// Branded image shared alongside a player's submission link — gives the link
 /// a trustworthy, on-brand visual (recognisable shield/app name) instead of a
-/// bare UUID URL that reads as suspicious to less tech-savvy players. The QR
-/// code is a bonus for face-to-face handoff (manager shows their screen, the
-/// player scans with their own phone) — it can't help someone opening this on
-/// the device the link was sent to, since you can't scan your own screen; the
-/// tap-through link (shared as a separate item, see `PlayerLinkShareItem`)
-/// remains the actual way in for a remotely-sent link.
+/// bare UUID URL that reads as suspicious to less tech-savvy players. No QR
+/// code here — that's shown in-app instead (see `PlayersView`'s "Show In
+/// Person" section), and embedding the CoreImage-rendered QR in this card
+/// was implicated in AirDrop transfers failing with a corrupted/oversized
+/// image (`SFAirDropSend.Failure` badRequest); dropping it also keeps the
+/// card simpler and smaller.
 struct PlayerLinkCardView: View {
     let playerName: String
     let url: URL
@@ -28,20 +28,6 @@ struct PlayerLinkCardView: View {
                 Text("⚠️ \(PlayerLinkShareItem.safetyWarning)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(palette.accent)
-                    .multilineTextAlignment(.center)
-                if let qrImage = QRCodeGenerator.image(for: url.absoluteString) {
-                    Image(uiImage: qrImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 160, height: 160)
-                        .padding(12)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                Text("Face to face? Scan this with your camera instead.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.textSecondary)
                     .multilineTextAlignment(.center)
             }
             .padding(24)
