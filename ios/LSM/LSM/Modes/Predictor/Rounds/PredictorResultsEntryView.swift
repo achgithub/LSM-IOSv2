@@ -194,7 +194,12 @@ struct PredictorResultsEntryView: View {
             CloseRoundWarningSheet(dontShowAgain: $suppressCloseWarning) {
                 if suppressCloseWarning { closeWarningSuppressed = true }
                 showingCloseWarning = false
-                close()
+                // Let the sheet's dismissal transition finish before dismissing
+                // the parent screen — closing both in the same tick stalled
+                // SwiftUI's presentation reconciliation long enough to trip the
+                // background watchdog (0x8BADF00D) and get the app killed
+                // (TestFlight build 28, 2026-07-05).
+                DispatchQueue.main.async { close() }
             } onCancel: {
                 showingCloseWarning = false
             }
