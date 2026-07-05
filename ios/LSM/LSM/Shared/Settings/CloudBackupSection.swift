@@ -9,6 +9,8 @@ struct CloudBackupSection: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(\.modelContext) private var context
     @Query private var games: [Game]
+    @Query private var rosterMembers: [RosterMember]
+    @Query private var playerGroups: [PlayerGroup]
 
     @AppStorage("cloudBackupRestoreCode") private var restoreCodeRaw = ""
     @State private var isWorking = false
@@ -102,7 +104,11 @@ struct CloudBackupSection: View {
         statusMessage = nil
         defer { isWorking = false }
         let id = restoreCode ?? UUID()
-        let bundle = BackupBundle(games: games.map(GameSnapshotBuilder.snapshot(of:)))
+        let bundle = BackupBundle(
+            games: games.map(GameSnapshotBuilder.snapshot(of:)),
+            managerToken: ManagerToken.current,
+            roster: RosterSnapshotBuilder.snapshot(members: rosterMembers, groups: playerGroups)
+        )
         do {
             try await SnapshotClient.shared.backup(bundle, id: id)
             restoreCodeRaw = id.uuidString
@@ -124,6 +130,16 @@ struct CloudBackupSection: View {
             let bundle = try await SnapshotClient.shared.restore(id: id)
             for snapshot in bundle.games {
                 GameSnapshotBuilder.restore(snapshot, into: context)
+            }
+            if let roster = bundle.roster {
+                RosterSnapshotBuilder.restore(roster, into: context)
+            }
+            // Restoring the original device's token (rather than leaving this
+            // device's freshly-minted one) is what lets existing submission
+            // links, manager_lifecycle status, etc. keep working post-restore
+            // — see ManagerToken.restore.
+            if let managerToken = bundle.managerToken {
+                ManagerToken.restore(managerToken)
             }
             restoreCodeRaw = id.uuidString
             statusMessage = "Restored \(bundle.games.count) game\(bundle.games.count == 1 ? "" : "s")."

@@ -26,6 +26,17 @@ enum ManagerToken {
         return new
     }
 
+    /// Overwrites the Keychain value with a token recovered from a Cloud
+    /// Backup restore. Without this, a restored phone always mints a brand
+    /// new random token (Keychain data is device-local and isn't part of the
+    /// backup bundle by default), which silently orphans every existing
+    /// submission link, the manager_lifecycle row, and anything else scoped
+    /// server-side to the original device's token. Restoring the same value
+    /// makes the new device indistinguishable from the original to the server.
+    static func restore(_ token: String) {
+        save(token.lowercased())
+    }
+
     private static func keychainValue() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

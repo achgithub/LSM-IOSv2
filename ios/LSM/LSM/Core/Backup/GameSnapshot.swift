@@ -93,8 +93,50 @@ struct GameSnapshot: Codable {
 /// One or more games, the unit a Cloud Backup blob actually stores ("game(s)"
 /// per §0) — a manager may have several games on-device, of either mode,
 /// backed up together in one bundle.
+///
+/// `managerToken` and `roster` are both optional so old backups (written
+/// before either existed) still decode fine — `restore()` just skips
+/// whichever is absent, same as it always did for a backup with no roster.
 struct BackupBundle: Codable {
     let games: [GameSnapshot]
+    /// The device's Keychain-backed `ManagerToken` at backup time. Restoring
+    /// it onto a new device — rather than letting that device mint its own
+    /// fresh random token — is what lets a restored phone remint/revoke
+    /// submission links, keep its manager_lifecycle status, etc., under the
+    /// same server-side identity as the original device.
+    var managerToken: String?
+    /// The roster address book (`RosterMember` + `PlayerGroup`) — NOT
+    /// scoped to any one game, so it lives alongside `games` rather than
+    /// inside `GameSnapshot`.
+    var roster: RosterSnapshot?
+}
+
+/// The manager's roster address book — reusable players and the groups
+/// they belong to, independent of any specific game.
+struct RosterSnapshot: Codable {
+    let members: [MemberSnapshot]
+    let groups: [GroupSnapshot]
+
+    struct MemberSnapshot: Codable {
+        let id: UUID
+        let name: String
+        let createdAt: Date
+        /// The player's global submission-link token, if one's been minted.
+        /// Restoring this is the entire point of backing up the roster at
+        /// all — without it, a restored device has the player back, but
+        /// their existing link is orphaned (the device has no record of it,
+        /// and minting a fresh one 409s against the still-active old one).
+        let submissionTokenRaw: String?
+        /// Group membership by name, not id — reconciled against the
+        /// restored/existing `PlayerGroup` rows by name on restore.
+        let groupNames: [String]
+    }
+
+    struct GroupSnapshot: Codable {
+        let id: UUID
+        let name: String
+        let createdAt: Date
+    }
 }
 
 enum GameSnapshotBuilder {
@@ -247,5 +289,66 @@ enum GameSnapshotBuilder {
         }
 
         return game
+    }
+}
+
+enum RosterSnapshotBuilder {
+    static func snapshot(members: [RosterMember], groups: [PlayerGroup]) -> RosterSnapshot {
+        RosterSnapshot(
+            members: members.map { m in
+                RosterSnapshot.MemberSnapshot(
+                    id: m.id,
+                    name: m.name,
+                    createdAt: m.createdAt,
+                    submissionTokenRaw: m.submissionTokenRaw,
+                    groupNames: m.groups.map(\.name)
+                )
+            },
+            groups: groups.map { g in
+                RosterSnapshot.GroupSnapshot(id: g.id, name: g.name, createdAt: g.createdAt)
+            }
+        )
+    }
+
+    /// Restores roster members/groups, reconciled by **name** against
+    /// whatever's already on-device rather than blindly inserting
+    /// duplicates — a manager may have already re-added some players before
+    /// restoring, or be restoring onto a device with an existing roster.
+    /// Never overwrites a token this device already knows about; only fills
+    /// in one recovered from the backup if the local member has none.
+    static func restore(_ snapshot: RosterSnapshot, into context: ModelContext) {
+        let existingMembers = (try? context.fetch(FetchDescriptor<RosterMember>())) ?? []
+        var membersByName = Dictionary(existingMembers.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+
+        let existingGroups = (try? context.fetch(FetchDescriptor<PlayerGroup>())) ?? []
+        var groupsByName = Dictionary(existingGroups.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+
+        for g in snapshot.groups where groupsByName[g.name] == nil {
+            let group = PlayerGroup(name: g.name)
+            group.createdAt = g.createdAt
+            context.insert(group)
+            groupsByName[g.name] = group
+        }
+
+        for m in snapshot.members {
+            let member: RosterMember
+            if let existing = membersByName[m.name] {
+                member = existing
+            } else {
+                member = RosterMember(name: m.name)
+                member.createdAt = m.createdAt
+                context.insert(member)
+                membersByName[m.name] = member
+            }
+            if member.submissionTokenRaw == nil {
+                member.submissionTokenRaw = m.submissionTokenRaw
+            }
+            for groupName in m.groupNames {
+                guard let group = groupsByName[groupName] else { continue }
+                if !member.groups.contains(where: { $0.id == group.id }) {
+                    member.groups.append(group)
+                }
+            }
+        }
     }
 }
