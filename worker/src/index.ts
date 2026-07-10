@@ -35,8 +35,10 @@ app.get("/health", async (c) => {
 app.use("*", outageGate);
 
 // Layer 1 — league discovery + read-only sports data.
-// /scores and /fixtures are JWT-gated (requireJWT applied inside data.ts).
-// /leagues.json, /teams, /standings remain public.
+// /teams, /standings, /scores, /fixtures are all JWT-gated (requireJWT
+// applied inside data.ts) — upstream data license requires all league data
+// protected from unauthenticated access. Only /leagues.json (manifest) and
+// /leagues (metadata) remain public.
 app.route("/", data);
 
 // Admin — ops endpoints (sync, probe). Auth is inside admin.ts.

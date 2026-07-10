@@ -48,12 +48,15 @@ data.use("/leagues/:leagueId/*", async (c, next) => {
   await next();
 });
 
-// Teams — public, no gate (changes at most once per season).
+// Teams — attest-gated (upstream data license requires all league data to be
+// protected from unauthenticated/general access, not just scores/fixtures).
+data.use("/leagues/:leagueId/teams", requireJWT);
 data.get("/leagues/:leagueId/teams", async (c) =>
   c.json(await getTeamsByLeague(c.env.DB, c.req.param("leagueId"))),
 );
 
-// Standings — public, gate-refreshed from /standings upstream.
+// Standings — attest-gated, same license requirement as teams above.
+data.use("/leagues/:leagueId/standings", requireJWT);
 data.get("/leagues/:leagueId/standings", async (c) => {
   const league = c.get("league");
   const keys = leagueKeys(league.id);
