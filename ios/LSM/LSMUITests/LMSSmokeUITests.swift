@@ -342,6 +342,154 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "PlayerDetail")
     }
 
+    /// End-to-end manual-fixture flow inside a Predictor game — the concept
+    /// was previously only exercised (manually) in LMS. Confirms
+    /// `OpenRoundView`/`AddManualFixtureSheet` (moved to Shared/Rounds since
+    /// they're mode-agnostic) actually work when driven from
+    /// `PredictorGameDetailView`: add a hand-typed fixture, open a round on
+    /// it, enter a prediction, enter a result, and close the round.
+    @MainActor
+    func testManualFixturePredictorFlow() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        completeOnboardingIfNeeded(app)
+
+        let suffix = UUID().uuidString.prefix(6)
+        let player1 = "MF Player A \(suffix)"
+        let player2 = "MF Player B \(suffix)"
+
+        // --- Create two roster players. ---
+        XCTAssertTrue(app.tabBars.buttons["Players"].waitForExistence(timeout: 15), "Players tab never appeared")
+        app.tabBars.buttons["Players"].tap()
+        let search = app.searchFields.firstMatch
+        for name in [player1, player2] {
+            app.navigationBars.buttons["Add player"].tap()
+            let nameField = app.alerts.textFields.firstMatch
+            XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Add player alert never appeared")
+            nameField.tap()
+            nameField.typeText(name)
+            app.alerts.buttons["Add"].tap()
+            // The demo-seeded roster pushes new (alphabetically-sorted) rows
+            // off the lazy-loaded list — filter via search rather than
+            // relying on the row being on-screen.
+            XCTAssertTrue(search.waitForExistence(timeout: 10), "Search field missing from Players list")
+            search.tap()
+            search.typeText(name)
+            XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10), "\(name) never appeared in Players list")
+            search.buttons["Clear text"].tap()
+        }
+
+        // --- Create the Predictor game. ---
+        app.tabBars.buttons["Games"].tap()
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Predictor"].waitForExistence(timeout: 10), "Predictor mode option never appeared")
+        app.staticTexts["Predictor"].tap()
+        let gameName = "Manual Fixture Predictor \(suffix)"
+        let nameTextField = app.textFields["Game name"]
+        XCTAssertTrue(nameTextField.waitForExistence(timeout: 10), "Predictor form never appeared")
+        nameTextField.tap()
+        nameTextField.typeText(gameName)
+        app.navigationBars.buttons["Create"].tap()
+
+        XCTAssertTrue(app.staticTexts[gameName].waitForExistence(timeout: 10), "New Predictor game never appeared on Games list")
+        app.staticTexts[gameName].tap()
+        XCTAssertTrue(app.buttons["Standings"].waitForExistence(timeout: 10), "Predictor game detail screen never opened")
+
+        // --- Add the two roster players into this game. ---
+        app.buttons["Add Players"].tap()
+        let addPlayersSearch = app.searchFields.firstMatch
+        XCTAssertTrue(addPlayersSearch.waitForExistence(timeout: 10), "Search field missing from Add Players sheet")
+        for name in [player1, player2] {
+            addPlayersSearch.tap()
+            addPlayersSearch.typeText(name)
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", name)).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "\(name) missing from Add Players sheet")
+            row.tap()
+            addPlayersSearch.buttons["Clear text"].tap()
+        }
+        app.buttons["Done"].tap()
+
+        // --- Open a round, adding a manual (hand-typed) fixture. ---
+        let openMatchday = app.buttons["Open Matchday"]
+        XCTAssertTrue(openMatchday.waitForExistence(timeout: 10), "Open Matchday button never appeared")
+        openMatchday.tap()
+
+        let addManualFixture = app.buttons["Add Manual Fixture"]
+        XCTAssertTrue(addManualFixture.waitForExistence(timeout: 25), "Add Manual Fixture button never appeared (fixtures may not have loaded)")
+        addManualFixture.tap()
+
+        XCTAssertTrue(app.navigationBars["Add Manual Fixture"].waitForExistence(timeout: 10), "AddManualFixtureSheet never opened")
+        let homeField = app.textFields["Home team"]
+        let awayField = app.textFields["Away team"]
+        XCTAssertTrue(homeField.waitForExistence(timeout: 10))
+        homeField.tap()
+        homeField.typeText("UITest Rovers \(suffix)")
+        awayField.tap()
+        awayField.typeText("UITest Athletic \(suffix)")
+        app.navigationBars.buttons["Add"].tap()
+
+        // Back in OpenRoundView — the manual fixture is auto-selected, so
+        // "Open" should now be enabled (2 active players, 1 fixture picked).
+        let openButton = app.navigationBars.buttons["Open"]
+        XCTAssertTrue(openButton.waitForExistence(timeout: 10), "Open button never appeared")
+        XCTAssertTrue(openButton.isEnabled, "Open button stayed disabled after adding a manual fixture")
+        openButton.tap()
+
+        // --- Enter a prediction for each player on the manual fixture. ---
+        let enterPredictions = app.buttons["Enter Predictions"]
+        XCTAssertTrue(enterPredictions.waitForExistence(timeout: 10), "Enter Predictions button never appeared after opening the round")
+        enterPredictions.tap()
+
+        let homePlus = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'predictionHome-' AND identifier ENDSWITH '-plus'"
+        )).firstMatch
+        XCTAssertTrue(homePlus.waitForExistence(timeout: 10), "Prediction score stepper never appeared — manual fixture missing from Predictions entry")
+        homePlus.tap() // player 1: predicts 1-0
+
+        let playerPicker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Player,'")).firstMatch
+        XCTAssertTrue(playerPicker.waitForExistence(timeout: 10), "Player picker never appeared")
+        playerPicker.tap()
+        let player2MenuItem = app.buttons[player2]
+        XCTAssertTrue(player2MenuItem.waitForExistence(timeout: 5), "\(player2) never appeared in the player picker menu")
+        player2MenuItem.tap()
+
+        let awayPlus = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'predictionAway-' AND identifier ENDSWITH '-plus'"
+        )).firstMatch
+        XCTAssertTrue(awayPlus.waitForExistence(timeout: 10), "Prediction score stepper never appeared for \(player2)")
+        awayPlus.tap() // player 2: predicts 0-1
+        attachScreenshot(named: "ManualFixturePredictions")
+
+        app.navigationBars.buttons["Done"].tap()
+
+        // --- Enter the result and close the round. ---
+        let enterResults = app.buttons["Enter Results / Close"]
+        XCTAssertTrue(enterResults.waitForExistence(timeout: 10), "Enter Results / Close button never appeared")
+        enterResults.tap()
+
+        let enterResult = app.buttons["Enter result"]
+        XCTAssertTrue(enterResult.waitForExistence(timeout: 10), "Enter result button never appeared for the manual fixture")
+        enterResult.tap()
+
+        let closeRound = app.buttons["Close Round"]
+        XCTAssertTrue(closeRound.waitForExistence(timeout: 10))
+        XCTAssertTrue(closeRound.isEnabled, "Close Round stayed disabled after entering a result for the manual fixture")
+        closeRound.tap()
+
+        // A confirmation sheet appears unless previously suppressed on this device.
+        let confirmClose = app.sheets.buttons["Close Round"]
+        if confirmClose.waitForExistence(timeout: 5) {
+            confirmClose.tap()
+        }
+
+        // Back on game detail: the round closed without crashing and the
+        // manual fixture scored — Standings should reflect the new points.
+        XCTAssertTrue(app.buttons["Standings"].waitForExistence(timeout: 10), "Game detail never returned after closing the round")
+        attachScreenshot(named: "ManualFixtureRoundClosed")
+    }
+
     /// Verifies the downgrade-safety fix: a league already used by an active
     /// game stays fully usable after a subscription downgrade (no forced
     /// blocking screen, Create still works there), while starting a game in a

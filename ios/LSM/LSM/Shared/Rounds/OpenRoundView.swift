@@ -7,7 +7,11 @@ private let submissionsLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "
 /// Open a new round: choose a league, narrow fixtures (matchday / date range /
 /// unplayed-only) and select the ones the round runs on, then set the picks
 /// deadline (spec §6.3). Defaults to upcoming (unplayed) fixtures so managers
-/// see selectable games first.
+/// see selectable games first. Mode-agnostic — instantiated by both LMS's
+/// `GameDetailView` and `PredictorGameDetailView`; the only mode-specific
+/// branch is `strandedPlayers` (LMS-only "used teams" concept). Also hosts
+/// the "Add Manual Fixture" entry point shared by both modes (see
+/// `AddManualFixtureSheet`, `ManualFixtureService`).
 struct OpenRoundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
