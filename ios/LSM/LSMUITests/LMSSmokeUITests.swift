@@ -139,6 +139,59 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "PredictorGameDetail")
     }
 
+    /// Killer mode smoke: creates a Killer game through the New Game mode
+    /// picker and its own settings form, confirms it lands on the Games list
+    /// with a Killer badge, and that the game detail screen (lives
+    /// leaderboard, round section) opens without crashing.
+    @MainActor
+    func testCreateKillerGame() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let nameField = app.textFields.firstMatch
+        if nameField.waitForExistence(timeout: 15) {
+            nameField.tap()
+            nameField.typeText("UITester")
+            app.buttons["Continue"].firstMatch.tap()
+        }
+
+        XCTAssertTrue(
+            app.tabBars.buttons["Games"].waitForExistence(timeout: 15),
+            "Games tab never appeared"
+        )
+        app.tabBars.buttons["Games"].tap()
+
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Killer"].waitForExistence(timeout: 10),
+            "Killer mode option never appeared in the New Game picker"
+        )
+        app.staticTexts["Killer"].tap()
+
+        let nameTextField = app.textFields["Game name"]
+        XCTAssertTrue(nameTextField.waitForExistence(timeout: 10), "Killer form never appeared")
+        nameTextField.tap()
+        nameTextField.typeText("Killer Test")
+
+        app.navigationBars.buttons["Create"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Killer Test"].waitForExistence(timeout: 10),
+            "New Killer game never appeared on the Games list"
+        )
+        XCTAssertTrue(app.staticTexts["Killer"].waitForExistence(timeout: 5), "Killer mode badge missing on GameCard")
+        attachScreenshot(named: "KillerGameCard")
+
+        app.staticTexts["Killer Test"].tap()
+        XCTAssertTrue(
+            app.buttons["Add Players"].waitForExistence(timeout: 10),
+            "Killer game detail screen never opened"
+        )
+        attachScreenshot(named: "KillerGameDetail")
+    }
+
     /// Phase-2 Cloud Backup/Publish render smoke: flips the DEBUG-only
     /// "Simulate tier" picker to a cloud-entitled tier (no network/purchase
     /// needed), confirms the gated UI actually renders both there and inside

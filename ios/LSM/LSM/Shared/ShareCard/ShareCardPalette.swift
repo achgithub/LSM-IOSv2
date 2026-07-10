@@ -32,4 +32,15 @@ struct ShareCardPalette {
         textPrimary: Color(hex: "F5F5F5"),
         textSecondary: Color(hex: "9CA3AF")
     )
+
+    /// Near-black + crimson — Killer.
+    static let killer = ShareCardPalette(
+        bg: Color(hex: "170D0D"),
+        headerBar: Color(hex: "2E1616"),
+        accent: Color(hex: "F03030"),
+        positive: Color(hex: "22C55E"),
+        negative: Color(hex: "EF4444"),
+        textPrimary: Color(hex: "F5F5F5"),
+        textSecondary: Color(hex: "9CA3AF")
+    )
 }
