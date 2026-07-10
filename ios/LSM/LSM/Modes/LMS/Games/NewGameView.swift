@@ -32,7 +32,30 @@ struct NewGameView: View {
 
     private var managerTrimmed: String { managerName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canCreate: Bool { !trimmedName.isEmpty && !selectedLeagueIds.isEmpty }
+    private var canCreate: Bool { !trimmedName.isEmpty && !selectedLeagueIds.isEmpty && !wouldExceedLeagueAllowance }
+
+    /// Leagues currently used by any non-completed game. These stay available
+    /// for further games no matter what the current tier allows — a lapsed
+    /// subscription never interrupts a game already in progress. Only picking
+    /// a league beyond this set needs allowance headroom (see
+    /// `wouldExceedLeagueAllowance`), mirroring how `maxActiveGames` only
+    /// gates game creation, never existing games.
+    private var activeLeagueIds: Set<String> {
+        let completeRaw = GameStatus.complete.rawValue
+        let descriptor = FetchDescriptor<Game>(predicate: #Predicate { $0.statusRaw != completeRaw })
+        let games = (try? context.fetch(descriptor)) ?? []
+        return Set(games.flatMap(\.leagueIdsRaw))
+    }
+
+    /// True only when the selection adds a league not already in active use
+    /// AND doing so would push the total past the tier's allowance. Selecting
+    /// exclusively from already-active leagues is always allowed, even if the
+    /// manager is already over allowance from a downgrade.
+    private var wouldExceedLeagueAllowance: Bool {
+        let newSelections = selectedLeagueIds.subtracting(activeLeagueIds)
+        guard !newSelections.isEmpty else { return false }
+        return activeLeagueIds.union(selectedLeagueIds).count > Entitlements.shared.leagueAllowance
+    }
 
     var body: some View {
         NavigationStack {
@@ -115,9 +138,13 @@ struct NewGameView: View {
                 } header: {
                     Text("Leagues")
                 } footer: {
-                    Text(enabled.leagues.count == 1
-                         ? "Your only enabled league. Enable more in Settings to blend leagues in a game."
-                         : "Pick one league, or blend several — players can then pick teams from any of them.")
+                    if wouldExceedLeagueAllowance {
+                        Text("Your plan doesn't cover an extra league right now. Leagues already in use by another game stay available to pick from — upgrade to add a new one.")
+                    } else {
+                        Text(enabled.leagues.count == 1
+                             ? "Your only enabled league. Enable more in Settings to blend leagues in a game."
+                             : "Pick one league, or blend several — players can then pick teams from any of them.")
+                    }
                 }
 
                 if !managerTrimmed.isEmpty {
@@ -207,7 +234,7 @@ struct NewGameView: View {
     }
 
     private func create() {
-        guard activeGameCount() < Entitlements.shared.maxActiveGames else { return }
+        guard activeGameCount() < Entitlements.shared.maxActiveGames, !wouldExceedLeagueAllowance else { return }
         let game = Game(
             name: trimmedName,
             season: season,
@@ -256,9 +283,13 @@ struct NewGameView: View {
             } header: {
                 Text("Leagues")
             } footer: {
-                Text(enabled.leagues.count == 1
-                     ? "Your only enabled league. Enable more in Settings to blend leagues in a game."
-                     : "Pick one league, or blend several — predictions can then cover fixtures from any of them.")
+                if wouldExceedLeagueAllowance {
+                    Text("Your plan doesn't cover an extra league right now. Leagues already in use by another game stay available to pick from — upgrade to add a new one.")
+                } else {
+                    Text(enabled.leagues.count == 1
+                         ? "Your only enabled league. Enable more in Settings to blend leagues in a game."
+                         : "Pick one league, or blend several — predictions can then cover fixtures from any of them.")
+                }
             }
 
             if !managerTrimmed.isEmpty {
@@ -322,7 +353,7 @@ struct NewGameView: View {
     }
 
     private func createPredictor() {
-        guard activeGameCount() < Entitlements.shared.maxActiveGames else { return }
+        guard activeGameCount() < Entitlements.shared.maxActiveGames, !wouldExceedLeagueAllowance else { return }
         let game = Game(
             name: trimmedName,
             season: season,

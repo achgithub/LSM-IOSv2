@@ -66,11 +66,13 @@ publish.post("/", async (c) => {
   await c.env.BACKUPS.put(r2Key, JSON.stringify(body.snapshot), {
     httpMetadata: { contentType: "application/json" },
   });
+  // Republishing clears any unlock lockout too — a manager fixing a PIN
+  // problem by republishing should never stay locked out from their own fix.
   await c.env.DB
     .prepare(
-      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, owner_token, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?6)
-       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?6`,
+      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, owner_token, created_at, updated_at, unlock_attempts, unlock_locked_until)
+       VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?6, 0, NULL)
+       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?6, unlock_attempts = 0, unlock_locked_until = NULL`,
     )
     .bind(id, salt, hash, r2Key, ownerToken, now)
     .run();

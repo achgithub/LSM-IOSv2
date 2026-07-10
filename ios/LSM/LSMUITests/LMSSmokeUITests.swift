@@ -342,6 +342,92 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "PlayerDetail")
     }
 
+    /// Verifies the downgrade-safety fix: a league already used by an active
+    /// game stays fully usable after a subscription downgrade (no forced
+    /// blocking screen, Create still works there), while starting a game in a
+    /// *different*, not-yet-active league beyond the new allowance is blocked
+    /// with an inline message instead of silently deleting anything.
+    @MainActor
+    func testLeagueAllowanceProtectsActiveGamesOnDowngrade() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        completeOnboardingIfNeeded(app)
+
+        // Bump to a 3-league tier and enable a second league.
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["Settings"].tap()
+        app.staticTexts["Subscription"].tap()
+        let tierPicker = app.buttons["Simulate tier, Free"]
+        XCTAssertTrue(tierPicker.waitForExistence(timeout: 10), "Dev tier simulator never appeared")
+        tierPicker.tap()
+        app.buttons["3 Leagues"].tap()
+        app.navigationBars.buttons.firstMatch.tap() // back to Settings
+
+        app.staticTexts["Leagues"].tap()
+        let championship = app.buttons["England — Championship"]
+        XCTAssertTrue(championship.waitForExistence(timeout: 10), "Championship row never appeared")
+        championship.tap()
+        app.navigationBars.buttons.firstMatch.tap() // back to Settings
+
+        // Create a game in the Premier League (the original, already-enabled
+        // league) so it becomes "active" — this is the league that must
+        // survive a downgrade.
+        app.tabBars.buttons["Games"].tap()
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        app.staticTexts["Last Man Standing"].tap()
+        let nameField = app.textFields["Game name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "LMS form never appeared")
+        nameField.tap()
+        nameField.typeText("Downgrade Test Game")
+        app.buttons["England — Premier League"].tap() // select PL only (multi-league picker now visible)
+        app.navigationBars.buttons["Create"].tap()
+        XCTAssertTrue(app.staticTexts["Downgrade Test Game"].waitForExistence(timeout: 10), "Game never appeared on Games list")
+
+        // Downgrade below the leagues now enabled (2 enabled, Free allows 1).
+        app.tabBars.buttons["Settings"].tap()
+        app.staticTexts["Subscription"].tap()
+        app.buttons["Simulate tier, 3 Leagues"].tap()
+        app.buttons["Free"].tap()
+        app.navigationBars.buttons.firstMatch.tap()
+
+        // No forced blocking screen — the tab bar must still be there and
+        // interactive immediately after the downgrade.
+        XCTAssertTrue(app.tabBars.buttons["Games"].waitForExistence(timeout: 10), "App got blocked after downgrade instead of staying usable")
+        app.tabBars.buttons["Games"].tap()
+        XCTAssertTrue(app.staticTexts["Downgrade Test Game"].waitForExistence(timeout: 10), "Existing game vanished after downgrade")
+
+        // The already-active league (PL) must still be usable for a new game.
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        app.staticTexts["Last Man Standing"].tap()
+        let nameField2 = app.textFields["Game name"]
+        XCTAssertTrue(nameField2.waitForExistence(timeout: 10))
+        nameField2.tap()
+        nameField2.typeText("Second PL Game")
+        app.buttons["England — Premier League"].tap()
+        let createButton = app.navigationBars.buttons["Create"]
+        XCTAssertTrue(createButton.isEnabled, "Create disabled for an already-active league after downgrade — live game continuity broken")
+        createButton.tap()
+        XCTAssertTrue(app.staticTexts["Second PL Game"].waitForExistence(timeout: 10), "Could not create a second game in the already-active league after downgrade")
+        attachScreenshot(named: "DowngradeStillUsable")
+
+        // A DIFFERENT, not-yet-active league (Championship) beyond the new
+        // Free allowance must be blocked — Create disabled, inline message shown.
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        app.staticTexts["Last Man Standing"].tap()
+        let nameField3 = app.textFields["Game name"]
+        XCTAssertTrue(nameField3.waitForExistence(timeout: 10))
+        nameField3.tap()
+        nameField3.typeText("Should Not Create")
+        app.buttons["England — Championship"].tap()
+        XCTAssertFalse(app.navigationBars.buttons["Create"].isEnabled, "Create should be disabled for a new, over-allowance league after downgrade")
+        XCTAssertTrue(
+            app.staticTexts["Your plan doesn't cover an extra league right now. Leagues already in use by another game stay available to pick from — upgrade to add a new one."].waitForExistence(timeout: 5),
+            "Over-allowance explanation footer never appeared"
+        )
+        attachScreenshot(named: "DowngradeBlockedNewLeague")
+    }
+
     private func attachScreenshot(named name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)

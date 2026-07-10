@@ -48,18 +48,15 @@ final class EnabledLeagues {
     }
 
     /// Drop leagues that no longer exist (never empty). Does NOT trim for the
-    /// subscription allowance — going over allowance (e.g. a cancelled sub) is
-    /// surfaced to the user so THEY choose which to keep (LeagueDowngradeView).
+    /// subscription allowance — going over allowance (e.g. a cancelled sub)
+    /// never force-removes anything; existing games keep running regardless
+    /// of tier. Only starting a NEW game in a not-yet-active league is gated
+    /// (see `NewGameView`). The user can always manually disable an idle
+    /// excess league in Settings (`LeagueSettingsView`).
     func pruneInvalid() {
         ids = ids.filter { Leagues.byId($0) != nil }
         if ids.isEmpty { ids = [Leagues.home.id] }
         persist()
-    }
-
-    /// Whether the enabled count fits the subscription. When false the app must
-    /// force the user to reduce their leagues before continuing.
-    func isWithinAllowance(_ entitlements: Entitlements) -> Bool {
-        ids.count <= entitlements.leagueAllowance
     }
 
     private func persist() { UserDefaults.standard.set(ids, forKey: Self.key) }

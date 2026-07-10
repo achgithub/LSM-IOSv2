@@ -10,20 +10,15 @@ enum RootTab: Hashable { case games, players, matches, standings, settings }
 /// is the reusable player roster rather than a read-only picks view.)
 struct RootTabView: View {
     /// True while the launch splash is still showing — modal presentations
-    /// (onboarding, downgrade gate) wait until it's gone so they don't pop over
-    /// the splash (a `.sheet`/`.fullScreenCover` presents at the window level).
+    /// (onboarding) wait until it's gone so they don't pop over the splash
+    /// (a `.sheet`/`.fullScreenCover` presents at the window level).
     var splashActive: Bool = false
     /// Owned by `AppRootView` so it persists across the language re-key.
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var entitlements = Entitlements.shared
-    @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
     // @Environment(\.scenePhase) private var scenePhase  // interstitial dropped 2026-06-15
-
-    /// True when more leagues are enabled than the (possibly downgraded)
-    /// subscription allows — the app is blocked until the user reduces them.
-    private var mustReduceLeagues: Bool { !enabled.isWithinAllowance(entitlements) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,12 +50,6 @@ struct RootTabView: View {
         .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {
             ManagerOnboardingView(managerName: $managerName)
         }
-        // Subscription downgrade: block the whole app until the user trims their
-        // enabled leagues back within the new allowance.
-        .fullScreenCover(isPresented: .constant(!splashActive && mustReduceLeagues)) {
-            LeagueDowngradeView()
-                .environment(entitlements)
-        }
         .task {
             #if DEBUG
             DemoRosterSeeder.seedIfNeeded(context: context)
@@ -80,7 +69,9 @@ struct RootTabView: View {
             }
             await entitlements.refresh()
             // Drop any leagues that no longer exist. Going over the subscription
-            // allowance is handled by the blocking downgrade gate, not silently.
+            // allowance (e.g. a lapsed sub) is never force-corrected — existing
+            // games keep running regardless of tier; only starting a NEW game in
+            // a not-yet-active league is gated, in NewGameView.
             EnabledLeagues.shared.pruneInvalid()
             // The device's one-ever free look at real data (home league only) —
             // see LeagueData's doc comment. A no-op after the first-ever launch.

@@ -136,7 +136,7 @@ ${brandHeader()}
   ${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}
   <form class="form" method="POST">
     <label>PIN
-      <input type="password" inputmode="numeric" name="pin" placeholder="000000" autocomplete="one-time-code" autofocus required>
+      <input type="password" inputmode="numeric" name="pin" placeholder="000000" autocomplete="off" autofocus required>
     </label>
     <button class="btn" type="submit">View league</button>
   </form>
