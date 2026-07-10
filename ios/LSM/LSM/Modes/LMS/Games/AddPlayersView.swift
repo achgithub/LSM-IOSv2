@@ -156,6 +156,7 @@ struct AddPlayersView: View {
         player.rosterMemberId = member.id
         context.insert(player)
         game.players.append(player)
+        KillerScoringService.attachStateIfNeeded(to: player, game: game, context: context)
     }
 
     private func addManager() {
@@ -164,6 +165,7 @@ struct AddPlayersView: View {
                             entryNumber: game.nextEntryNumber)
         context.insert(player)
         game.players.append(player)
+        KillerScoringService.attachStateIfNeeded(to: player, game: game, context: context)
     }
 
     /// Remove the manager from this game (they're running it but not playing).

@@ -80,6 +80,7 @@ struct GamesListView: View {
                 switch game.mode {
                 case .lms: GameDetailView(game: game)
                 case .predictor: PredictorGameDetailView(game: game)
+                case .killer: KillerGameDetailView(game: game)
                 }
             }
             .sheet(isPresented: $showingNew) { NewGameView() }
@@ -156,14 +157,26 @@ private struct GameCard: View {
                     Label(leader, systemImage: "crown.fill")
                 }
             }
+        case .killer:
+            HStack(spacing: 12) {
+                Label("Round \(game.currentRound?.roundNumber ?? 0)", systemImage: "calendar")
+                Label("\(game.activePlayers.count) active", systemImage: "person.fill")
+            }
         }
     }
 }
 
 private struct ModeBadge: View {
     let mode: GameMode
+    private var label: String {
+        switch mode {
+        case .lms: return "LMS"
+        case .predictor: return "Predictor"
+        case .killer: return "Killer"
+        }
+    }
     var body: some View {
-        Text(mode == .lms ? "LMS" : "Predictor")
+        Text(label)
             .font(.caption2.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

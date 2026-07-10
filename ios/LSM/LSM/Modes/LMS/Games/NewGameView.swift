@@ -30,6 +30,12 @@ struct NewGameView: View {
     @State private var predictorResultPoints = PredictorSettings.lastResultPoints
     @State private var predictorJokerEnabled = PredictorSettings.lastJokerEnabled
 
+    // Killer settings — prefilled from the manager's last-used settings, same
+    // "implicit remember last settings" pattern as Predictor.
+    @State private var killerBuildPhaseRounds = KillerSettings.lastBuildPhaseRounds
+    @State private var killerMaxAdditionalLives = KillerSettings.lastMaxAdditionalLives
+    @State private var killerMaxMPG = KillerSettings.lastMaxMPG
+
     private var managerTrimmed: String { managerName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canCreate: Bool { !trimmedName.isEmpty && !selectedLeagueIds.isEmpty && !wouldExceedLeagueAllowance }
@@ -99,6 +105,7 @@ struct NewGameView: View {
         switch mode {
         case .lms: lmsForm
         case .predictor: predictorForm
+        case .killer: killerForm
         }
     }
 
@@ -380,6 +387,123 @@ struct NewGameView: View {
         dismiss()
     }
 
+    // MARK: - Killer
+
+    private var killerForm: some View {
+        Form {
+            Section("Game") {
+                TextField("Game name", text: $name)
+            }
+
+            Section {
+                ForEach(enabled.leagues) { league in
+                    if enabled.leagues.count == 1 {
+                        HStack {
+                            Text(league.name).foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: "checkmark").foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Button {
+                            toggleLeague(league.id)
+                        } label: {
+                            HStack {
+                                Text(league.name).foregroundStyle(.primary)
+                                Spacer()
+                                if selectedLeagueIds.contains(league.id) {
+                                    Image(systemName: "checkmark").foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Leagues")
+            } footer: {
+                if wouldExceedLeagueAllowance {
+                    Text("Your plan doesn't cover an extra league right now. Leagues already in use by another game stay available to pick from — upgrade to add a new one.")
+                } else {
+                    Text(enabled.leagues.count == 1
+                         ? "Your only enabled league. Enable more in Settings to blend leagues in a game."
+                         : "Pick one league, or blend several — Manager Picked Games can then come from any of them.")
+                }
+            }
+
+            if !managerTrimmed.isEmpty {
+                Section {
+                    Button {
+                        managerPlaying.toggle()
+                    } label: {
+                        HStack {
+                            Text("\(managerTrimmed) (you)").foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: managerPlaying ? "minus.circle.fill" : "plus.circle")
+                                .foregroundStyle(managerPlaying ? .red : .blue)
+                        }
+                    }
+                } header: {
+                    Text("You")
+                } footer: {
+                    Text(managerPlaying
+                         ? "You're playing in this game — you have lives and can be eliminated."
+                         : "You're running this game but not playing.")
+                }
+            }
+
+            Section {
+                Stepper("Build Phase: \(killerBuildPhaseRounds) round\(killerBuildPhaseRounds == 1 ? "" : "s")",
+                        value: $killerBuildPhaseRounds, in: 1...10)
+                Stepper("Max additional lives: \(killerMaxAdditionalLives)",
+                        value: $killerMaxAdditionalLives, in: 0...20)
+                Stepper("Max Manager Picked Games: \(killerMaxMPG)",
+                        value: $killerMaxMPG, in: 1...10)
+            } header: {
+                Text("Killer Settings")
+            } footer: {
+                // swiftlint:disable:next line_length
+                Text("Everyone starts with 1 life. During the Build Phase, a correct prediction earns +1 life (up to the cap). After that, the Kill Phase begins: predictions also fire a Hit at a chosen opponent.")
+            }
+        }
+        .navigationTitle("New Game")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Create") { createKiller() }
+                    .disabled(!canCreate)
+            }
+        }
+        .onAppear {
+            if selectedLeagueIds.isEmpty, enabled.leagues.count == 1 {
+                selectedLeagueIds = Set(enabled.leagues.map(\.id))
+            }
+        }
+    }
+
+    private func createKiller() {
+        guard activeGameCount() < Entitlements.shared.maxActiveGames, !wouldExceedLeagueAllowance else { return }
+        let game = Game(
+            name: trimmedName,
+            season: season,
+            allowRepeats: Leagues.app.allowRepeatDefault,
+            leagueIds: Array(selectedLeagueIds),
+            mode: .killer,
+            killerBuildPhaseRounds: killerBuildPhaseRounds,
+            killerMaxAdditionalLives: killerMaxAdditionalLives,
+            killerMaxMPG: killerMaxMPG
+        )
+        context.insert(game)
+        addManagerIfPlaying(to: game)
+        KillerSettings.saveLastUsed(
+            buildPhaseRounds: killerBuildPhaseRounds,
+            maxAdditionalLives: killerMaxAdditionalLives,
+            maxMPG: killerMaxMPG
+        )
+        dismiss()
+    }
+
     /// Non-completed game count — used as a safety net before insert.
     /// The primary gate is in GamesListView; this prevents a bypass if
     /// NewGameView is ever presented through another path.
@@ -399,6 +523,7 @@ struct NewGameView: View {
                                 entryNumber: game.nextEntryNumber)
             context.insert(player)
             game.players.append(player)
+            KillerScoringService.attachStateIfNeeded(to: player, game: game, context: context)
         }
     }
 }
@@ -450,5 +575,32 @@ enum PredictorSettings {
         defaults.set(resultEnabled, forKey: Key.resultEnabled)
         defaults.set(resultPoints, forKey: Key.resultPoints)
         defaults.set(jokerEnabled, forKey: Key.jokerEnabled)
+    }
+}
+
+/// UserDefaults-backed "remember last settings" for Killer's New Game form,
+/// same pattern as `PredictorSettings`.
+enum KillerSettings {
+    private static let defaults = UserDefaults.standard
+    private enum Key {
+        static let buildPhaseRounds = "killer.lastBuildPhaseRounds"
+        static let maxAdditionalLives = "killer.lastMaxAdditionalLives"
+        static let maxMPG = "killer.lastMaxMPG"
+    }
+
+    static var lastBuildPhaseRounds: Int {
+        defaults.object(forKey: Key.buildPhaseRounds) as? Int ?? 2
+    }
+    static var lastMaxAdditionalLives: Int {
+        defaults.object(forKey: Key.maxAdditionalLives) as? Int ?? 10
+    }
+    static var lastMaxMPG: Int {
+        defaults.object(forKey: Key.maxMPG) as? Int ?? 5
+    }
+
+    static func saveLastUsed(buildPhaseRounds: Int, maxAdditionalLives: Int, maxMPG: Int) {
+        defaults.set(buildPhaseRounds, forKey: Key.buildPhaseRounds)
+        defaults.set(maxAdditionalLives, forKey: Key.maxAdditionalLives)
+        defaults.set(maxMPG, forKey: Key.maxMPG)
     }
 }
