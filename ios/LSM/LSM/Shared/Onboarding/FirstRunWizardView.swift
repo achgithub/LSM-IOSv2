@@ -83,6 +83,9 @@ struct GameWizardView: View {
         switch game.mode {
         case .lms:       return lmsPhase(for: game)
         case .predictor: return predictorPhase(for: game)
+        // The tutorial only ever creates LMS/Predictor demo games — Killer has
+        // no guided wizard yet (see predictor-wizard-demo-todo memory).
+        case .killer:    return .complete
         }
     }
 

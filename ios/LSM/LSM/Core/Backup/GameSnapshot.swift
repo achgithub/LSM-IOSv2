@@ -37,6 +37,11 @@ struct GameSnapshot: Codable {
     let predictorPublishLinkIdRaw: String?
     let predictorPublishOwnerToken: String?
     let cloudGameTokenRaw: String?
+    /// Killer settings. Optional so pre-Killer backups decode fine; restore
+    /// falls back to `Game`'s own defaults (2 / 10 / 5) when absent.
+    let killerBuildPhaseRounds: Int?
+    let killerMaxAdditionalLives: Int?
+    let killerMaxMPG: Int?
     let players: [PlayerSnapshot]
     let rounds: [RoundSnapshot]
 
@@ -50,13 +55,24 @@ struct GameSnapshot: Codable {
         // submissionTokenRaw was per-player in Phase 3; now lives on RosterMember.
         // Kept optional here so old backups with this field decode without error.
         let submissionTokenRaw: String?
+        /// Nil for non-Killer games (or old backups predating Killer).
+        let killerState: KillerPlayerStateSnapshot?
 
         init(id: UUID, name: String, statusRaw: String, entryNumber: Int,
-             teamPoolResetAfterRound: Int, isManager: Bool) {
+             teamPoolResetAfterRound: Int, isManager: Bool,
+             killerState: KillerPlayerStateSnapshot? = nil) {
             self.id = id; self.name = name; self.statusRaw = statusRaw
             self.entryNumber = entryNumber; self.teamPoolResetAfterRound = teamPoolResetAfterRound
             self.isManager = isManager; self.submissionTokenRaw = nil
+            self.killerState = killerState
         }
+    }
+
+    struct KillerPlayerStateSnapshot: Codable {
+        let lives: Int
+        let additionalLivesGained: Int
+        let correctPredictions: Int
+        let successfulHitsLanded: Int
     }
 
     struct RoundSnapshot: Codable {
@@ -68,6 +84,8 @@ struct GameSnapshot: Codable {
         let statusRaw: String
         let picks: [PickSnapshot]
         let predictions: [PredictionSnapshot]
+        /// Nil for old backups predating Killer.
+        let killerPredictions: [KillerPredictionSnapshot]?
     }
 
     struct PickSnapshot: Codable {
@@ -85,6 +103,17 @@ struct GameSnapshot: Codable {
         let actualAway: Int?
         let pointsAwarded: Int?
         let isJoker: Bool
+        /// References `PlayerSnapshot.id` within the same `GameSnapshot`.
+        let playerId: UUID
+    }
+
+    struct KillerPredictionSnapshot: Codable {
+        let fixtureId: Int
+        let predictedOutcomeRaw: String
+        let actualOutcomeRaw: String?
+        let wasCorrect: Bool?
+        let hitTargetPlayerId: UUID?
+        let hitLanded: Bool?
         /// References `PlayerSnapshot.id` within the same `GameSnapshot`.
         let playerId: UUID
     }
@@ -166,6 +195,9 @@ enum GameSnapshotBuilder {
             predictorPublishLinkIdRaw: game.predictorPublishLinkIdRaw,
             predictorPublishOwnerToken: game.predictorPublishOwnerToken,
             cloudGameTokenRaw: game.cloudGameTokenRaw,
+            killerBuildPhaseRounds: game.killerBuildPhaseRounds,
+            killerMaxAdditionalLives: game.killerMaxAdditionalLives,
+            killerMaxMPG: game.killerMaxMPG,
             players: game.players.map { player in
                 GameSnapshot.PlayerSnapshot(
                     id: player.id,
@@ -173,7 +205,15 @@ enum GameSnapshotBuilder {
                     statusRaw: player.statusRaw,
                     entryNumber: player.entryNumber,
                     teamPoolResetAfterRound: player.teamPoolResetAfterRound,
-                    isManager: player.isManager
+                    isManager: player.isManager,
+                    killerState: player.killerState.map { state in
+                        GameSnapshot.KillerPlayerStateSnapshot(
+                            lives: state.lives,
+                            additionalLivesGained: state.additionalLivesGained,
+                            correctPredictions: state.correctPredictions,
+                            successfulHitsLanded: state.successfulHitsLanded
+                        )
+                    }
                 )
             },
             rounds: game.rounds.map { round in
@@ -202,6 +242,18 @@ enum GameSnapshotBuilder {
                             isJoker: prediction.isJoker,
                             playerId: playerId
                         )
+                    },
+                    killerPredictions: round.killerPredictions.compactMap { prediction in
+                        guard let playerId = prediction.player?.id else { return nil }
+                        return GameSnapshot.KillerPredictionSnapshot(
+                            fixtureId: prediction.fixtureId,
+                            predictedOutcomeRaw: prediction.predictedOutcomeRaw,
+                            actualOutcomeRaw: prediction.actualOutcomeRaw,
+                            wasCorrect: prediction.wasCorrect,
+                            hitTargetPlayerId: prediction.hitTargetPlayerId,
+                            hitLanded: prediction.hitLanded,
+                            playerId: playerId
+                        )
                     }
                 )
             }
@@ -228,7 +280,10 @@ enum GameSnapshotBuilder {
             predictorGDPoints: snapshot.predictorGDPoints,
             predictorResultEnabled: snapshot.predictorResultEnabled,
             predictorResultPoints: snapshot.predictorResultPoints,
-            predictorJokerEnabled: snapshot.predictorJokerEnabled
+            predictorJokerEnabled: snapshot.predictorJokerEnabled,
+            killerBuildPhaseRounds: snapshot.killerBuildPhaseRounds ?? 2,
+            killerMaxAdditionalLives: snapshot.killerMaxAdditionalLives ?? 10,
+            killerMaxMPG: snapshot.killerMaxMPG ?? 5
         )
         game.statusRaw = snapshot.statusRaw
         game.anonymityModeRaw = snapshot.anonymityModeRaw
@@ -248,6 +303,16 @@ enum GameSnapshotBuilder {
             context.insert(player)
             game.players.append(player)
             newPlayerId[p.id] = player
+
+            if let ks = p.killerState {
+                let state = KillerPlayerState(player: player, game: game)
+                state.lives = ks.lives
+                state.additionalLivesGained = ks.additionalLivesGained
+                state.correctPredictions = ks.correctPredictions
+                state.successfulHitsLanded = ks.successfulHitsLanded
+                context.insert(state)
+                player.killerState = state
+            }
         }
 
         for r in snapshot.rounds {
@@ -285,6 +350,25 @@ enum GameSnapshotBuilder {
                 prediction.pointsAwarded = pr.pointsAwarded
                 context.insert(prediction)
                 round.predictions.append(prediction)
+            }
+
+            for kp in r.killerPredictions ?? [] {
+                guard let player = newPlayerId[kp.playerId] else { continue }
+                // Remap through the same id table as everything else — restore
+                // mints fresh UUIDs, so the target must point at the new player.
+                let remappedTargetId = kp.hitTargetPlayerId.flatMap { newPlayerId[$0]?.id }
+                let prediction = KillerPrediction(
+                    fixtureId: kp.fixtureId,
+                    predictedOutcome: FixtureOutcome(rawValue: kp.predictedOutcomeRaw) ?? .homeWin,
+                    hitTargetPlayerId: remappedTargetId,
+                    player: player,
+                    round: round
+                )
+                prediction.actualOutcomeRaw = kp.actualOutcomeRaw
+                prediction.wasCorrect = kp.wasCorrect
+                prediction.hitLanded = kp.hitLanded
+                context.insert(prediction)
+                round.killerPredictions.append(prediction)
             }
         }
 

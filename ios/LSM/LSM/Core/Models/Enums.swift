@@ -52,6 +52,21 @@ enum RoundType: String, Codable, CaseIterable, Identifiable {
 
 enum PickResult: String, Codable, CaseIterable { case win, draw, loss, postponed }
 
+/// Per-fixture result the manager enters (or pulls from the server). Shared
+/// across engines (LMS's `GameLogicService`, Killer's `KillerScoringService`).
+enum FixtureOutcome: String, CaseIterable, Identifiable {
+    case homeWin, draw, awayWin, postponed
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .homeWin: return AppString("Home Win")
+        case .draw: return AppString("Draw")
+        case .awayWin: return AppString("Away Win")
+        case .postponed: return AppString("Postponed")
+        }
+    }
+}
+
 /// Summary-card anonymity, set once at game creation (spec §13b.2).
 enum AnonymityMode: String, Codable, CaseIterable, Identifiable {
     case anonymous, named

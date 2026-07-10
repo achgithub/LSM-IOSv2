@@ -18,6 +18,9 @@ final class Round {
     @Relationship(deleteRule: .cascade, inverse: \Prediction.round)
     var predictions: [Prediction] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \KillerPrediction.round)
+    var killerPredictions: [KillerPrediction] = []
+
     init(
         roundNumber: Int,
         deadline: Date,

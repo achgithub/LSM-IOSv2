@@ -28,6 +28,14 @@ final class Player {
     @Relationship(deleteRule: .cascade, inverse: \Prediction.player)
     var predictions: [Prediction] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \KillerPrediction.player)
+    var killerPredictions: [KillerPrediction] = []
+
+    /// Killer-only numeric state (lives, Accuracy Table total). Nil for
+    /// LMS/Predictor games.
+    @Relationship(deleteRule: .cascade, inverse: \KillerPlayerState.player)
+    var killerState: KillerPlayerState?
+
     init(name: String, game: Game? = nil, isManager: Bool = false, entryNumber: Int = 0) {
         self.id = UUID()
         self.name = name

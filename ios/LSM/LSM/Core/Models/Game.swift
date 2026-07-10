@@ -45,6 +45,21 @@ final class Game {
     /// One double-points fixture per matchday per player, off by default.
     var predictorJokerEnabled: Bool = false
 
+    // Killer settings — set once at creation, prefilled from the manager's
+    // last-used settings. Unused by LMS/Predictor games. See the Killer
+    // implementation plan for the rules these encode.
+    /// Rounds 1...killerBuildPhaseRounds are the Build Phase (lives earned,
+    /// no Hits); rounds after that are the Kill Phase.
+    var killerBuildPhaseRounds: Int = 2
+    /// Cap on lives *gained* during the Build Phase (on top of the starting
+    /// 1 life), so max total lives = 1 + this.
+    var killerMaxAdditionalLives: Int = 10
+    /// Ceiling on Manager Picked Games per round; the actual count is
+    /// `min(killerMaxMPG, activePlayers.count - 1)`, which guarantees the Kill
+    /// Phase's "each Hit targets a different opponent" constraint is always
+    /// satisfiable.
+    var killerMaxMPG: Int = 5
+
     // Cloud Publish (Phase 2, Predictor only) — set at GAME level, not typed in
     // on every publish: a 6-digit PIN, generated once on first Publish and
     // reused on every republish until the manager explicitly resets it. The
@@ -97,7 +112,10 @@ final class Game {
         predictorGDPoints: Int = 3,
         predictorResultEnabled: Bool = true,
         predictorResultPoints: Int = 2,
-        predictorJokerEnabled: Bool = false
+        predictorJokerEnabled: Bool = false,
+        killerBuildPhaseRounds: Int = 2,
+        killerMaxAdditionalLives: Int = 10,
+        killerMaxMPG: Int = 5
     ) {
         self.id = UUID()
         self.name = name
@@ -117,6 +135,9 @@ final class Game {
         self.predictorResultEnabled = predictorResultEnabled
         self.predictorResultPoints = predictorResultPoints
         self.predictorJokerEnabled = predictorJokerEnabled
+        self.killerBuildPhaseRounds = killerBuildPhaseRounds
+        self.killerMaxAdditionalLives = killerMaxAdditionalLives
+        self.killerMaxMPG = killerMaxMPG
     }
 
     /// The league(s) this game runs in (legacy empty → home). Resolved through
