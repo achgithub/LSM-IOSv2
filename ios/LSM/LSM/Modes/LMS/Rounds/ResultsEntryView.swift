@@ -8,12 +8,14 @@ import SwiftUI
 struct ResultsEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     let round: Round
     /// Set true when closing leaves everyone eliminated; the parent then presents
     /// the tie resolution (at the top level, after this sheet dismisses).
     @Binding var pendingResolve: Bool
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -21,6 +23,8 @@ struct ResultsEntryView: View {
     // Shared pull-from-server state — throttle clock is shared with Matches tab
     // (see `LeagueDataCache.sharedMatchesThrottleUntil`): one cooldown for both.
     @State private var refresh = LiveMatchRefreshState()
+    @State private var pendingSubmissionCount = 0
+    @State private var showingPendingSubmissionsWarning = false
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -76,7 +80,7 @@ struct ResultsEntryView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 16)
 
-                    Button { close() } label: {
+                    Button { attemptClose() } label: {
                         Text("Close Round").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -97,6 +101,18 @@ struct ResultsEntryView: View {
                         detail: "Scores are pre-filled. Tap Close Round ↓ to eliminate and advance."
                     )
                 }
+            }
+            .confirmationDialog(
+                pendingSubmissionCount == 1
+                    ? AppString("1 player submission not yet reviewed")
+                    : AppString("\(pendingSubmissionCount) player submissions not yet reviewed"),
+                isPresented: $showingPendingSubmissionsWarning,
+                titleVisibility: .visible
+            ) {
+                Button("Close Anyway", role: .destructive) { close() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Closing this round leaves them unresolved in the Submission Queue. Review them first, or close anyway.")
             }
         }
     }
@@ -148,6 +164,29 @@ struct ResultsEntryView: View {
     private func pullFromServer() async {
         if let fresh = await refresh.pull(for: game.leagues) { data = fresh }
         seedOutcomesFromCache()
+    }
+
+    /// Checks for unreviewed player submissions before closing, so they aren't
+    /// silently stranded once the round moves on. Skips the check entirely when
+    /// PWA submissions aren't in use for this game.
+    private func attemptClose() {
+        guard entitlements.canUseCloud, pwaSubmissionsEnabled, let gameToken = game.cloudGameToken else {
+            close()
+            return
+        }
+        Task {
+            let count = (try? await SubmissionsClient.shared.listSubmissions(
+                gameToken: gameToken, round: round.roundNumber
+            ))?.filter { $0.status == "pending" }.count ?? 0
+            await MainActor.run {
+                if count > 0 {
+                    pendingSubmissionCount = count
+                    showingPendingSubmissionsWarning = true
+                } else {
+                    close()
+                }
+            }
+        }
     }
 
     private func close() {

@@ -9,9 +9,11 @@ import SwiftData
 struct PredictorResultsEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     let round: Round
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -21,6 +23,7 @@ struct PredictorResultsEntryView: View {
     @State private var closeError: String?
     @State private var showingCloseWarning = false
     @State private var suppressCloseWarning = false
+    @State private var pendingSubmissionCount = 0
     /// Persisted opt-out for the "check your scores" confirmation. Once the
     /// manager ticks "Don't show again" it stays dismissed on this device.
     @AppStorage("predictorCloseRoundWarningSuppressed") private var closeWarningSuppressed = false
@@ -191,7 +194,7 @@ struct PredictorResultsEntryView: View {
             Text(closeError ?? "")
         }
         .sheet(isPresented: $showingCloseWarning) {
-            CloseRoundWarningSheet(dontShowAgain: $suppressCloseWarning) {
+            CloseRoundWarningSheet(dontShowAgain: $suppressCloseWarning, pendingSubmissionCount: pendingSubmissionCount) {
                 if suppressCloseWarning { closeWarningSuppressed = true }
                 showingCloseWarning = false
                 // Let the sheet's dismissal transition finish before dismissing
@@ -209,13 +212,27 @@ struct PredictorResultsEntryView: View {
 
     /// Show the "check your scores" confirmation before closing, unless the
     /// manager has previously opted out. Closing writes points and cannot be undone.
+    /// Also checks for unreviewed player submissions — that warning can't be
+    /// suppressed, since closing would silently strand them either way.
     private func attemptClose() {
-        if closeWarningSuppressed {
-            close()
-        } else {
-            suppressCloseWarning = false
-            showingCloseWarning = true
+        Task {
+            let count = await fetchPendingSubmissionCount()
+            await MainActor.run {
+                pendingSubmissionCount = count
+                if closeWarningSuppressed && count == 0 {
+                    close()
+                } else {
+                    suppressCloseWarning = false
+                    showingCloseWarning = true
+                }
+            }
         }
+    }
+
+    private func fetchPendingSubmissionCount() async -> Int {
+        guard entitlements.canUseCloud, pwaSubmissionsEnabled, let gameToken = game.cloudGameToken else { return 0 }
+        let items = try? await SubmissionsClient.shared.listSubmissions(gameToken: gameToken, round: round.roundNumber)
+        return items?.filter { $0.status == "pending" }.count ?? 0
     }
 
     private func adjust(_ fixtureId: Int, isHome: Bool, by delta: Int) {
@@ -294,6 +311,7 @@ struct PredictorResultsEntryView: View {
 /// scorelines first. A "Don't show again" tick lets experienced managers opt out.
 private struct CloseRoundWarningSheet: View {
     @Binding var dontShowAgain: Bool
+    let pendingSubmissionCount: Int
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -315,8 +333,19 @@ private struct CloseRoundWarningSheet: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if pendingSubmissionCount > 0 {
+                    Text(pendingSubmissionCount == 1
+                         ? "1 player submission hasn't been reviewed yet — it will be left unresolved."
+                         : "\(pendingSubmissionCount) player submissions haven't been reviewed yet — they will be left unresolved.")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Toggle("Don't show this again", isOn: $dontShowAgain)
                     .font(.subheadline)
+                    .disabled(pendingSubmissionCount > 0)
 
                 Spacer(minLength: 0)
 
