@@ -1,8 +1,5 @@
 import SwiftUI
 import SwiftData
-import OSLog
-
-private let submissionsLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
 /// Open a new round: choose a league, narrow fixtures (matchday / date range /
 /// unplayed-only) and select the ones the round runs on, then set the picks
@@ -442,143 +439,10 @@ struct OpenRoundView: View {
         )
         try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
-            pushRound(round)
+            let name = managerName
+            Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: round, managerName: name, context: context) }
         }
         onOpened()
         dismiss()
-    }
-
-    /// Fire-and-forget round push to the Worker. Mints cloudGameToken on first push.
-    private func pushRound(_ round: Round) {
-        guard let ld = data else { return }
-
-        let fixtureItems: [FixturePushItem] = round.fixtureIds.compactMap { fid in
-            guard let m = ld.matches.first(where: { $0.id == fid }) else { return nil }
-            let home = ld.teamsById[m.homeTeamId]?.name ?? "Home"
-            let away = ld.teamsById[m.awayTeamId]?.name ?? "Away"
-            return FixturePushItem(fixtureId: fid, home: home, away: away, kickoff: m.kickoff)
-        }
-
-        // Lazily mint cloudGameToken on first push for this game.
-        if game.cloudGameTokenRaw == nil {
-            game.cloudGameTokenRaw = UUID().uuidString.lowercased()
-        }
-        guard let gameToken = game.cloudGameToken else { return }
-
-        // Build fixture-level TeamRefs for eligible-team computation (LMS only).
-        // Scoped per fixture (not deduped by team) — a team playing twice in
-        // the round appears twice so the PWA/picker can record which fixture a
-        // pick is backing.
-        let fixtureTeamRefs: [TeamRef] = round.fixtureIds.flatMap { fid -> [TeamRef] in
-            guard let m = ld.matches.first(where: { $0.id == fid }) else { return [] }
-            let home = ld.teamsById[m.homeTeamId]
-            let away = ld.teamsById[m.awayTeamId]
-            var refs: [TeamRef] = []
-            if let home {
-                refs.append(TeamRef(id: home.externalId, name: home.name,
-                                     position: ld.standingsByTeam[home.externalId]?.position,
-                                     fixtureId: fid, opponentName: away?.name))
-            }
-            if let away {
-                refs.append(TeamRef(id: away.externalId, name: away.name,
-                                     position: ld.standingsByTeam[away.externalId]?.position,
-                                     fixtureId: fid, opponentName: home?.name))
-            }
-            return refs
-        }
-        let standingsKnown = fixtureTeamRefs.contains { $0.position != nil }
-        let allowRepeats = game.allowRepeats
-        let mode = game.mode
-        let roundNumber = round.roundNumber
-        let deadline = round.deadline
-        let gameName = game.name
-
-        // Resolve roster-member tokens synchronously before the async task
-        // (avoids SwiftData main-actor access from a background context).
-        // Self-heal: players added before rosterMemberId was tracked get it
-        // written here so subsequent pushes use the UUID directly.
-        // Also carries the roster member's *current* name so a rename made
-        // after the link was minted rides along on this push and refreshes
-        // the backend's `player_tokens.player_name` — no dedicated rename
-        // call needed, it self-heals on the next natural push.
-        var playerTokenMap: [UUID: String] = [:]
-        var playerNameMap: [UUID: String] = [:]
-        for player in game.activePlayers where !player.isManager {
-            let member: RosterMember?
-            if let memberId = player.rosterMemberId {
-                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
-                member = (try? context.fetch(fd))?.first
-            } else {
-                let name = player.name
-                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.name == name })
-                member = (try? context.fetch(fd))?.first
-                if let m = member { player.rosterMemberId = m.id }  // self-heal
-            }
-            if let rawToken = member?.submissionTokenRaw {
-                playerTokenMap[player.id] = rawToken.lowercased()
-                playerNameMap[player.id] = member?.name ?? player.name
-            }
-        }
-
-        // Last 8 hex chars of the manager's player UUID — used by the PWA to
-        // identify which manager owns each game.
-        let managerSuffix: String? = game.players.first(where: { $0.isManager }).map {
-            String($0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
-        }
-
-        let jokerEnabled = game.predictorJokerEnabled
-        let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
-
-        let trimmedManagerName: String? = {
-            let n = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
-            return n.isEmpty ? nil : n
-        }()
-
-        Task {
-            var playerItems: [PlayerPushItem] = []
-            for player in linkedPlayers {
-                guard let token = playerTokenMap[player.id] else { continue }
-                let eligibleTeams: [EligibleTeam]
-                if mode == .lms {
-                    let used = GameLogicService.usedTeamIds(for: player)
-                    let ordered = GameEngine.orderedAvailableTeams(
-                        fixtureTeams: fixtureTeamRefs,
-                        used: used,
-                        allowRepeats: allowRepeats,
-                        standingsKnown: standingsKnown
-                    )
-                    eligibleTeams = ordered.map {
-                        EligibleTeam(id: $0.id, name: $0.name, fixtureId: $0.fixtureId, opponentName: $0.opponentName)
-                    }
-                } else {
-                    eligibleTeams = fixtureTeamRefs.map {
-                        EligibleTeam(id: $0.id, name: $0.name, fixtureId: $0.fixtureId, opponentName: $0.opponentName)
-                    }
-                }
-                playerItems.append(PlayerPushItem(
-                    token: token,
-                    localPlayerId: player.id.uuidString.lowercased(),
-                    playerName: playerNameMap[player.id],
-                    eligibleTeams: eligibleTeams.isEmpty ? nil : eligibleTeams
-                ))
-            }
-
-            do {
-                try await SubmissionsClient.shared.pushRound(
-                    gameToken: gameToken,
-                    mode: mode.rawValue,
-                    roundNumber: roundNumber,
-                    deadline: deadline,
-                    gameName: gameName,
-                    fixtures: fixtureItems,
-                    jokerEnabled: jokerEnabled,
-                    managerSuffix: managerSuffix,
-                    managerName: trimmedManagerName,
-                    players: playerItems
-                )
-            } catch {
-                submissionsLog.warning("Round push failed: \(error.localizedDescription)")
-            }
-        }
     }
 }

@@ -22,13 +22,34 @@ export interface PriorSubmission {
   };
 }
 
-// A player's own submission for a round that's since closed. "What did I
-// submit," not "did I win" — results/points aren't carried here, only the
-// picks themselves (roundNumber + status + payload, same shape as PriorSubmission).
+// What actually happened that round — survived/eliminated (LMS), points
+// (Predictor), or lives/hits (Killer). Only the fields for the game's own
+// mode will ever be populated; the component reading this already knows
+// `game.mode`, so no discriminated union is needed.
+export interface SubmissionHistoryResult {
+  // LMS
+  teamPicked?: string;
+  survived?: boolean;
+  // Predictor
+  pointsThisRound?: number;
+  cumulativePoints?: number;
+  position?: number;
+  // Killer
+  lives?: number;
+  eliminated?: boolean;
+  hitsLandedThisRound?: number;
+  correctPredictionsThisRound?: number;
+}
+
+// A player's own submission for a round that's since closed, plus (once the
+// manager's app has pushed it) what actually happened that round. `status`/
+// `payload` are absent for a round where a result exists but the player
+// never submitted anything (e.g. the manager entered their pick manually).
 export interface SubmissionHistoryItem {
   roundNumber: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status?: 'pending' | 'approved' | 'rejected';
   payload?: PriorSubmission['payload'];
+  result?: SubmissionHistoryResult;
 }
 
 // Opponent roster entry for Killer's Kill Phase hit-target picker — `id` is

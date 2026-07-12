@@ -98,10 +98,18 @@ submissions.post("/links/revoke-by-name", async (c) => {
 
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
-// Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, extra?, managerSuffix?, players }
+// Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, extra?,
+//         previousResultsRoundNumber?, previousResults?, managerSuffix?, players }
 // `extra` is an opaque, mode-specific JSON string (e.g. Killer's
 // {"phase":"build"}) — stored and returned unread/unvalidated, exactly like
 // fixtures/payload_json elsewhere in this file. Null/omitted for LMS/Predictor.
+// `previousResults` (a pre-serialized JSON array string, same convention as
+// `extra`) is the most-recently-closed round's outcome (survived/eliminated,
+// points, lives/hits — opaque per mode) for `previousResultsRoundNumber`,
+// piggybacked on whichever push happens next: a new round opening, a
+// game-complete event with no new round, or a manual "resend" retry. Not a
+// separate endpoint — always rides along with the same round_pushes upsert
+// this route already does.
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   // fixtureId/opponentName are set when a team plays twice in the round
@@ -120,12 +128,17 @@ submissions.post("/games/:gameToken/push", async (c) => {
     fixtures: unknown[];
     jokerEnabled?: boolean;
     extra?: string | null;
+    previousResultsRoundNumber?: number | null;
+    previousResults?: string | null;
     managerSuffix?: string | null;
     managerName?: string | null;
     managerToken?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, extra, managerSuffix, managerName, managerToken, players } = body ?? {};
+  const {
+    mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, extra,
+    previousResultsRoundNumber, previousResults, managerSuffix, managerName, managerToken, players,
+  } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
@@ -149,6 +162,26 @@ submissions.post("/games/:gameToken/push", async (c) => {
   ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts, extra ?? null).run();
 
   if (mgrToken) await ensureManagerLifecycle(c.env, mgrToken);
+
+  if (previousResultsRoundNumber != null && previousResults) {
+    // `previousResults` arrives already JSON.stringify'd by the client (same
+    // convention as `extra`) — stored verbatim, no re-serialization needed.
+    await c.env.DB.prepare(
+      `INSERT INTO round_results (game_token, round_number, mode, results_json, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (game_token, round_number) DO UPDATE SET
+         mode = excluded.mode,
+         results_json = excluded.results_json,
+         created_at = excluded.created_at`
+    ).bind(gameToken, previousResultsRoundNumber, mode, previousResults, ts).run();
+
+    // Keep the last 2 results rows per game (matches submissions' retention).
+    if (previousResultsRoundNumber > 1) {
+      await c.env.DB.prepare(
+        `DELETE FROM round_results WHERE game_token = ? AND round_number < ?`
+      ).bind(gameToken, previousResultsRoundNumber - 1).run();
+    }
+  }
 
   // Prune submissions older than 2 rounds (aligned with Predictor publish retention).
   if (roundNumber > 2) {
@@ -321,14 +354,30 @@ submissions.get("/s/:token", async (c) => {
 
     // Last-2-rounds submission history — the `submissions` table already
     // retains the prior round's rows (pruned at round_number < current - 2 on
-    // push), this just surfaces what's already there. "What did I submit,"
-    // not "did I win" — results/points aren't tracked here, only in iOS.
+    // push), this just surfaces what's already there. "What did I submit."
     const historyRows = await c.env.DB.prepare(
       `SELECT round_number, status, submitted_at, payload_json
        FROM submissions
        WHERE token = ? AND game_token = ? AND round_number < ? AND round_number >= ?
        ORDER BY round_number DESC`
     ).bind(token, row.game_token, row.round_number, Math.max(1, row.round_number - 2)).all();
+
+    // "What actually happened" — survived/eliminated, points, lives/hits —
+    // fetched independently of `historyRows` since a player can have a
+    // result for a round without ever having submitted anything there (e.g.
+    // the manager entered their pick manually). Merged below by round number.
+    const resultsRows = await c.env.DB.prepare(
+      `SELECT round_number, results_json
+       FROM round_results
+       WHERE game_token = ? AND round_number < ? AND round_number >= ?
+       ORDER BY round_number DESC`
+    ).bind(row.game_token, row.round_number, Math.max(1, row.round_number - 2)).all();
+    const resultByRound = new Map<number, unknown>();
+    for (const r of (resultsRows.results ?? []) as { round_number: number; results_json: string }[]) {
+      const entries = JSON.parse(r.results_json) as { playerId?: string }[];
+      const mine = entries.find((e) => e.playerId?.toLowerCase() === (row.local_player_id ?? "").toLowerCase());
+      if (mine) resultByRound.set(r.round_number, mine);
+    }
 
     const game: Record<string, unknown> = {
       gameToken: row.game_token,
@@ -357,13 +406,27 @@ submissions.get("/s/:token", async (c) => {
         payload: JSON.parse(prior.payload_json),
       };
     }
-    if ((historyRows.results ?? []).length > 0) {
-      game.history = (historyRows.results ?? []).map((h: any) => ({
+    const historyByRound = new Map<number, Record<string, unknown>>();
+    for (const h of (historyRows.results ?? []) as { round_number: number; status: string; submitted_at: string; payload_json: string }[]) {
+      historyByRound.set(h.round_number, {
         roundNumber: h.round_number,
         status: h.status,
         submittedAt: h.submitted_at,
         payload: JSON.parse(h.payload_json),
-      }));
+      });
+    }
+    for (const [roundNum, result] of resultByRound) {
+      const existing = historyByRound.get(roundNum);
+      if (existing) {
+        existing.result = result;
+      } else {
+        historyByRound.set(roundNum, { roundNumber: roundNum, result });
+      }
+    }
+    if (historyByRound.size > 0) {
+      game.history = Array.from(historyByRound.values()).sort(
+        (a, b) => (b.roundNumber as number) - (a.roundNumber as number)
+      );
     }
     return game;
   }));

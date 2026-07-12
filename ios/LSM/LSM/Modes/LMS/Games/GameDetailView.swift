@@ -34,6 +34,7 @@ struct GameDetailView: View {
     @State private var exportError: String?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -230,6 +231,17 @@ struct GameDetailView: View {
         Section {
             LabeledContent("Status", value: game.status.label)
             LabeledContent("Round", value: "\(currentRound?.roundNumber ?? 0)")
+            // Safety net for the auto pushes (round-open, game-complete) —
+            // re-sends current fixtures/state plus the last round's results,
+            // always safe to repeat (upserts, not appends).
+            if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                Button {
+                    let name = managerName
+                    Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
+                } label: {
+                    Label("Resend to Player App", systemImage: "arrow.clockwise.icloud")
+                }
+            }
         }
     }
 

@@ -10,9 +10,12 @@ import SwiftData
 struct KillerTiebreakView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     let candidates: [Player]
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     /// Selected winner(s) — starts empty, manager must pick at least one.
     @State private var selectedWinnerIds: Set<UUID> = []
 
@@ -68,6 +71,12 @@ struct KillerTiebreakView: View {
     private func confirm() {
         KillerScoringService.applyTiebreakDecision(candidates: candidates, winnerIds: selectedWinnerIds, game: game)
         try? context.save()
+        // The game just completed with no further round to open — same
+        // reasoning as `KillerResultsEntryView`'s single-survivor path.
+        if entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil {
+            let name = managerName
+            Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+        }
         dismiss()
     }
 }

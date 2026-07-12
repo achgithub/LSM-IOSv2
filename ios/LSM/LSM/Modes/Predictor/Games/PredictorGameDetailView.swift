@@ -21,6 +21,7 @@ struct PredictorGameDetailView: View {
     @State private var pendingEditFixtures = false
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -125,6 +126,17 @@ struct PredictorGameDetailView: View {
             if entitlements.canUseCloud {
                 Button { sheet = .publish } label: {
                     Label("Publish League…", systemImage: "globe")
+                }
+            }
+            // Safety net for the auto push on round-open — re-sends current
+            // fixtures/state plus the last round's results, always safe to
+            // repeat (upserts, not appends).
+            if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                Button {
+                    let name = managerName
+                    Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
+                } label: {
+                    Label("Resend to Player App", systemImage: "arrow.clockwise.icloud")
                 }
             }
         }

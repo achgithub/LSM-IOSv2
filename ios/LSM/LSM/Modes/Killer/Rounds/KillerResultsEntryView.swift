@@ -8,12 +8,15 @@ import SwiftUI
 struct KillerResultsEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     let round: Round
     /// Set when closing produces a `.stillTied` outcome; the parent presents
     /// `KillerTiebreakView` at the top level once this sheet dismisses.
     @Binding var pendingTiebreakIds: [UUID]?
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -163,10 +166,22 @@ struct KillerResultsEntryView: View {
             try context.save()
             if case .stillTied(let ids) = outcome {
                 pendingTiebreakIds = ids
+            } else if game.status == .complete {
+                // Single-survivor or immediate-tiebreak-winner path — the
+                // game just ended with no further round to open, so push
+                // explicitly rather than relying on the next round-open's
+                // piggyback (there is no next round). See `PWARoundPusher`.
+                pushGameCompleteIfNeeded()
             }
             dismiss()
         } catch {
             closeError = error.localizedDescription
         }
+    }
+
+    private func pushGameCompleteIfNeeded() {
+        guard entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil else { return }
+        let name = managerName
+        Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
     }
 }

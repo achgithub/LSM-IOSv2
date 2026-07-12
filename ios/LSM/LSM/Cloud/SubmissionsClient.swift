@@ -143,7 +143,9 @@ actor SubmissionsClient {
         managerSuffix: String?,
         managerName: String?,
         players: [PlayerPushItem],
-        extraJSON: String? = nil
+        extraJSON: String? = nil,
+        previousResultsRoundNumber: Int? = nil,
+        previousResultsJSON: String? = nil
     ) async throws {
         struct Body: Encodable {
             let mode: String
@@ -159,6 +161,10 @@ actor SubmissionsClient {
             /// Opaque, mode-specific round data (e.g. Killer's phase/roster) —
             /// pre-serialized by the caller so this client stays mode-agnostic.
             let extra: String?
+            /// The most-recently-closed round's outcome — same opaque-JSON-
+            /// string convention as `extra`, paired with the round it's for.
+            let previousResultsRoundNumber: Int?
+            let previousResults: String?
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
         var req = try await request(
@@ -168,7 +174,8 @@ actor SubmissionsClient {
             Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr, gameName: gameName,
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
                  managerSuffix: managerSuffix, managerName: managerName,
-                 managerToken: ManagerToken.current, players: players, extra: extraJSON)
+                 managerToken: ManagerToken.current, players: players, extra: extraJSON,
+                 previousResultsRoundNumber: previousResultsRoundNumber, previousResults: previousResultsJSON)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)

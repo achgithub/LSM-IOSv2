@@ -16,6 +16,7 @@ struct ResultsEntryView: View {
     @Binding var pendingResolve: Bool
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -216,9 +217,21 @@ struct ResultsEntryView: View {
                   let winner = game.players.first(where: { $0.status == .active }) {
             GameLogicService.apply(.winners([winner.id]), game: game)
             try? context.save()
+            pushGameCompleteIfNeeded()
             dismiss()
         } else {
             dismiss()
         }
+    }
+
+    /// The game just completed with no further round to open — round-open's
+    /// "next round's push carries this round's results" trick has nothing to
+    /// ride on, so push explicitly here instead (`round: nil` resends the
+    /// existing/final round_pushes row unchanged and attaches this round's
+    /// results). See `PWARoundPusher` for why this is safe/idempotent.
+    private func pushGameCompleteIfNeeded() {
+        guard entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil else { return }
+        let name = managerName
+        Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
     }
 }

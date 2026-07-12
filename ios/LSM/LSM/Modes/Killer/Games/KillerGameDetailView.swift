@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum KillerSheet: String, Identifiable {
-    case open, predictions, results, scratchpad
+    case open, predictions, results, scratchpad, submissions
     case shareFixtures, sharePlayerKey, shareWeeklyResults, shareStandings, shareWinner
     var id: String { rawValue }
 }
@@ -12,10 +12,14 @@ private enum KillerSheet: String, Identifiable {
 /// surface, and share cards / scratchpad text entry.
 struct KillerGameDetailView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     @Bindable var game: Game
     @State private var showingAddPlayers = false
     @State private var sheet: KillerSheet?
     @State private var pendingRemovePlayer: Player?
+
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     /// Set by `KillerResultsEntryView` when closing produces a `.stillTied`
     /// outcome; presented at the top level (after that sheet dismisses)
     /// rather than stacking a sheet on a sheet.
@@ -69,6 +73,12 @@ struct KillerGameDetailView: View {
                 }
             case .scratchpad:
                 if let round = openRound { KillerScratchpadEntryView(game: game, round: round) }
+            case .submissions:
+                if let round = openRound, let gameToken = game.cloudGameToken {
+                    NavigationStack {
+                        SubmissionQueueView(game: game, round: round, gameToken: gameToken)
+                    }
+                }
             case .shareFixtures:
                 if let round = openRound { KillerShareView(game: game, round: round, type: .fixtures) }
             case .sharePlayerKey:
@@ -118,6 +128,17 @@ struct KillerGameDetailView: View {
             if let currentPhase {
                 LabeledContent("Phase", value: currentPhase == .build ? "Build" : "Kill")
             }
+            // Safety net for the auto pushes (round-open, game-complete) —
+            // re-sends current fixtures/state plus the last round's results,
+            // always safe to repeat (upserts, not appends).
+            if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                Button {
+                    let name = managerName
+                    Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+                } label: {
+                    Label("Resend to Player App", systemImage: "arrow.clockwise.icloud")
+                }
+            }
         }
     }
 
@@ -132,6 +153,11 @@ struct KillerGameDetailView: View {
                 shareCardButton("Share Fixtures Card", .shareFixtures, enabled: true)
                 if currentPhase == .kill {
                     shareCardButton("Share Player Key Card", .sharePlayerKey, enabled: true)
+                }
+                if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                    Button { sheet = .submissions } label: {
+                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
+                    }
                 }
             } else {
                 Button { sheet = .open } label: { Label("Open Round", systemImage: "calendar.badge.plus") }

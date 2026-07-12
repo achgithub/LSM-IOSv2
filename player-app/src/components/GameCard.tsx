@@ -122,24 +122,50 @@ function HistoryLine({ game }: { game: Game }) {
   const t = useT();
   const item = game.history?.[0];
   if (!item) return null;
-  // Killer's history isn't summarized yet (Milestone 1/2 covers submission,
-  // not a recap line) — the generic "reviewed" state is enough for now.
-  if (game.mode === 'killer') return null;
+  const wrap = (text: string) => (
+    <p className="m-0 border-t border-white/10 px-3.5 py-2 text-xs text-slate-500">{text}</p>
+  );
+
+  const result = item.result;
+  if (game.mode === 'lms') {
+    if (result?.survived != null) {
+      return wrap(
+        t(result.survived ? 'game.historyResultLmsSurvived' : 'game.historyResultLmsEliminated', {
+          n: item.roundNumber,
+          team: result.teamPicked ?? item.payload?.teamName ?? '',
+        })
+      );
+    }
+    if (!item.payload?.teamName) return null;
+    return wrap(t('game.historyLms', { n: item.roundNumber, team: item.payload.teamName }));
+  }
+
   if (game.mode === 'predictor') {
+    if (result?.pointsThisRound != null) {
+      return wrap(
+        t('game.historyResultPredictor', {
+          n: item.roundNumber,
+          points: result.pointsThisRound,
+          total: result.cumulativePoints ?? 0,
+          position: result.position ?? 0,
+        })
+      );
+    }
     const count = item.payload?.scores?.length;
     if (!count) return null;
-    return (
-      <p className="m-0 border-t border-white/10 px-3.5 py-2 text-xs text-slate-500">
-        {t('game.historyPredictor', { n: item.roundNumber, count })}
-      </p>
+    return wrap(t('game.historyPredictor', { n: item.roundNumber, count }));
+  }
+
+  // Killer had no history recap before this — nothing to fall back to.
+  if (game.mode === 'killer' && result?.lives != null) {
+    return wrap(
+      t(result.eliminated ? 'game.historyResultKillerEliminated' : 'game.historyResultKillerAlive', {
+        n: item.roundNumber,
+        lives: result.lives,
+      })
     );
   }
-  if (!item.payload?.teamName) return null;
-  return (
-    <p className="m-0 border-t border-white/10 px-3.5 py-2 text-xs text-slate-500">
-      {t('game.historyLms', { n: item.roundNumber, team: item.payload.teamName })}
-    </p>
-  );
+  return null;
 }
 
 export function GameCard({

@@ -67,6 +67,11 @@ const de: Translations = {
     picked: 'Picked {team}.',
     historyLms: 'Round {n}: picked {team}',
     historyPredictor: 'Round {n}: {count} predictions submitted',
+    historyResultLmsSurvived: 'Round {n}: survived ({team})',
+    historyResultLmsEliminated: 'Round {n}: eliminated ({team})',
+    historyResultPredictor: 'Round {n}: {points} pts ({total} total, {position} place)',
+    historyResultKillerAlive: 'Round {n}: {lives} lives remaining',
+    historyResultKillerEliminated: 'Round {n}: eliminated',
   },
   lms: {
     noTeamsTitle: 'No eligible teams found',

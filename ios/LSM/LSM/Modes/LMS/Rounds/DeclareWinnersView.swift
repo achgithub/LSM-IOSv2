@@ -7,9 +7,12 @@ import SwiftData
 struct DeclareWinnersView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     let onDone: () -> Void
 
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var selection: Set<UUID> = []
 
     private var sortedPlayers: [Player] {
@@ -61,6 +64,10 @@ struct DeclareWinnersView: View {
     private func apply() {
         GameLogicService.apply(.winners(Array(selection)), game: game)
         try? context.save()
+        if entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil {
+            let name = managerName
+            Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
+        }
         onDone()
         dismiss()
     }
