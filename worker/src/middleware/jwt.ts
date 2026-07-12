@@ -6,6 +6,7 @@
 // key here and redeploy — no code change required.
 
 import type { Context, Next } from "hono";
+import { attestBypassed } from "../attest-config";
 
 const ALG = { name: "ECDSA", namedCurve: "P-256" } as const;
 const HASH = "SHA-256";
@@ -31,7 +32,9 @@ function parsePublicKeys(raw: string): Record<string, string> {
 }
 
 export async function requireJWT(c: Context<{ Bindings: Env }>, next: Next) {
-  if (c.env.ATTEST_DEV_BYPASS === "1") return next();
+  // Routes through the same guarded check as attest.ts (issue #7) rather
+  // than its own inline copy of the raw env-var test.
+  if (attestBypassed(c.env)) return next();
 
   const auth = c.req.header("Authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;

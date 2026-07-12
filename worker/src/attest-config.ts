@@ -27,9 +27,15 @@ export function getChallengeSecret(env: Env): string {
  * in the Simulator, so local development needs an escape hatch. This is gated on
  * `ATTEST_DEV_BYPASS === "1"`, which MUST ONLY ever be set in the local, gitignored
  * `worker/.dev.vars`. It is NEVER added to wrangler.jsonc `vars` or set as a
- * secret, so it cannot exist in any deployed environment. Verify before each
- * release that no deployed env defines ATTEST_DEV_BYPASS.
+ * secret, so it cannot exist in any deployed environment.
+ *
+ * That alone used to be the entire safety contract — a stray `ATTEST_DEV_BYPASS`
+ * on a deployed env would have silently disabled the JWT gate with no runtime
+ * refusal (issue #7). Also requiring `APP_ATTEST_ENV !== "production"` — a value
+ * every real deployment explicitly sets to `"production"` in wrangler.jsonc —
+ * means a single stray var is no longer enough; two independently-configured
+ * values would both have to be wrong at once.
  */
 export function attestBypassed(env: Env): boolean {
-  return env.ATTEST_DEV_BYPASS === "1";
+  return env.ATTEST_DEV_BYPASS === "1" && env.APP_ATTEST_ENV !== "production";
 }

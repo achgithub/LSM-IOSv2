@@ -1,3 +1,12 @@
 # Copy to .dev.vars and fill in. Real values for deploy via: wrangler secret put <NAME> --env pl
 FOOTBALL_DATA_TOKEN=your-football-data-org-api-token
 ADMIN_TOKEN=a-long-random-string
+
+# App Attest cannot run in the Simulator, so local dev needs an escape hatch —
+# see attestBypassed() in src/attest-config.ts. Both vars are required: the
+# runtime refuses the bypass unless APP_ATTEST_ENV is also not "production"
+# (wrangler.jsonc's env.uk/env.eu vars set it to "production" even for
+# `wrangler dev`, so this override is what actually re-enables the bypass
+# locally — a deployed environment could never have both stray).
+ATTEST_DEV_BYPASS=1
+APP_ATTEST_ENV=development
