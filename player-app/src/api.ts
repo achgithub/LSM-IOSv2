@@ -15,11 +15,27 @@ export class MaintenanceError extends Error {
   }
 }
 
+// Thrown when the round the player loaded against has moved on (the manager
+// closed it and opened a new one) before the submission landed — the server
+// rejects the stale-round write rather than silently overwriting the current
+// round's data. Callers should prompt the player to refresh.
+export class RoundMovedOnError extends Error {
+  currentRound: number;
+  constructor(currentRound: number) {
+    super('This round has moved on — refresh to see the latest.');
+    this.name = 'RoundMovedOnError';
+    this.currentRound = currentRound;
+  }
+}
+
 async function throwIfError(res: Response): Promise<void> {
   if (res.ok) return;
-  const body = await res.json().catch(() => ({}) as { error?: string; message?: string });
+  const body = await res.json().catch(() => ({}) as { error?: string; message?: string; currentRound?: number });
   if (res.status === 503 && body.error === 'maintenance') {
     throw new MaintenanceError(body.message || "We're doing scheduled maintenance — back shortly.");
+  }
+  if (res.status === 409 && body.error === 'round_moved_on') {
+    throw new RoundMovedOnError(body.currentRound ?? 0);
   }
   throw new Error(body.error || `Server error ${res.status}`);
 }
@@ -30,20 +46,30 @@ export async function fetchPlayer(token: string): Promise<PlayerData> {
   return res.json();
 }
 
-export async function submitLMS(token: string, gameToken: string, selection: LMSSelection): Promise<void> {
+export async function submitLMS(
+  token: string,
+  gameToken: string,
+  roundNumber: number,
+  selection: LMSSelection
+): Promise<void> {
   const res = await fetch(`${API_BASE}/s/${token}/games/${gameToken}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(selection),
+    body: JSON.stringify({ roundNumber, ...selection }),
   });
   await throwIfError(res);
 }
 
-export async function submitPredictor(token: string, gameToken: string, scores: PredictorScore[]): Promise<void> {
+export async function submitPredictor(
+  token: string,
+  gameToken: string,
+  roundNumber: number,
+  scores: PredictorScore[]
+): Promise<void> {
   const res = await fetch(`${API_BASE}/s/${token}/games/${gameToken}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ scores }),
+    body: JSON.stringify({ roundNumber, scores }),
   });
   await throwIfError(res);
 }

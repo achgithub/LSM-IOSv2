@@ -141,6 +141,16 @@ struct SubmissionQueueView: View {
             return
         }
 
+        // Guard against a submission that was filled out against a round that's
+        // since closed (e.g. approved late, after the manager already opened
+        // the next round) — applying it to whatever round is open now would be
+        // silently wrong. This view is always scoped to one specific `round`,
+        // so a mismatch means the submission is stale.
+        guard result.roundNumber == round.roundNumber else {
+            subQueueLog.warning("Approve skipped: stale round (submission for \(result.roundNumber), open round is \(round.roundNumber))")
+            return
+        }
+
         // Find player by UUID first; fall back to name for pre-Phase-5 enrollments.
         let player = game.players.first(where: {
             $0.id.uuidString.lowercased() == result.localPlayerId.lowercased()

@@ -35,6 +35,7 @@ const nl: Translations = {
   error: {
     missingToken: 'This link is missing its token. Check the URL and try again.',
     loadFailed: "Couldn't load your link. It may have expired or been revoked.",
+    roundMovedOn: 'This round has moved on — refresh to see the latest.',
   },
   footer: {
     reviewed: "Submissions are reviewed by your game's manager before they go live.",

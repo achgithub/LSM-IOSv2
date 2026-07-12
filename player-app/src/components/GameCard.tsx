@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { EligibleTeam, Fixture, Game, PredictorScore } from '../types';
-import { submitLMS, submitPredictor } from '../api';
+import { submitLMS, submitPredictor, RoundMovedOnError } from '../api';
 import { formatDate, kickoffParts } from '../format';
 import { useT } from '../i18n';
 
@@ -225,10 +225,10 @@ function LMSSection({
     setBusy(true);
     setError(null);
     try {
-      await submitLMS(token, game.gameToken, selection);
+      await submitLMS(token, game.gameToken, game.roundNumber, selection);
       onSubmitted(selection.teamName);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed');
+      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
     } finally {
       setBusy(false);
     }
@@ -346,10 +346,10 @@ function PredictorSection({
       isJoker: Boolean(game.jokerEnabled) && joker === f.fixtureId,
     }));
     try {
-      await submitPredictor(token, game.gameToken, payload);
+      await submitPredictor(token, game.gameToken, game.roundNumber, payload);
       onSubmitted(payload);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed');
+      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
     } finally {
       setBusy(false);
     }

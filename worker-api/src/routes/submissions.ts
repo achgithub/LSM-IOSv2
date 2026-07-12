@@ -345,6 +345,9 @@ submissions.get("/s/:token", async (c) => {
 // LMS body: { teamId, teamName?, fixtureId? } — fixtureId disambiguates a team
 // playing twice in the round.
 // Predictor body: { scores: [{fixtureId, home, away, isJoker?}] }
+// All modes may optionally include `roundNumber` (the round the client loaded
+// against) — if present and stale, the submission is rejected with 409 rather
+// than silently landing against whatever round is now live.
 submissions.post("/s/:token/games/:gameToken", async (c) => {
   const token = c.req.param("token").toLowerCase();
   const gameToken = c.req.param("gameToken").toLowerCase();
@@ -362,6 +365,17 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
     `SELECT round_number FROM round_pushes WHERE game_token = ?`
   ).bind(gameToken).first<{ round_number: number }>();
   if (!push) return c.json({ error: "No active round for this game." }, 404);
+
+  // If the client tells us which round it loaded against, reject a submission
+  // that's fallen behind — otherwise a stale tab (round N still open in the
+  // browser after the manager has moved on to round N+1) silently overwrites
+  // whatever was already submitted for the new round via the upsert below.
+  // Optional/backwards-compatible: an old cached PWA build that doesn't send
+  // roundNumber still gets today's behavior.
+  const submittedRoundNumber = typeof body.roundNumber === "number" ? body.roundNumber : null;
+  if (submittedRoundNumber !== null && submittedRoundNumber !== push.round_number) {
+    return c.json({ error: "round_moved_on", currentRound: push.round_number }, 409);
+  }
 
   const ts = now();
   const id = crypto.randomUUID().toLowerCase();
