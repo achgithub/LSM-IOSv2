@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { validateSubmissionPayload } from "../validation/submissionPayload";
+import { validateSubmissionPayload, referencedFixtureIds } from "../validation/submissionPayload";
 
 // ── Submissions (the anonymous PWA approval queue) — Phase 5 ─────────────────
 //
@@ -393,8 +393,8 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
   if (!enrollment) return c.json({ error: "Link not found, revoked, or not enrolled in this game." }, 404);
 
   const push = await c.env.DB.prepare(
-    `SELECT round_number, mode FROM round_pushes WHERE game_token = ?`
-  ).bind(gameToken).first<{ round_number: number; mode: string }>();
+    `SELECT round_number, mode, deadline, fixtures_json FROM round_pushes WHERE game_token = ?`
+  ).bind(gameToken).first<{ round_number: number; mode: string; deadline: string | null; fixtures_json: string }>();
   if (!push) return c.json({ error: "No active round for this game." }, 404);
 
   // If the client tells us which round it loaded against, reject a submission
@@ -408,6 +408,14 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
     return c.json({ error: "round_moved_on", currentRound: push.round_number }, 409);
   }
 
+  // `deadline` was previously display-only — a submission arriving after it
+  // (e.g. a tab left open past cutoff) was silently accepted. Reject it
+  // server-side instead of relying on the PWA's own clock, which the client
+  // controls.
+  if (push.deadline && Date.now() > new Date(push.deadline).getTime()) {
+    return c.json({ error: "deadline_passed", deadline: push.deadline }, 403);
+  }
+
   // This endpoint is unauthenticated by design (anonymous player token, no
   // login) — anyone who guesses or leaks a token can POST arbitrary JSON
   // here, so unlike the JWT-gated manager push above, the shape/range of
@@ -418,6 +426,22 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
   // defense against unexpected extra fields.
   const validation = validateSubmissionPayload(push.mode, body);
   if (!validation.ok) return c.json({ error: validation.error }, 400);
+
+  // A round number can match while the fixtures underneath it have already
+  // moved on in some edge case (or a client is simply sending fabricated
+  // ids) — cross-check every fixtureId the payload references is actually
+  // part of the round currently pushed for this game.
+  let pushedFixtureIds: Set<number>;
+  try {
+    const fixtures = JSON.parse(push.fixtures_json) as Array<{ fixtureId: number }>;
+    pushedFixtureIds = new Set(fixtures.map((f) => f.fixtureId));
+  } catch {
+    pushedFixtureIds = new Set();
+  }
+  const badFixtureId = referencedFixtureIds(push.mode, validation.value).find((id) => !pushedFixtureIds.has(id));
+  if (badFixtureId !== undefined) {
+    return c.json({ error: `fixtureId ${badFixtureId} is not part of the current round` }, 400);
+  }
 
   const ts = now();
   const id = crypto.randomUUID().toLowerCase();

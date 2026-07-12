@@ -134,3 +134,25 @@ export function validateSubmissionPayload(mode: string, body: unknown): Validati
       return { ok: false, error: `Unknown mode: ${mode}` };
   }
 }
+
+// Every fixtureId a validated payload references, so the caller can check
+// each one belongs to the round currently pushed for this game (issue #10
+// item 3 — a stale submission referencing an old round's fixtures should be
+// rejected, not silently accepted just because the round number happens to
+// match). Generalized to all three modes rather than Predictor-only, since
+// LMS and Killer submissions reference fixtureIds too and the check is free
+// once the payload's already been shape-validated.
+export function referencedFixtureIds(mode: string, value: object): number[] {
+  switch (mode) {
+    case "lms": {
+      const v = value as LMSPayload;
+      return v.fixtureId !== undefined ? [v.fixtureId] : [];
+    }
+    case "predictor":
+      return (value as { scores: PredictorScore[] }).scores.map((s) => s.fixtureId);
+    case "killer":
+      return (value as { outcomes: KillerOutcomeEntry[] }).outcomes.map((o) => o.fixtureId);
+    default:
+      return [];
+  }
+}

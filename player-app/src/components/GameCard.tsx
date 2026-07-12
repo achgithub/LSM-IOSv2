@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { EligibleTeam, Fixture, Game, GameMode, KillerExtra, KillerOutcome, PredictorScore } from '../types';
-import { submitLMS, submitPredictor, submitKiller, RoundMovedOnError } from '../api';
+import { submitLMS, submitPredictor, submitKiller, RoundMovedOnError, DeadlinePassedError } from '../api';
 import { formatDate, kickoffParts } from '../format';
 import { useT } from '../i18n';
+
+// Shared submit-error → localized message mapping, used by all three
+// per-mode submit handlers below.
+function submitErrorMessage(e: unknown, t: ReturnType<typeof useT>): string {
+  if (e instanceof RoundMovedOnError) return t('error.roundMovedOn');
+  if (e instanceof DeadlinePassedError) return t('error.deadlinePassed');
+  if (e instanceof Error) return e.message;
+  return 'Submit failed';
+}
 
 function Kickoff({ value }: { value?: string | null }) {
   const parts = kickoffParts(value);
@@ -291,7 +300,7 @@ function LMSSection({
       await submitLMS(token, game.gameToken, game.roundNumber, selection);
       onSubmitted(selection.teamName);
     } catch (e) {
-      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
+      setError(submitErrorMessage(e, t));
     } finally {
       setBusy(false);
     }
@@ -412,7 +421,7 @@ function PredictorSection({
       await submitPredictor(token, game.gameToken, game.roundNumber, payload);
       onSubmitted(payload);
     } catch (e) {
-      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
+      setError(submitErrorMessage(e, t));
     } finally {
       setBusy(false);
     }
@@ -544,7 +553,7 @@ function KillerSection({
       await submitKiller(token, game.gameToken, game.roundNumber, payload);
       onSubmitted(payload.length);
     } catch (e) {
-      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
+      setError(submitErrorMessage(e, t));
     } finally {
       setBusy(false);
     }

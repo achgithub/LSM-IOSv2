@@ -28,14 +28,28 @@ export class RoundMovedOnError extends Error {
   }
 }
 
+// Thrown when the submission arrives after the round's deadline — the server
+// now enforces this itself rather than trusting the client's clock.
+export class DeadlinePassedError extends Error {
+  constructor() {
+    super('The deadline for this round has passed.');
+    this.name = 'DeadlinePassedError';
+  }
+}
+
 async function throwIfError(res: Response): Promise<void> {
   if (res.ok) return;
-  const body = await res.json().catch(() => ({}) as { error?: string; message?: string; currentRound?: number });
+  const body = await res
+    .json()
+    .catch(() => ({}) as { error?: string; message?: string; currentRound?: number; deadline?: string });
   if (res.status === 503 && body.error === 'maintenance') {
     throw new MaintenanceError(body.message || "We're doing scheduled maintenance — back shortly.");
   }
   if (res.status === 409 && body.error === 'round_moved_on') {
     throw new RoundMovedOnError(body.currentRound ?? 0);
+  }
+  if (res.status === 403 && body.error === 'deadline_passed') {
+    throw new DeadlinePassedError();
   }
   throw new Error(body.error || `Server error ${res.status}`);
 }
