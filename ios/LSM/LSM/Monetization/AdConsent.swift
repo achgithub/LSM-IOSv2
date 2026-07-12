@@ -65,7 +65,16 @@ enum AdConsent {
         if !testDeviceIdentifiers.isEmpty {
             MobileAds.shared.requestConfiguration.testDeviceIdentifiers = testDeviceIdentifiers
         }
-        MobileAds.shared.start(completionHandler: nil)
+        // `start(completionHandler:)` does real synchronous work on first
+        // launch ever (mediation adapter init, disk I/O) — on the calling
+        // thread. Called from @MainActor as-is, that's exactly the ~1s+
+        // fresh-install hang a tester hit mid-wizard (issue #13). Google's
+        // start() is documented safe to call off the main thread, so hop to
+        // a background queue for just this call; there's no completion
+        // handler here to dispatch back to main.
+        DispatchQueue.global(qos: .utility).async {
+            MobileAds.shared.start(completionHandler: nil)
+        }
         #endif
     }
 
