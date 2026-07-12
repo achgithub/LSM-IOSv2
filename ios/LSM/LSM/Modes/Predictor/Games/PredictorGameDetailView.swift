@@ -123,7 +123,12 @@ struct PredictorGameDetailView: View {
             Button { sheet = .standings } label: {
                 Label("Standings", systemImage: "list.number")
             }
-            if entitlements.canUseCloud {
+            // Hidden for new use — Publish League's rough edges (issues #14,
+            // #16, #17) aren't worth polishing right now. Left reachable only
+            // for a game that already has a live published link, so an
+            // existing manager can still get back in to unpublish/manage it
+            // rather than being stranded with an orphaned public page.
+            if entitlements.canUseCloud && game.predictorPublishLinkId != nil {
                 Button { sheet = .publish } label: {
                     Label("Publish League…", systemImage: "globe")
                 }

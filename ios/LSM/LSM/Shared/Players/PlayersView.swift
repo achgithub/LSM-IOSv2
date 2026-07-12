@@ -248,10 +248,17 @@ struct PlayerDetailView: View {
                     }
                 }
 
-                if linkURL != nil {
+                if let url = linkURL {
                     Section {
+                        // Opens the player's own link in Safari, exactly as
+                        // they'd see it — lets the manager answer "what am I
+                        // supposed to see?" by just looking, rather than
+                        // guessing from a description.
+                        Link(destination: url) {
+                            Label("View as \(member.name)", systemImage: "eye")
+                        }
+
                         Button {
-                            guard let url = linkURL else { return }
                             linkShareItem = PlayerLinkShareItem(playerName: member.name, url: url)
                         } label: {
                             Label("Share Link", systemImage: "square.and.arrow.up")
