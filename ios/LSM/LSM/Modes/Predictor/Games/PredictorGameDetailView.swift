@@ -19,6 +19,8 @@ struct PredictorGameDetailView: View {
     @State private var sheet: PredictorSheet?
     @State private var pendingRemovePlayer: Player?
     @State private var pendingEditFixtures = false
+    @State private var renaming = false
+    @State private var renameText = ""
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
@@ -45,6 +47,21 @@ struct PredictorGameDetailView: View {
         }
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    renameText = game.name
+                    renaming = true
+                } label: {
+                    Label("Rename Game", systemImage: "pencil")
+                }
+            }
+        }
+        .alert("Rename game", isPresented: $renaming) {
+            TextField("Game name", text: $renameText)
+            Button("Rename") { commitRename() }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
         .sheet(item: $sheet) { which in
             switch which {
@@ -219,6 +236,15 @@ struct PredictorGameDetailView: View {
         game.players.removeAll { $0.id == player.id }
         context.delete(player)
         pendingRemovePlayer = nil
+    }
+
+    /// `game.name` is read live everywhere it's used (share cards, PWA
+    /// pushes) rather than cached, so nothing else needs to change here.
+    private func commitRename() {
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        game.name = name
+        try? context.save()
     }
 
     private func resetOpenRound() {

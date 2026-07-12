@@ -24,6 +24,8 @@ struct KillerGameDetailView: View {
     /// outcome; presented at the top level (after that sheet dismisses)
     /// rather than stacking a sheet on a sheet.
     @State private var pendingTiebreakIds: [UUID]?
+    @State private var renaming = false
+    @State private var renameText = ""
 
     private var sortedByLives: [Player] {
         game.players.sorted { a, b in
@@ -60,6 +62,21 @@ struct KillerGameDetailView: View {
         }
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    renameText = game.name
+                    renaming = true
+                } label: {
+                    Label("Rename Game", systemImage: "pencil")
+                }
+            }
+        }
+        .alert("Rename game", isPresented: $renaming) {
+            TextField("Game name", text: $renameText)
+            Button("Rename") { commitRename() }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
         .sheet(item: $sheet) { which in
             switch which {
@@ -233,5 +250,14 @@ struct KillerGameDetailView: View {
         game.players.removeAll { $0.id == player.id }
         context.delete(player)
         pendingRemovePlayer = nil
+    }
+
+    /// `game.name` is read live everywhere it's used (share cards, PWA
+    /// pushes) rather than cached, so nothing else needs to change here.
+    private func commitRename() {
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        game.name = name
+        try? context.save()
     }
 }

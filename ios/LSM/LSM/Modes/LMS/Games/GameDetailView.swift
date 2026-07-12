@@ -32,6 +32,8 @@ struct GameDetailView: View {
     @State private var isPreparingExport = false
     @State private var exportFiles: [URL]?
     @State private var exportError: String?
+    @State private var renaming = false
+    @State private var renameText = ""
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
@@ -85,6 +87,14 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    renameText = game.name
+                    renaming = true
+                } label: {
+                    Label("Rename Game", systemImage: "pencil")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { Task { await exportGame() } } label: {
                     if isPreparingExport {
                         ProgressView()
@@ -94,6 +104,11 @@ struct GameDetailView: View {
                 }
                 .disabled(isPreparingExport)
             }
+        }
+        .alert("Rename game", isPresented: $renaming) {
+            TextField("Game name", text: $renameText)
+            Button("Rename") { commitRename() }
+            Button("Cancel", role: .cancel) {}
         }
         .sheet(item: Binding(
             get: { exportFiles.map(ExportShareItem.init) },
@@ -203,6 +218,15 @@ struct GameDetailView: View {
         } catch {
             exportError = "Couldn't prepare the export. Please try again."
         }
+    }
+
+    /// `game.name` is read live everywhere it's used (share cards, PWA
+    /// pushes) rather than cached, so nothing else needs to change here.
+    private func commitRename() {
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        game.name = name
+        try? context.save()
     }
 
     /// Remove a player who's dropped out (cascade deletes their picks).
