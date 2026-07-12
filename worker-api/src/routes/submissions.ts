@@ -305,7 +305,7 @@ submissions.get("/s/:token", async (c) => {
   if (pt.revoked_at) return c.json({ error: "This link has been revoked." }, 404);
 
   const enrollments = await c.env.DB.prepare(
-    `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix,
+    `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix, ge.local_player_id,
             rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled, rp.extra_json
      FROM game_enrollments ge
      JOIN round_pushes rp ON rp.game_token = ge.game_token
@@ -338,6 +338,9 @@ submissions.get("/s/:token", async (c) => {
       fixtures: JSON.parse(row.fixtures_json),
       jokerEnabled: row.joker_enabled === 1,
       managerSuffix: row.manager_suffix ?? null,
+      // Lets the PWA identify "me" in a mode-agnostic per-player roster (e.g.
+      // Killer's opponent list) without a separate lookup.
+      localPlayerId: row.local_player_id ?? null,
     };
     if (row.eligible_team_ids_json) {
       game.eligibleTeams = JSON.parse(row.eligible_team_ids_json);

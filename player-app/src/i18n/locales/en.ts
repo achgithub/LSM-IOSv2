@@ -88,7 +88,7 @@ const en = {
     draw: 'Draw',
     away: 'Away',
     submittedCount: '{count} picks submitted',
-    killPhaseUnsupported: 'Update the app to submit Kill Phase picks.',
+    pickTarget: 'Pick your target',
   },
 };
 

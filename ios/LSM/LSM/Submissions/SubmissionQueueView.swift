@@ -191,6 +191,21 @@ struct SubmissionQueueView: View {
                 KillerScoringService.setPrediction(
                     player: player, round: round, fixtureId: entry.fixtureId, outcome: outcome, context: context
                 )
+
+                // Kill Phase only. A bad/unresolvable target UUID (malformed
+                // string, or a player deactivated between push and
+                // submission) just leaves the target unset for this fixture
+                // rather than dropping the outcome too. `setHitTarget` itself
+                // is the real enforcement gate for self-target/duplicate-
+                // target — it already guards both and no-ops on violation
+                // (see KillerScoringService), so this stays the backstop even
+                // if the PWA's own client-side validation is bypassed.
+                guard let hitTargetIdString = entry.hitTargetId,
+                      let hitTargetId = UUID(uuidString: hitTargetIdString),
+                      let target = game.players.first(where: { $0.id == hitTargetId }) else { continue }
+                _ = KillerScoringService.setHitTarget(
+                    player: player, round: round, fixtureId: entry.fixtureId, targetPlayerId: target.id, context: context
+                )
             }
         }
         try? context.save()
@@ -230,8 +245,13 @@ private struct SubmissionRow: View {
                 s.isJoker == true ? "\(s.home)–\(s.away) ★" : "\(s.home)–\(s.away)"
             }.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
         } else if let outcomes = item.payload.outcomes {
-            Text(outcomes.map { Self.abbreviation(for: $0.outcome) }.joined(separator: ", "))
-                .font(.caption).foregroundStyle(.secondary)
+            Text(outcomes.map { entry -> String in
+                let abbrev = Self.abbreviation(for: entry.outcome)
+                guard let targetIdString = entry.hitTargetId,
+                      let targetId = UUID(uuidString: targetIdString),
+                      let target = game.players.first(where: { $0.id == targetId }) else { return abbrev }
+                return "\(abbrev)→\(target.name)"
+            }.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
         } else {
             Text("—").font(.caption).foregroundStyle(.secondary)
         }

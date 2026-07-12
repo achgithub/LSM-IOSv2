@@ -241,7 +241,7 @@ struct KillerOpenRoundView: View {
         guard let gameToken = game.cloudGameToken else { return }
 
         let phase = KillerScoringService.phase(for: round, game: game)
-        let extraJSON = "{\"phase\":\"\(phase == .build ? "build" : "kill")\"}"
+        let extraJSON = Self.encodeExtra(phase: phase, game: game)
 
         let roundNumber = round.roundNumber
         let deadline = round.deadline
@@ -304,5 +304,30 @@ struct KillerOpenRoundView: View {
                 killerSubmissionsLog.warning("Killer round push failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Encodes the round's opaque `extra` payload via `JSONEncoder` rather
+    /// than hand-built string interpolation — a player name containing a
+    /// quote (e.g. "O'Brien" — no, an actual `"` — or any other JSON-special
+    /// character) would silently produce invalid JSON otherwise. Kill Phase
+    /// includes the full active-player roster (everyone, not just PWA-linked
+    /// players — a hit target can be anyone active), sorted the same way
+    /// `KillerHitTargetPickerView` orders opponents.
+    private static func encodeExtra(phase: KillerPhase, game: Game) -> String? {
+        struct OtherPlayer: Encodable { let id: String; let name: String }
+        struct Extra: Encodable { let phase: String; let otherPlayers: [OtherPlayer]? }
+
+        let otherPlayers: [OtherPlayer]?
+        if phase == .kill {
+            otherPlayers = game.activePlayers
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                .map { OtherPlayer(id: $0.id.uuidString.lowercased(), name: $0.name) }
+        } else {
+            otherPlayers = nil
+        }
+
+        let extra = Extra(phase: phase == .build ? "build" : "kill", otherPlayers: otherPlayers)
+        guard let data = try? JSONEncoder().encode(extra) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 }

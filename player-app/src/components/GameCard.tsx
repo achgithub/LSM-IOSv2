@@ -513,11 +513,23 @@ function KillerSection({
   const t = useT();
   const fixtures = game.fixtures ?? [];
   const extra = useMemo(() => parseKillerExtra(game), [game]);
+  const isKillPhase = extra?.phase === 'kill';
+  // The pushed roster includes every active player; the viewer excludes
+  // themselves client-side via `localPlayerId` (the server doesn't know
+  // which enrollment is "self" from a roster's point of view — it's the
+  // same list pushed to everyone).
+  const roster = useMemo(
+    () => (extra?.otherPlayers ?? []).filter((p) => p.id !== game.localPlayerId),
+    [extra, game.localPlayerId]
+  );
   const [outcomes, setOutcomes] = useState<Record<number, KillerOutcome['outcome']>>({});
+  const [targets, setTargets] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const allFilled = fixtures.length > 0 && fixtures.every((f) => outcomes[f.fixtureId] != null);
+  const allFilled =
+    fixtures.length > 0 &&
+    fixtures.every((f) => outcomes[f.fixtureId] != null && (!isKillPhase || targets[f.fixtureId] != null));
 
   async function submit() {
     if (busy || !allFilled || updateAvailable) return;
@@ -526,6 +538,7 @@ function KillerSection({
     const payload: KillerOutcome[] = fixtures.map((f) => ({
       fixtureId: f.fixtureId,
       outcome: outcomes[f.fixtureId],
+      ...(isKillPhase ? { hitTargetId: targets[f.fixtureId] } : {}),
     }));
     try {
       await submitKiller(token, game.gameToken, game.roundNumber, payload);
@@ -537,20 +550,25 @@ function KillerSection({
     }
   }
 
-  if (extra?.phase === 'kill') {
-    return (
-      <section className="grid gap-2 p-3.5">
-        <p className="m-0 text-slate-400">{t('killer.killPhaseUnsupported')}</p>
-      </section>
-    );
-  }
-
   return (
     <section className="grid gap-3 p-3.5">
       <span className="text-[1.05rem] font-bold">{t('killer.pickOutcome')}</span>
       <div className="grid max-h-[min(31rem,58vh)] gap-2 overflow-y-auto pr-0.5 [overscroll-behavior:contain]">
         {fixtures.map((fixture) => {
           const selected = outcomes[fixture.fixtureId];
+          const selectedTarget = targets[fixture.fixtureId];
+          // A player already picked as another fixture's target this round
+          // can't be picked again — mirrors KillerHitTargetPickerView's
+          // `usedElsewhere` exclusion (see that file and
+          // KillerPickTextParser for the other two places this rule lives;
+          // keep all three in sync). Removed from the option list entirely,
+          // not just visually disabled, so a duplicate can't be submitted.
+          const usedElsewhere = new Set(
+            Object.entries(targets)
+              .filter(([fid]) => Number(fid) !== fixture.fixtureId)
+              .map(([, id]) => id)
+          );
+          const availableTargets = roster.filter((p) => p.id === selectedTarget || !usedElsewhere.has(p.id));
           return (
             <div key={fixture.fixtureId} className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
               {fixture.kickoff && (
@@ -576,6 +594,23 @@ function KillerSection({
                   </button>
                 ))}
               </div>
+              {isKillPhase && (
+                <select
+                  aria-label={t('killer.pickTarget')}
+                  value={selectedTarget ?? ''}
+                  onChange={(e) => setTargets((tg) => ({ ...tg, [fixture.fixtureId]: e.target.value }))}
+                  className="mt-1.5 min-h-[2.3rem] w-full rounded-lg border border-white/10 bg-bg/50 px-2 text-sm font-semibold text-slate-200"
+                >
+                  <option value="" disabled>
+                    {t('killer.pickTarget')}
+                  </option>
+                  {availableTargets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           );
         })}

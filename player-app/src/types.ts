@@ -67,6 +67,9 @@ export interface Game {
   history?: SubmissionHistoryItem[];
   /** Opaque, mode-specific round data — raw JSON string, parse client-side. */
   extra?: string;
+  /** This player's own local Player UUID string — lets mode-specific UI (e.g.
+   * Killer's opponent roster) identify and exclude "me" without a lookup. */
+  localPlayerId?: string;
 }
 
 export interface PlayerData {
