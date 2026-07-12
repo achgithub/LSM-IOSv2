@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { validateSubmissionPayload } from "../validation/submissionPayload";
 
 // ── Submissions (the anonymous PWA approval queue) — Phase 5 ─────────────────
 //
@@ -392,8 +393,8 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
   if (!enrollment) return c.json({ error: "Link not found, revoked, or not enrolled in this game." }, 404);
 
   const push = await c.env.DB.prepare(
-    `SELECT round_number FROM round_pushes WHERE game_token = ?`
-  ).bind(gameToken).first<{ round_number: number }>();
+    `SELECT round_number, mode FROM round_pushes WHERE game_token = ?`
+  ).bind(gameToken).first<{ round_number: number; mode: string }>();
   if (!push) return c.json({ error: "No active round for this game." }, 404);
 
   // If the client tells us which round it loaded against, reject a submission
@@ -407,6 +408,17 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
     return c.json({ error: "round_moved_on", currentRound: push.round_number }, 409);
   }
 
+  // This endpoint is unauthenticated by design (anonymous player token, no
+  // login) — anyone who guesses or leaks a token can POST arbitrary JSON
+  // here, so unlike the JWT-gated manager push above, the shape/range of
+  // this body is worth policing before it's persisted and later trusted by
+  // the manager's approve flow. Validates against `push.mode`, which comes
+  // from the trusted round_pushes row, not from this body. Stores the
+  // whitelisted, sanitized value — not the raw body — as a second layer of
+  // defense against unexpected extra fields.
+  const validation = validateSubmissionPayload(push.mode, body);
+  if (!validation.ok) return c.json({ error: validation.error }, 400);
+
   const ts = now();
   const id = crypto.randomUUID().toLowerCase();
   await c.env.DB.prepare(
@@ -418,7 +430,7 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
        status = 'pending',
        submitted_at = excluded.submitted_at,
        decided_at = NULL`
-  ).bind(id, token, gameToken, push.round_number, JSON.stringify(body), ts).run();
+  ).bind(id, token, gameToken, push.round_number, JSON.stringify(validation.value), ts).run();
 
   return c.json({ ok: true });
 });
