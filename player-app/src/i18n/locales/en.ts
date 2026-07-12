@@ -16,6 +16,9 @@ const en = {
     lms: 'Last Man Standing',
     predictor: 'Predictor',
   },
+  deadline: {
+    closesIn: '{game} closes in {time}',
+  },
   update: {
     banner: 'A new version is available',
     applyNow: 'Update now',

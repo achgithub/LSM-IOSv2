@@ -3,8 +3,11 @@ import type { Game, GameMode, PlayerState } from './types';
 import { fetchPlayer, MaintenanceError } from './api';
 import { useUpdateAvailable } from './hooks/useUpdateAvailable';
 import { usePushSubscription } from './hooks/usePushSubscription';
+import { useDeadlineCountdown } from './hooks/useDeadlineCountdown';
 import { GameCard } from './components/GameCard';
 import { useT } from './i18n';
+import { needsPlayerAction } from './gameStatus';
+import { formatCountdown } from './format';
 
 const TOKEN_STORAGE_KEY = 'lsm.playerSubmissionToken';
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -23,11 +26,6 @@ function getRememberedToken(): string | null {
   } catch {
     return null;
   }
-}
-
-function needsPlayerAction(game: Game): boolean {
-  const status = game.priorSubmission?.status;
-  return status !== 'approved' && status !== 'pending';
 }
 
 function pendingCount(games: Game[], mode?: GameMode): number {
@@ -102,6 +100,7 @@ export default function App() {
   const visibleGames = activeMode ? games.filter((g) => g.mode === activeMode) : games;
   const totalPending = pendingCount(games);
   const modeLabels: Record<GameMode, string> = { lms: t('mode.lms'), predictor: t('mode.predictor') };
+  const deadline = useDeadlineCountdown(games);
 
   return (
     <>
@@ -232,6 +231,17 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {deadline && (
+          <div className="animate-card-in flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm text-slate-200">
+            <span className="min-w-0 truncate">
+              {t('deadline.closesIn', {
+                game: deadline.game.gameName || modeLabels[deadline.game.mode],
+                time: formatCountdown(deadline.remainingMs),
+              })}
+            </span>
+          </div>
+        )}
 
         {updateAvailable && (
           <div className="animate-card-in flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/15 px-4 py-2.5 text-sm text-red-200">
