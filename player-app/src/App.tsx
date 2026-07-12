@@ -87,7 +87,7 @@ export default function App() {
 
   useEffect(() => {
     if (activeMode && modesPresent.has(activeMode)) return;
-    const order: GameMode[] = ['lms', 'predictor'];
+    const order: GameMode[] = ['lms', 'predictor', 'killer'];
     const next =
       order.find((m) => modesPresent.has(m) && pendingCount(games, m) > 0) ??
       order.find((m) => modesPresent.has(m)) ??
@@ -99,7 +99,7 @@ export default function App() {
   const showFilter = !state.loading && !state.error && games.length > 0;
   const visibleGames = activeMode ? games.filter((g) => g.mode === activeMode) : games;
   const totalPending = pendingCount(games);
-  const modeLabels: Record<GameMode, string> = { lms: t('mode.lms'), predictor: t('mode.predictor') };
+  const modeLabels: Record<GameMode, string> = { lms: t('mode.lms'), predictor: t('mode.predictor'), killer: t('mode.killer') };
   const deadline = useDeadlineCountdown(games);
 
   return (
@@ -217,7 +217,7 @@ export default function App() {
                 onChange={(e) => setActiveMode((e.target.value || null) as GameMode | null)}
                 className="min-h-[2.1rem] flex-1 bg-transparent text-right text-sm font-bold text-slate-200"
               >
-                {(['lms', 'predictor'] as GameMode[])
+                {(['lms', 'predictor', 'killer'] as GameMode[])
                   .filter((m) => modesPresent.has(m))
                   .map((m) => {
                     const pending = pendingCount(games, m);

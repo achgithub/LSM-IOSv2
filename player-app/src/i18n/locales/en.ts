@@ -15,6 +15,7 @@ const en = {
   mode: {
     lms: 'Last Man Standing',
     predictor: 'Predictor',
+    killer: 'Killer',
   },
   deadline: {
     closesIn: '{game} closes in {time}',
@@ -78,6 +79,16 @@ const en = {
     joker: 'Joker',
     jokerLabel: 'Joker for {home} v {away}',
     homeScoreLabel: '{team} score',
+  },
+  killer: {
+    pickOutcome: 'Pick the outcome',
+    submitting: 'Submitting…',
+    submit: 'Submit picks',
+    home: 'Home',
+    draw: 'Draw',
+    away: 'Away',
+    submittedCount: '{count} picks submitted',
+    killPhaseUnsupported: 'Update the app to submit Kill Phase picks.',
   },
 };
 

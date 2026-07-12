@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import type { EligibleTeam, Fixture, Game, PredictorScore } from '../types';
-import { submitLMS, submitPredictor, RoundMovedOnError } from '../api';
+import { useEffect, useMemo, useState } from 'react';
+import type { EligibleTeam, Fixture, Game, GameMode, KillerExtra, KillerOutcome, PredictorScore } from '../types';
+import { submitLMS, submitPredictor, submitKiller, RoundMovedOnError } from '../api';
 import { formatDate, kickoffParts } from '../format';
 import { useT } from '../i18n';
 
@@ -39,16 +39,32 @@ function StatusPill({ game }: { game: Game }) {
   );
 }
 
-function ModeIcon({ isPredictor }: { isPredictor: boolean }) {
+const MODE_ICON_STYLES: Record<GameMode, { bg: string; text: string; label: string }> = {
+  predictor: { bg: 'bg-predictor-dim', text: 'text-predictor', label: 'PRE' },
+  killer: { bg: 'bg-killer-dim', text: 'text-killer', label: 'KLR' },
+  lms: { bg: 'bg-lms-dim', text: 'text-lms', label: 'LMS' },
+};
+
+function ModeIcon({ mode }: { mode: GameMode }) {
+  const style = MODE_ICON_STYLES[mode];
   return (
-    <span
-      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
-        isPredictor ? 'bg-predictor-dim text-predictor' : 'bg-lms-dim text-lms'
-      }`}
-    >
-      {isPredictor ? 'PRE' : 'LMS'}
+    <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${style.bg} ${style.text}`}>
+      {style.label}
     </span>
   );
+}
+
+// Parses `Game.extra` (opaque per-mode JSON) into Killer's shape. Malformed
+// or missing extra is treated as "no data yet" rather than an error — the
+// round may have just been pushed by an older worker-api build, or the
+// mode-specific field genuinely isn't populated.
+function parseKillerExtra(game: Game): KillerExtra | null {
+  if (!game.extra) return null;
+  try {
+    return JSON.parse(game.extra) as KillerExtra;
+  } catch {
+    return null;
+  }
 }
 
 // Slim, read-only recap of what was submitted — LMS already shows "Picked
@@ -97,6 +113,9 @@ function HistoryLine({ game }: { game: Game }) {
   const t = useT();
   const item = game.history?.[0];
   if (!item) return null;
+  // Killer's history isn't summarized yet (Milestone 1/2 covers submission,
+  // not a recap line) — the generic "reviewed" state is enough for now.
+  if (game.mode === 'killer') return null;
   if (game.mode === 'predictor') {
     const count = item.payload?.scores?.length;
     if (!count) return null;
@@ -127,6 +146,7 @@ export function GameCard({
 }) {
   const t = useT();
   const isPredictor = game.mode === 'predictor';
+  const isKiller = game.mode === 'killer';
   const roundLabel = isPredictor ? t('game.matchday', { n: game.roundNumber }) : t('game.round', { n: game.roundNumber });
   const title = game.gameName || roundLabel;
   const prior = game.priorSubmission;
@@ -134,6 +154,7 @@ export function GameCard({
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [pickedTeamName, setPickedTeamName] = useState<string | null>(null);
   const [submittedScores, setSubmittedScores] = useState<PredictorScore[] | null>(null);
+  const [submittedKillerCount, setSubmittedKillerCount] = useState<number | null>(null);
 
   // GameCard instances persist across refreshes (keyed on gameToken), so a
   // stale `localSubmitted` from an earlier submit would otherwise survive a
@@ -153,7 +174,7 @@ export function GameCard({
   return (
     <article className="animate-card-in overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
       <header className="flex items-center gap-3 border-b border-white/10 p-3.5">
-        <ModeIcon isPredictor={isPredictor} />
+        <ModeIcon mode={game.mode} />
         <div className="min-w-0 flex-1">
           <h2 className="m-0 truncate text-[clamp(0.98rem,4.2vw,1.2rem)] font-bold leading-tight">{title}</h2>
           {game.deadline && (
@@ -167,6 +188,12 @@ export function GameCard({
         {submitted ? (
           isPredictor ? (
             <PredictorSummary game={game} scores={submittedScores ?? prior?.payload?.scores ?? null} />
+          ) : isKiller ? (
+            <p className="m-0 p-3.5 text-slate-400">
+              {submittedKillerCount != null
+                ? t('killer.submittedCount', { count: submittedKillerCount })
+                : t('game.pickReviewPending')}
+            </p>
           ) : (
             <p className="m-0 p-3.5 text-slate-400">
               {pickedTeamName
@@ -189,6 +216,17 @@ export function GameCard({
                 onSubmitted={(scores) => {
                   setLocalSubmitted(true);
                   setSubmittedScores(scores);
+                  onChanged();
+                }}
+              />
+            ) : isKiller ? (
+              <KillerSection
+                game={game}
+                token={token}
+                updateAvailable={updateAvailable}
+                onSubmitted={(count) => {
+                  setLocalSubmitted(true);
+                  setSubmittedKillerCount(count);
                   onChanged();
                 }}
               />
@@ -451,6 +489,106 @@ function PredictorSection({
         className="min-h-[2.9rem] rounded-xl bg-predictor px-4 py-3 font-bold text-[#06121E] transition-transform active:scale-[0.98] disabled:opacity-40"
       >
         {busy ? t('predictor.submitting') : t('predictor.submit')}
+      </button>
+    </section>
+  );
+}
+
+// Build Phase: one Home/Draw/Away pick per Manager Picked Game, no scores, no
+// joker — simplest of the three modes' UIs. Kill Phase (adding the
+// hit-target picker) ships in Milestone 2/2; until then this renders a
+// placeholder if it ever sees phase === 'kill' (shouldn't happen before that
+// ships, but keeps the branch exhaustive rather than crashing on bad data).
+function KillerSection({
+  game,
+  token,
+  onSubmitted,
+  updateAvailable,
+}: {
+  game: Game;
+  token: string;
+  onSubmitted: (count: number) => void;
+  updateAvailable: boolean;
+}) {
+  const t = useT();
+  const fixtures = game.fixtures ?? [];
+  const extra = useMemo(() => parseKillerExtra(game), [game]);
+  const [outcomes, setOutcomes] = useState<Record<number, KillerOutcome['outcome']>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const allFilled = fixtures.length > 0 && fixtures.every((f) => outcomes[f.fixtureId] != null);
+
+  async function submit() {
+    if (busy || !allFilled || updateAvailable) return;
+    setBusy(true);
+    setError(null);
+    const payload: KillerOutcome[] = fixtures.map((f) => ({
+      fixtureId: f.fixtureId,
+      outcome: outcomes[f.fixtureId],
+    }));
+    try {
+      await submitKiller(token, game.gameToken, game.roundNumber, payload);
+      onSubmitted(payload.length);
+    } catch (e) {
+      setError(e instanceof RoundMovedOnError ? t('error.roundMovedOn') : e instanceof Error ? e.message : 'Submit failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (extra?.phase === 'kill') {
+    return (
+      <section className="grid gap-2 p-3.5">
+        <p className="m-0 text-slate-400">{t('killer.killPhaseUnsupported')}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="grid gap-3 p-3.5">
+      <span className="text-[1.05rem] font-bold">{t('killer.pickOutcome')}</span>
+      <div className="grid max-h-[min(31rem,58vh)] gap-2 overflow-y-auto pr-0.5 [overscroll-behavior:contain]">
+        {fixtures.map((fixture) => {
+          const selected = outcomes[fixture.fixtureId];
+          return (
+            <div key={fixture.fixtureId} className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+              {fixture.kickoff && (
+                <p className="m-0 mb-1 text-[0.68rem] font-semibold text-slate-500">{formatDate(fixture.kickoff)}</p>
+              )}
+              <div className="mb-1.5 flex items-center justify-between gap-2 text-sm font-bold">
+                <span className="min-w-0 flex-1 truncate">{fixture.home}</span>
+                <span className="shrink-0 text-slate-500">v</span>
+                <span className="min-w-0 flex-1 truncate text-right">{fixture.away}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['homeWin', 'draw', 'awayWin'] as const).map((outcome) => (
+                  <button
+                    key={outcome}
+                    type="button"
+                    aria-pressed={selected === outcome}
+                    onClick={() => setOutcomes((o) => ({ ...o, [fixture.fixtureId]: outcome }))}
+                    className={`min-h-[2.3rem] rounded-lg border text-sm font-bold transition-colors ${
+                      selected === outcome ? 'border-killer/60 bg-killer/20 text-red-200' : 'border-white/10 bg-bg/50 text-slate-300'
+                    }`}
+                  >
+                    {t(`killer.${outcome === 'homeWin' ? 'home' : outcome === 'draw' ? 'draw' : 'away'}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {updateAvailable && <p className="m-0 text-sm text-red-300">{t('update.blocksSubmit')}</p>}
+      {error && <p className="m-0 text-sm text-red-300">{error}</p>}
+      <button
+        type="button"
+        disabled={busy || !allFilled || updateAvailable}
+        onClick={submit}
+        className="min-h-[2.9rem] rounded-xl bg-killer px-4 py-3 font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-40"
+      >
+        {busy ? t('killer.submitting') : t('killer.submit')}
       </button>
     </section>
   );

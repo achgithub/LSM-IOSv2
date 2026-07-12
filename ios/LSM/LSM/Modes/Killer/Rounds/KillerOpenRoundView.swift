@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+import OSLog
+
+private let killerSubmissionsLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
 /// Open a Killer round: choose exactly N Manager Picked Games, where N is
 /// `KillerScoringService.requiredMPGCount(activePlayers:maxMPG:)`. A separate
@@ -10,12 +13,16 @@ import SwiftData
 struct KillerOpenRoundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
     let game: Game
     var onOpened: () -> Void = {}
 
     @State private var data: LeagueData?
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     @State private var selectedLeagueIds: Set<String> = []
     @State private var unplayedOnly = true
@@ -204,9 +211,98 @@ struct KillerOpenRoundView: View {
             deadline: deadline,
             context: context
         )
-        _ = round
         try? context.save()
+        if entitlements.canUseCloud && pwaSubmissionsEnabled {
+            pushRound(round)
+        }
         onOpened()
         dismiss()
+    }
+
+    /// Pushes the round to the PWA submission pipeline — mirrors
+    /// `OpenRoundView.pushRound`'s structure (fixture items, lazy
+    /// `cloudGameToken`, roster-token self-heal, manager suffix) but skips
+    /// team-eligibility computation entirely: Killer's PWA is driven by
+    /// fixtures + phase, never team lists, so every player's `eligibleTeams`
+    /// stays nil.
+    private func pushRound(_ round: Round) {
+        guard let ld = data else { return }
+
+        let fixtureItems: [FixturePushItem] = round.fixtureIds.compactMap { fid in
+            guard let m = ld.matches.first(where: { $0.id == fid }) else { return nil }
+            let home = ld.teamsById[m.homeTeamId]?.name ?? "Home"
+            let away = ld.teamsById[m.awayTeamId]?.name ?? "Away"
+            return FixturePushItem(fixtureId: fid, home: home, away: away, kickoff: m.kickoff)
+        }
+
+        if game.cloudGameTokenRaw == nil {
+            game.cloudGameTokenRaw = UUID().uuidString.lowercased()
+        }
+        guard let gameToken = game.cloudGameToken else { return }
+
+        let phase = KillerScoringService.phase(for: round, game: game)
+        let extraJSON = "{\"phase\":\"\(phase == .build ? "build" : "kill")\"}"
+
+        let roundNumber = round.roundNumber
+        let deadline = round.deadline
+        let gameName = game.name
+
+        var playerTokenMap: [UUID: String] = [:]
+        var playerNameMap: [UUID: String] = [:]
+        for player in game.activePlayers where !player.isManager {
+            let member: RosterMember?
+            if let memberId = player.rosterMemberId {
+                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.id == memberId })
+                member = (try? context.fetch(fd))?.first
+            } else {
+                let name = player.name
+                let fd = FetchDescriptor<RosterMember>(predicate: #Predicate { $0.name == name })
+                member = (try? context.fetch(fd))?.first
+                if let m = member { player.rosterMemberId = m.id }  // self-heal
+            }
+            if let rawToken = member?.submissionTokenRaw {
+                playerTokenMap[player.id] = rawToken.lowercased()
+                playerNameMap[player.id] = member?.name ?? player.name
+            }
+        }
+
+        let managerSuffix: String? = game.players.first(where: { $0.isManager }).map {
+            String($0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
+        }
+        let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
+        let trimmedManagerName: String? = {
+            let n = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return n.isEmpty ? nil : n
+        }()
+
+        Task {
+            let playerItems: [PlayerPushItem] = linkedPlayers.compactMap { player in
+                guard let token = playerTokenMap[player.id] else { return nil }
+                return PlayerPushItem(
+                    token: token,
+                    localPlayerId: player.id.uuidString.lowercased(),
+                    playerName: playerNameMap[player.id],
+                    eligibleTeams: nil
+                )
+            }
+
+            do {
+                try await SubmissionsClient.shared.pushRound(
+                    gameToken: gameToken,
+                    mode: game.mode.rawValue,
+                    roundNumber: roundNumber,
+                    deadline: deadline,
+                    gameName: gameName,
+                    fixtures: fixtureItems,
+                    jokerEnabled: false,
+                    managerSuffix: managerSuffix,
+                    managerName: trimmedManagerName,
+                    players: playerItems,
+                    extraJSON: extraJSON
+                )
+            } catch {
+                killerSubmissionsLog.warning("Killer round push failed: \(error.localizedDescription)")
+            }
+        }
     }
 }

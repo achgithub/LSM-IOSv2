@@ -178,6 +178,20 @@ struct SubmissionQueueView: View {
             if let jokerScore = scores.first(where: { $0.isJoker == true }) {
                 PredictorScoringService.setJoker(player: player, round: round, fixtureId: jokerScore.fixtureId)
             }
+        } else if game.mode == .killer, let outcomes = result.payload.outcomes {
+            for entry in outcomes {
+                // A malformed/unknown outcome string skips just that fixture
+                // rather than aborting the whole submission — matches the
+                // "safely rejectable, not corrupting" requirement for
+                // untrusted PWA payloads.
+                guard let outcome = FixtureOutcome(rawValue: entry.outcome) else {
+                    subQueueLog.warning("Skipped Killer outcome with unknown value: \(entry.outcome)")
+                    continue
+                }
+                KillerScoringService.setPrediction(
+                    player: player, round: round, fixtureId: entry.fixtureId, outcome: outcome, context: context
+                )
+            }
         }
         try? context.save()
     }
@@ -215,8 +229,20 @@ private struct SubmissionRow: View {
             Text(scores.map { s in
                 s.isJoker == true ? "\(s.home)–\(s.away) ★" : "\(s.home)–\(s.away)"
             }.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+        } else if let outcomes = item.payload.outcomes {
+            Text(outcomes.map { Self.abbreviation(for: $0.outcome) }.joined(separator: ", "))
+                .font(.caption).foregroundStyle(.secondary)
         } else {
             Text("—").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private static func abbreviation(for rawOutcome: String) -> String {
+        switch rawOutcome {
+        case "homeWin": return "H"
+        case "draw": return "D"
+        case "awayWin": return "A"
+        default: return "?"
         }
     }
 }

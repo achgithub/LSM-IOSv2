@@ -9,8 +9,13 @@
 --
 -- Sports data (leagues, teams, fixtures, standings) stays in the sports shard DBs.
 --
--- Apply:
+-- Apply (fresh databases only — CREATE TABLE IF NOT EXISTS is a no-op against
+-- an existing table, so this alone does not add new columns to uk/eu):
 --   pnpm db:migrate:uk   (or db:migrate:eu)
+--
+-- One-off column additions to existing tables live in migrations/*.sql —
+-- apply those manually, once per region, before deploying code that depends
+-- on them. See migrations/0001_add_round_pushes_extra_json.sql.
 
 PRAGMA foreign_keys = ON;
 
@@ -57,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_game_enrollments_game ON game_enrollments (game_t
 -- One row per game's currently open round. Upserted on every push.
 CREATE TABLE IF NOT EXISTS round_pushes (
   game_token    TEXT PRIMARY KEY,
-  mode          TEXT NOT NULL,            -- 'lms' | 'predictor'
+  mode          TEXT NOT NULL,            -- 'lms' | 'predictor' | 'killer'
   round_number  INTEGER NOT NULL,
   deadline      TEXT,                     -- ISO8601 UTC; null if unset
   game_name     TEXT,                     -- the manager's game title, for the PWA card heading
@@ -65,7 +70,14 @@ CREATE TABLE IF NOT EXISTS round_pushes (
   joker_enabled INTEGER NOT NULL DEFAULT 0,
   manager_token TEXT,
   warned_at     TEXT,
-  updated_at    TEXT NOT NULL
+  updated_at    TEXT NOT NULL,
+  -- Opaque, mode-specific round data (unread/unvalidated by the server, like
+  -- payload_json below) — e.g. Killer's { phase, otherPlayers }. Null for
+  -- LMS/Predictor. Existing on-disk uk/eu DBs need the one-off migration in
+  -- migrations/0001_add_round_pushes_extra_json.sql; this CREATE TABLE only
+  -- covers fresh databases (CREATE TABLE IF NOT EXISTS is a no-op on an
+  -- existing table, so adding a column here does nothing for uk/eu as-is).
+  extra_json    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_round_pushes_manager ON round_pushes (manager_token);

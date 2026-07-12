@@ -1,4 +1,4 @@
-import type { LMSSelection, PlayerData, PredictorScore } from './types';
+import type { KillerOutcome, LMSSelection, PlayerData, PredictorScore } from './types';
 
 // In dev, requests go through the Vite proxy at /api (see vite.config.ts) so
 // the browser sees a same-origin call — worker-api's CORS only allows the
@@ -70,6 +70,20 @@ export async function submitPredictor(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ roundNumber, scores }),
+  });
+  await throwIfError(res);
+}
+
+export async function submitKiller(
+  token: string,
+  gameToken: string,
+  roundNumber: number,
+  outcomes: KillerOutcome[]
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/s/${token}/games/${gameToken}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ roundNumber, outcomes }),
   });
   await throwIfError(res);
 }

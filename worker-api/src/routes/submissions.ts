@@ -97,7 +97,10 @@ submissions.post("/links/revoke-by-name", async (c) => {
 
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
-// Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, managerSuffix?, players }
+// Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, extra?, managerSuffix?, players }
+// `extra` is an opaque, mode-specific JSON string (e.g. Killer's
+// {"phase":"build"}) — stored and returned unread/unvalidated, exactly like
+// fixtures/payload_json elsewhere in this file. Null/omitted for LMS/Predictor.
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   // fixtureId/opponentName are set when a team plays twice in the round
@@ -115,12 +118,13 @@ submissions.post("/games/:gameToken/push", async (c) => {
     gameName?: string | null;
     fixtures: unknown[];
     jokerEnabled?: boolean;
+    extra?: string | null;
     managerSuffix?: string | null;
     managerName?: string | null;
     managerToken?: string | null;
     players: PushPlayer[];
   }>();
-  const { mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, managerSuffix, managerName, managerToken, players } = body ?? {};
+  const { mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, extra, managerSuffix, managerName, managerToken, players } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
   }
@@ -129,8 +133,8 @@ submissions.post("/games/:gameToken/push", async (c) => {
   const mgrToken = managerToken?.toLowerCase() ?? null;
 
   await c.env.DB.prepare(
-    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at, extra_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
        mode = excluded.mode,
        round_number = excluded.round_number,
@@ -139,8 +143,9 @@ submissions.post("/games/:gameToken/push", async (c) => {
        fixtures_json = excluded.fixtures_json,
        joker_enabled = excluded.joker_enabled,
        manager_token = COALESCE(round_pushes.manager_token, excluded.manager_token),
-       updated_at = excluded.updated_at`
-  ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts).run();
+       updated_at = excluded.updated_at,
+       extra_json = excluded.extra_json`
+  ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts, extra ?? null).run();
 
   if (mgrToken) await ensureManagerLifecycle(c.env, mgrToken);
 
@@ -301,7 +306,7 @@ submissions.get("/s/:token", async (c) => {
 
   const enrollments = await c.env.DB.prepare(
     `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix,
-            rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled
+            rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled, rp.extra_json
      FROM game_enrollments ge
      JOIN round_pushes rp ON rp.game_token = ge.game_token
      WHERE ge.token = ?`
@@ -336,6 +341,9 @@ submissions.get("/s/:token", async (c) => {
     };
     if (row.eligible_team_ids_json) {
       game.eligibleTeams = JSON.parse(row.eligible_team_ids_json);
+    }
+    if (row.extra_json) {
+      game.extra = row.extra_json;
     }
     if (prior) {
       game.priorSubmission = {

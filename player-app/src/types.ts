@@ -1,4 +1,4 @@
-export type GameMode = 'lms' | 'predictor';
+export type GameMode = 'lms' | 'predictor' | 'killer';
 
 export interface EligibleTeam {
   id: number;
@@ -31,6 +31,28 @@ export interface SubmissionHistoryItem {
   payload?: PriorSubmission['payload'];
 }
 
+// Opponent roster entry for Killer's Kill Phase hit-target picker — `id` is
+// the local Player UUID string, verbatim from the iOS side, that must
+// round-trip unchanged through a submission back to `applyLocally`.
+export interface KillerOtherPlayer {
+  id: string;
+  name: string;
+}
+
+// Parsed shape of a Killer game's opaque `extra` field (see `Game.extra`).
+export interface KillerExtra {
+  phase: 'build' | 'kill';
+  otherPlayers?: KillerOtherPlayer[];
+}
+
+export interface KillerOutcome {
+  fixtureId: number;
+  /** Matches iOS `FixtureOutcome.rawValue` exactly — no translation layer. */
+  outcome: 'homeWin' | 'draw' | 'awayWin';
+  /** Kill Phase only. Local Player UUID string of the chosen hit target. */
+  hitTargetId?: string;
+}
+
 export interface Game {
   mode: GameMode;
   gameToken: string;
@@ -43,6 +65,8 @@ export interface Game {
   priorSubmission?: PriorSubmission;
   /** Last up-to-2 closed rounds' submissions, most recent first. */
   history?: SubmissionHistoryItem[];
+  /** Opaque, mode-specific round data — raw JSON string, parse client-side. */
+  extra?: string;
 }
 
 export interface PlayerData {

@@ -12,6 +12,7 @@ module.exports = {
         chrome: '#3DA8FF',
         lms: { DEFAULT: '#F97316', dim: 'rgba(249,115,22,0.14)' },
         predictor: { DEFAULT: '#38BDF8', dim: 'rgba(56,189,248,0.14)' },
+        killer: { DEFAULT: '#F43F5E', dim: 'rgba(244,63,94,0.14)' },
         success: '#22C55E',
         danger: '#EF4444',
         warning: '#FBBF24',

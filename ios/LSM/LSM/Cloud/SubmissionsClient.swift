@@ -52,6 +52,8 @@ struct SubmissionPayload: Decodable {
     let opponentName: String?
     // Predictor
     let scores: [PredictorScore]?
+    // Killer
+    let outcomes: [KillerOutcomeWire]?
 }
 
 struct PredictorScore: Decodable {
@@ -59,6 +61,15 @@ struct PredictorScore: Decodable {
     let home: Int
     let away: Int
     let isJoker: Bool?
+}
+
+struct KillerOutcomeWire: Decodable {
+    let fixtureId: Int
+    /// Raw `FixtureOutcome` rawValue string ("homeWin"/"draw"/"awayWin").
+    let outcome: String
+    /// Kill Phase only — nil in Build Phase. Local `Player` UUID string of
+    /// the opponent this fixture's Hit targets.
+    let hitTargetId: String?
 }
 
 struct ApproveResult: Decodable {
@@ -131,7 +142,8 @@ actor SubmissionsClient {
         jokerEnabled: Bool,
         managerSuffix: String?,
         managerName: String?,
-        players: [PlayerPushItem]
+        players: [PlayerPushItem],
+        extraJSON: String? = nil
     ) async throws {
         struct Body: Encodable {
             let mode: String
@@ -144,6 +156,9 @@ actor SubmissionsClient {
             let managerName: String?
             let managerToken: String
             let players: [PlayerPushItem]
+            /// Opaque, mode-specific round data (e.g. Killer's phase/roster) —
+            /// pre-serialized by the caller so this client stays mode-agnostic.
+            let extra: String?
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
         var req = try await request(
@@ -153,7 +168,7 @@ actor SubmissionsClient {
             Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr, gameName: gameName,
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
                  managerSuffix: managerSuffix, managerName: managerName,
-                 managerToken: ManagerToken.current, players: players)
+                 managerToken: ManagerToken.current, players: players, extra: extraJSON)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)
