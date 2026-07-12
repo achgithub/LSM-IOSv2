@@ -313,6 +313,17 @@ submissions.get("/s/:token", async (c) => {
        FROM submissions WHERE token = ? AND game_token = ? AND round_number = ?`
     ).bind(token, row.game_token, row.round_number).first<any>();
 
+    // Last-2-rounds submission history — the `submissions` table already
+    // retains the prior round's rows (pruned at round_number < current - 2 on
+    // push), this just surfaces what's already there. "What did I submit,"
+    // not "did I win" — results/points aren't tracked here, only in iOS.
+    const historyRows = await c.env.DB.prepare(
+      `SELECT round_number, status, submitted_at, payload_json
+       FROM submissions
+       WHERE token = ? AND game_token = ? AND round_number < ? AND round_number >= ?
+       ORDER BY round_number DESC`
+    ).bind(token, row.game_token, row.round_number, Math.max(1, row.round_number - 2)).all();
+
     const game: Record<string, unknown> = {
       gameToken: row.game_token,
       mode: row.mode,
@@ -333,6 +344,14 @@ submissions.get("/s/:token", async (c) => {
         submittedAt: prior.submitted_at,
         payload: JSON.parse(prior.payload_json),
       };
+    }
+    if ((historyRows.results ?? []).length > 0) {
+      game.history = (historyRows.results ?? []).map((h: any) => ({
+        roundNumber: h.round_number,
+        status: h.status,
+        submittedAt: h.submitted_at,
+        payload: JSON.parse(h.payload_json),
+      }));
     }
     return game;
   }));

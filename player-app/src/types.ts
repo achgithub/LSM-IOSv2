@@ -22,6 +22,15 @@ export interface PriorSubmission {
   };
 }
 
+// A player's own submission for a round that's since closed. "What did I
+// submit," not "did I win" — results/points aren't carried here, only the
+// picks themselves (roundNumber + status + payload, same shape as PriorSubmission).
+export interface SubmissionHistoryItem {
+  roundNumber: number;
+  status: 'pending' | 'approved' | 'rejected';
+  payload?: PriorSubmission['payload'];
+}
+
 export interface Game {
   mode: GameMode;
   gameToken: string;
@@ -32,6 +41,8 @@ export interface Game {
   fixtures?: Fixture[];
   jokerEnabled?: boolean;
   priorSubmission?: PriorSubmission;
+  /** Last up-to-2 closed rounds' submissions, most recent first. */
+  history?: SubmissionHistoryItem[];
 }
 
 export interface PlayerData {

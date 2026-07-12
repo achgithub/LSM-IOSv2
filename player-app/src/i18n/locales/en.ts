@@ -58,6 +58,8 @@ const en = {
     rejected: 'Rejected — pick again.',
     pickReviewPending: 'Your manager will review it before it goes live.',
     picked: 'Picked {team}.',
+    historyLms: 'Round {n}: picked {team}',
+    historyPredictor: 'Round {n}: {count} predictions submitted',
   },
   lms: {
     noTeamsTitle: 'No eligible teams found',

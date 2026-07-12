@@ -90,6 +90,30 @@ function PredictorSummary({
   );
 }
 
+// Read-only recap of the player's own last-submitted round, once a newer
+// round has opened. Just "what did I submit" — not results/points, which
+// only exist in the manager's local app, not on the server.
+function HistoryLine({ game }: { game: Game }) {
+  const t = useT();
+  const item = game.history?.[0];
+  if (!item) return null;
+  if (game.mode === 'predictor') {
+    const count = item.payload?.scores?.length;
+    if (!count) return null;
+    return (
+      <p className="m-0 border-t border-white/10 px-3.5 py-2 text-xs text-slate-500">
+        {t('game.historyPredictor', { n: item.roundNumber, count })}
+      </p>
+    );
+  }
+  if (!item.payload?.teamName) return null;
+  return (
+    <p className="m-0 border-t border-white/10 px-3.5 py-2 text-xs text-slate-500">
+      {t('game.historyLms', { n: item.roundNumber, team: item.payload.teamName })}
+    </p>
+  );
+}
+
 export function GameCard({
   game,
   token,
@@ -182,6 +206,7 @@ export function GameCard({
             )}
           </>
         )}
+        <HistoryLine game={game} />
       </div>
     </article>
   );
