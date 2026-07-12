@@ -11,8 +11,8 @@ const nl: Translations = {
     loading: 'Loading…',
     title: 'Last Stand Manager',
     refresh: 'Refresh',
-    notifications: 'Notifications',
     games: 'Games',
+    needsYou: '{count} needs you',
   },
   mode: {
     lms: 'Last Man Standing',
@@ -21,6 +21,11 @@ const nl: Translations = {
   },
   deadline: {
     closesIn: '{game} closes in {time}',
+    soonestLabel: 'Closes soonest',
+    days: 'Days',
+    hours: 'Hrs',
+    minutes: 'Min',
+    seconds: 'Sec',
   },
   update: {
     banner: 'A new version is available',
@@ -44,14 +49,6 @@ const nl: Translations = {
   },
   footer: {
     reviewed: "Submissions are reviewed by your game's manager before they go live.",
-  },
-  push: {
-    enable: 'Enable',
-    turnOff: 'Turn off',
-    enabled: 'Notifications enabled',
-    blocked: 'Blocked in browser settings.',
-    unsupported: 'Install to home screen to enable push notifications.',
-    installHint: 'Only available if saved to mobile home screen.',
   },
   status: {
     submitted: 'Submitted',

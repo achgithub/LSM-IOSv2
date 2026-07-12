@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Game, GameMode, PlayerState } from './types';
 import { fetchPlayer, MaintenanceError } from './api';
 import { useUpdateAvailable } from './hooks/useUpdateAvailable';
-import { usePushSubscription } from './hooks/usePushSubscription';
 import { useDeadlineCountdown } from './hooks/useDeadlineCountdown';
 import { GameCard } from './components/GameCard';
+import { ClosesSoonest } from './components/ClosesSoonest';
 import { useT } from './i18n';
 import { needsPlayerAction } from './gameStatus';
-import { formatCountdown } from './format';
+
+const MODE_DOT: Record<GameMode, string> = { lms: 'bg-lms', predictor: 'bg-predictor', killer: 'bg-killer' };
 
 const TOKEN_STORAGE_KEY = 'lsm.playerSubmissionToken';
 const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -50,10 +51,8 @@ export default function App() {
   const [state, setState] = useState<PlayerState>(token ? { loading: true } : { error: t('error.missingToken') });
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const { updateAvailable, applyUpdate, checkForUpdate } = useUpdateAvailable();
-  const push = usePushSubscription(token);
 
   async function load() {
     if (!token) return;
@@ -107,14 +106,14 @@ export default function App() {
       <div className="blob blob-chrome" aria-hidden="true" />
       <div className="blob blob-predictor" aria-hidden="true" />
       <div className="relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-app flex-col gap-4 px-[clamp(0.75rem,2.8vw,1.25rem)] pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.85rem,env(safe-area-inset-top))]">
-        <section className="animate-card-in grid gap-3 rounded-2xl border border-white/10 bg-surface p-[clamp(0.9rem,3vw,1.25rem)] shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur">
+        <section className="animate-card-in grid gap-3 rounded-[20px] border border-white/10 bg-surface p-[clamp(0.9rem,3vw,1.25rem)] shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <img src="/shield.png" alt="" aria-hidden="true" className="mt-0.5 h-7 w-7 shrink-0 opacity-40" />
               <div>
                 {state.playerName ? (
                   <>
-                    <h1 className="m-0 text-[clamp(1.3rem,5vw,1.8rem)] font-extrabold leading-tight tracking-tight">
+                    <h1 className="m-0 font-display text-[clamp(1.3rem,5vw,1.8rem)] font-bold leading-tight tracking-tight">
                       {t('hero.greeting', { name: state.playerName })}
                     </h1>
                     {state.managerName && (
@@ -122,7 +121,7 @@ export default function App() {
                     )}
                   </>
                 ) : (
-                  <h1 className="m-0 text-[clamp(1.3rem,5vw,1.8rem)] font-extrabold leading-tight tracking-tight">
+                  <h1 className="m-0 font-display text-[clamp(1.3rem,5vw,1.8rem)] font-bold leading-tight tracking-tight">
                     {state.loading ? t('hero.loading') : t('hero.title')}
                   </h1>
                 )}
@@ -146,76 +145,28 @@ export default function App() {
                   />
                 </svg>
               </button>
-              {push.supported && token && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-label={t('hero.notifications')}
-                    aria-pressed={push.subscribed}
-                    onClick={() => setShowNotifications((s) => !s)}
-                    className={`inline-flex min-h-[2.5rem] min-w-[2.5rem] items-center justify-center rounded-full border transition-colors ${
-                      push.subscribed ? 'border-chrome/50 bg-chrome/15 text-chrome' : 'border-white/10 bg-surface text-slate-300 hover:bg-surface-hover'
-                    }`}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden className="h-[1.05rem] w-[1.05rem]">
-                      <path
-                        fill="currentColor"
-                        d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C8.63 5.36 7 7.92 7 11v5l-2 2v1h14v-1l-2-2z"
-                      />
-                    </svg>
-                  </button>
-                  {showNotifications && (
-                    <div className="animate-card-in absolute right-0 top-[calc(100%+10px)] z-20 min-w-[14rem] rounded-xl border border-white/10 bg-panel-strong p-3.5 shadow-2xl">
-                      <p className="m-0 mb-2.5 text-xs text-slate-500">{t('push.installHint')}</p>
-                      {push.permission === 'denied' ? (
-                        <p className="m-0 text-sm text-slate-400">{t('push.blocked')}</p>
-                      ) : push.subscribed ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm">{t('push.enabled')}</span>
-                          <button
-                            type="button"
-                            disabled={push.busy}
-                            onClick={push.disable}
-                            className="rounded-full border border-white/10 bg-surface px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-surface-hover"
-                          >
-                            {t('push.turnOff')}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm text-slate-400">{t('hero.notifications')}</span>
-                          <button
-                            type="button"
-                            disabled={push.busy}
-                            onClick={push.enable}
-                            className="rounded-full bg-chrome px-3 py-1.5 text-xs font-bold text-[#06121E]"
-                          >
-                            {t('push.enable')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
           {showFilter && (
-            <div className="flex min-h-[2.75rem] items-center gap-3 rounded-full border border-white/10 bg-surface px-4 py-1.5">
-              <span className="flex items-center gap-1.5 whitespace-nowrap text-sm font-bold text-slate-200">
-                {t('hero.games')}
-                {totalPending > 0 && (
-                  <span className="inline-grid min-h-[1.4rem] min-w-[1.4rem] place-items-center rounded-full bg-lms/20 text-[0.72rem] font-black text-orange-200">
-                    {totalPending}
-                  </span>
-                )}
+            <div className="relative flex min-h-[2.75rem] items-center gap-2.5 rounded-2xl border border-white/10 bg-surface px-3.5 py-2.5">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${MODE_DOT[activeMode ?? 'lms']}`} aria-hidden="true" />
+              <span className="whitespace-nowrap text-[13.5px] font-medium text-slate-400">
+                {t('hero.games')} <span className="font-bold text-slate-100">{games.length}</span>
+              </span>
+              {totalPending > 0 && (
+                <span className="whitespace-nowrap rounded-full bg-lms/20 px-2.5 py-1 text-[11px] font-bold text-orange-200">
+                  {t('hero.needsYou', { count: totalPending })}
+                </span>
+              )}
+              <span className="ml-auto shrink-0 text-slate-500" aria-hidden="true">
+                ⌄
               </span>
               <select
                 aria-label={t('hero.games')}
                 value={activeMode ?? ''}
                 onChange={(e) => setActiveMode((e.target.value || null) as GameMode | null)}
-                className="min-h-[2.1rem] flex-1 bg-transparent text-right text-sm font-bold text-slate-200"
+                className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
               >
                 {(['lms', 'predictor', 'killer'] as GameMode[])
                   .filter((m) => modesPresent.has(m))
@@ -232,16 +183,7 @@ export default function App() {
           )}
         </section>
 
-        {deadline && (
-          <div className="animate-card-in flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm text-slate-200">
-            <span className="min-w-0 truncate">
-              {t('deadline.closesIn', {
-                game: deadline.game.gameName || modeLabels[deadline.game.mode],
-                time: formatCountdown(deadline.remainingMs),
-              })}
-            </span>
-          </div>
-        )}
+        {deadline && <ClosesSoonest deadline={deadline} />}
 
         {updateAvailable && (
           <div className="animate-card-in flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/15 px-4 py-2.5 text-sm text-red-200">

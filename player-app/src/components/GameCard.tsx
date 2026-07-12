@@ -27,25 +27,14 @@ function Kickoff({ value }: { value?: string | null }) {
 function StatusPill({ game }: { game: Game }) {
   const t = useT();
   const prior = game.priorSubmission;
+  const base = 'whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.03em]';
   if (prior?.status === 'pending') {
-    return (
-      <span className="whitespace-nowrap rounded-full border border-warning/30 bg-warning/12 px-2.5 py-1 text-[0.68rem] font-bold text-amber-300">
-        {t('status.submitted')}
-      </span>
-    );
+    return <span className={`${base} border-warning/30 bg-warning/12 text-amber-300`}>{t('status.submitted')}</span>;
   }
   if (prior?.status === 'approved') {
-    return (
-      <span className="whitespace-nowrap rounded-full border border-success/30 bg-success/12 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-300">
-        {t('status.approved')}
-      </span>
-    );
+    return <span className={`${base} border-success/30 bg-success/12 text-emerald-300`}>{t('status.approved')}</span>;
   }
-  return (
-    <span className="whitespace-nowrap rounded-full border border-danger/30 bg-danger/12 px-2.5 py-1 text-[0.68rem] font-bold text-red-300">
-      {t('status.needsAttention')}
-    </span>
-  );
+  return <span className={`${base} border-lms/45 bg-lms/20 text-orange-200`}>{t('status.needsAttention')}</span>;
 }
 
 const MODE_ICON_STYLES: Record<GameMode, { bg: string; text: string; label: string }> = {
@@ -207,11 +196,11 @@ export function GameCard({
   const submitted = localSubmitted || prior?.status === 'pending' || prior?.status === 'approved';
 
   return (
-    <article className="animate-card-in overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+    <article className="animate-card-in overflow-hidden rounded-[20px] border border-white/10 bg-surface shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
       <header className="flex items-center gap-3 border-b border-white/10 p-3.5">
         <ModeIcon mode={game.mode} />
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 truncate text-[clamp(0.98rem,4.2vw,1.2rem)] font-bold leading-tight">{title}</h2>
+          <h2 className="m-0 truncate font-display text-[clamp(0.98rem,4.2vw,1.2rem)] font-bold leading-tight">{title}</h2>
           {game.deadline && (
             <p className="m-0 mt-0.5 text-xs text-slate-400">{t('game.cutoff', { date: formatDate(game.deadline) ?? '' })}</p>
           )}
@@ -341,26 +330,31 @@ function LMSSection({
         disabled={!eligible}
         aria-pressed={selected}
         onClick={() => setSelection({ teamId: id!, teamName: name, fixtureId, opponentName })}
-        className={`min-h-[2.7rem] overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-sm font-bold transition-colors ${
+        className={`flex min-h-[2.9rem] items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5 text-sm font-bold transition-colors ${
           selected
-            ? 'border-lms/60 bg-lms/18 text-orange-200'
+            ? 'border-lms bg-gradient-to-br from-lms to-lms-deep text-lms-text shadow-[0_4px_16px_-4px_rgba(249,115,22,0.44)]'
             : 'border-white/10 bg-bg/50 text-slate-200 disabled:opacity-40'
         }`}
       >
-        {name}
+        {selected && (
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden className="h-[15px] w-[15px] shrink-0">
+            <path d="M4 10l4 4 8-8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{name}</span>
       </button>
     );
   }
 
   return (
     <section className="grid gap-3 p-3.5">
-      <span className="text-[1.05rem] font-bold">{t('lms.pickTeam')}</span>
-      <div className="grid gap-2">
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">{t('lms.pickTeam')}</span>
+      <div className="grid gap-2.5">
         {fixtures.length > 0
           ? fixtures.map((fixture: Fixture) => (
               <div
                 key={fixture.fixtureId}
-                className="grid grid-cols-[3.45rem_minmax(0,1fr)] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+                className="grid grid-cols-[3.45rem_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-white/10 bg-panel p-2.5"
               >
                 <Kickoff value={fixture.kickoff} />
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
@@ -370,7 +364,9 @@ function LMSSection({
                     fixtureId={fixture.fixtureId}
                     opponentName={fixture.away}
                   />
-                  <span className="text-sm font-bold text-slate-500">{t('lms.vs')}</span>
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/10 bg-bg text-[10px] font-bold text-slate-500">
+                    {t('lms.vs')}
+                  </span>
                   <TeamButton
                     name={fixture.away}
                     id={eligibleIdByFixtureAndName.get(`${fixture.fixtureId}:${fixture.away}`)}
@@ -381,7 +377,7 @@ function LMSSection({
               </div>
             ))
           : eligibleTeams.map((team: EligibleTeam) => (
-              <div key={`${team.fixtureId ?? ''}:${team.id}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+              <div key={`${team.fixtureId ?? ''}:${team.id}`} className="rounded-2xl border border-white/10 bg-panel p-2.5">
                 <TeamButton name={team.name} id={team.id} fixtureId={team.fixtureId ?? null} opponentName={team.opponentName ?? null} />
               </div>
             ))}
@@ -587,7 +583,7 @@ function KillerSection({
 
   return (
     <section className="grid gap-3 p-3.5">
-      <span className="text-[1.05rem] font-bold">{t('killer.pickOutcome')}</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">{t('killer.pickOutcome')}</span>
       <div className="grid max-h-[min(31rem,58vh)] gap-2 overflow-y-auto pr-0.5 [overscroll-behavior:contain]">
         {fixtures.map((fixture) => {
           const selected = outcomes[fixture.fixtureId];

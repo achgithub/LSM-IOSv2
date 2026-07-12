@@ -10,7 +10,7 @@
 html,
 body {
   min-height: 100%;
-  background: #0b1220;
+  background: #131b2e;
 }
 
 body {
@@ -19,9 +19,10 @@ body {
   color: #f8fafc;
   -webkit-font-smoothing: antialiased;
   background:
-    linear-gradient(180deg, rgba(11, 18, 32, 0.76), rgba(11, 18, 32, 0.96) 44%, #0b1220),
+    radial-gradient(600px 400px at 15% -5%, rgba(249, 115, 22, 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(19, 27, 46, 0.76), rgba(19, 27, 46, 0.96) 44%, #131b2e),
     url('/background.png') top center / cover no-repeat fixed,
-    #0b1220;
+    #131b2e;
 }
 
 button,
