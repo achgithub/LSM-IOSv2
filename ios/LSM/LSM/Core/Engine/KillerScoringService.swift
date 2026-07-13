@@ -12,7 +12,7 @@ enum KillerScoringError: LocalizedError {
     case incompleteOutcomes
 
     var errorDescription: String? {
-        "Every fixture must have a result entered before the round can be closed."
+        AppString("Every fixture must have a result entered before the round can be closed.")
     }
 }
 

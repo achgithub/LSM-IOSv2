@@ -99,7 +99,9 @@ struct KillerScratchpadEntryView: View {
 
                 if let confirmedCount {
                     Section {
-                        Label("Saved \(confirmedCount) pick\(confirmedCount == 1 ? "" : "s") for \(selectedPlayer?.name ?? "").",
+                        Label(confirmedCount == 1
+                              ? AppString("Saved \(confirmedCount) pick for \(selectedPlayer?.name ?? "").")
+                              : AppString("Saved \(confirmedCount) picks for \(selectedPlayer?.name ?? "")."),
                               systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     }

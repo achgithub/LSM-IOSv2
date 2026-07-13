@@ -13,11 +13,11 @@ enum KillerCardType: Equatable {
 extension KillerCardType {
     var sectionLabel: String {
         switch self {
-        case .fixtures:      return "MANAGER PICKED GAMES"
-        case .playerKey:     return "PLAYER KEY"
-        case .weeklyResults: return "WEEKLY RESULTS"
-        case .standings:     return "ACCURACY TABLE"
-        case .winner:        return "FINAL RESULT"
+        case .fixtures:      return AppString("MANAGER PICKED GAMES")
+        case .playerKey:     return AppString("PLAYER KEY")
+        case .weeklyResults: return AppString("WEEKLY RESULTS")
+        case .standings:     return AppString("ACCURACY TABLE")
+        case .winner:        return AppString("FINAL RESULT")
         }
     }
 }

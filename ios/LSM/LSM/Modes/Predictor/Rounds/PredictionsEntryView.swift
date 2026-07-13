@@ -144,9 +144,9 @@ private struct FixturePredictionRow: View {
         VStack(alignment: .leading, spacing: 6) {
             FixtureLabel(fixture: fixture, teamsById: teamsById)
             HStack {
-                scoreStepper(value: home, idPrefix: "predictionHome-\(fixture.id)", team: String(localized: "Home")) { setScore(home: $0, away: away) }
+                scoreStepper(value: home, idPrefix: "predictionHome-\(fixture.id)", team: AppString("Home")) { setScore(home: $0, away: away) }
                 Text("–").foregroundStyle(.secondary)
-                scoreStepper(value: away, idPrefix: "predictionAway-\(fixture.id)", team: String(localized: "Away")) { setScore(home: home, away: $0) }
+                scoreStepper(value: away, idPrefix: "predictionAway-\(fixture.id)", team: AppString("Away")) { setScore(home: home, away: $0) }
                 Spacer()
                 if jokerEnabled {
                     Button {

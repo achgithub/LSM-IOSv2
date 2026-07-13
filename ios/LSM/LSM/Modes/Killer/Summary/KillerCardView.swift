@@ -193,7 +193,9 @@ struct KillerCardView: View {
 
     private var killerFooter: some View {
         VStack(spacing: 6) {
-            Text("\(data.entrantCount) \(data.entrantCount == 1 ? "player" : "players") · Round \(data.roundNumber)")
+            Text(data.entrantCount == 1
+                 ? AppString("\(data.entrantCount) player · Round \(data.roundNumber)")
+                 : AppString("\(data.entrantCount) players · Round \(data.roundNumber)"))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(p.accent)
             Text(data.appName)

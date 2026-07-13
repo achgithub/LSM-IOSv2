@@ -152,7 +152,7 @@ struct KillerResultsEntryView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             let names = incompletePlayers.map(\.name).joined(separator: ", ")
-            Text("\(names) still \(incompletePlayers.count == 1 ? "hasn't" : "haven't") finished predicting — closing now leaves them scoring nothing this round.")
+            Text("Still to predict: \(names) — closing now scores them nothing this round.")
         }
         .confirmationDialog(
             pendingSubmissionCount == 1

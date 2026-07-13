@@ -24,23 +24,23 @@ enum KillerParseError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .empty:
-            return "Paste some picks first."
+            return AppString("Paste some picks first.")
         case .malformed(let text):
-            return "Couldn't understand \"\(text)\" — expected e.g. \"1H\" or \"1H2\"."
+            return AppString("Couldn't understand \"\(text)\" — expected e.g. \"1H\" or \"1H2\".")
         case .unknownFixtureNumber(let n):
-            return "There's no fixture number \(n) this round."
+            return AppString("There's no fixture number \(n) this round.")
         case .duplicateFixtureNumber(let n):
-            return "Fixture \(n) appears more than once."
+            return AppString("Fixture \(n) appears more than once.")
         case .missingHitTarget(let n):
-            return "Fixture \(n) is missing a Hit target, e.g. \"\(n)H2\"."
+            return AppString("Fixture \(n) is missing a Hit target, e.g. \"\(n)H2\".")
         case .unknownPlayerNumber(let n):
-            return "There's no player number \(n) in the key."
+            return AppString("There's no player number \(n) in the key.")
         case .selfTarget(let n):
-            return "Fixture \(n) can't target yourself."
+            return AppString("Fixture \(n) can't target yourself.")
         case .duplicateTarget(let n):
-            return "Player number \(n) is targeted more than once — Hits must target different opponents."
+            return AppString("Player number \(n) is targeted more than once — Hits must target different opponents.")
         case .incomplete(let got, let expected):
-            return "Found \(got) of \(expected) fixtures — check every fixture number is included."
+            return AppString("Found \(got) of \(expected) fixtures — check every fixture number is included.")
         }
     }
 }
