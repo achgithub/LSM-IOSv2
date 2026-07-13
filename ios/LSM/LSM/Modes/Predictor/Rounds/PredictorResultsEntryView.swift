@@ -144,7 +144,7 @@ struct PredictorResultsEntryView: View {
     private func scoreField(for fixture: MatchDTO, isHome: Bool) -> some View {
         let current = scores[fixture.id]
         let value = isHome ? (current?.home ?? 0) : (current?.away ?? 0)
-        let team = isHome ? "Home" : "Away"
+        let team = isHome ? String(localized: "Home") : String(localized: "Away")
         return HStack(spacing: 4) {
             Button { adjust(fixture.id, isHome: isHome, by: -1) } label: { Image(systemName: "minus.circle") }
                 .accessibilityLabel("Decrease \(team) score")
