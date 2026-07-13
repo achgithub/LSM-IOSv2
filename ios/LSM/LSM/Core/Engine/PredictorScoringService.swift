@@ -5,7 +5,7 @@ enum PredictorScoringError: LocalizedError {
     case incompleteScores
 
     var errorDescription: String? {
-        "Every fixture must have a result entered before the round can be closed."
+        AppString("Every fixture must have a result entered before the round can be closed.")
     }
 }
 

@@ -110,13 +110,15 @@ struct GamesListView: View {
     }
 
     private var deleteTitle: String {
-        (pendingDeleteOffsets?.count ?? 1) == 1 ? "Delete this game?" : "Delete \(pendingDeleteOffsets?.count ?? 0) games?"
+        (pendingDeleteOffsets?.count ?? 1) == 1
+            ? AppString("Delete this game?")
+            : AppString("Delete \(pendingDeleteOffsets?.count ?? 0) games?")
     }
 
     private var deleteMessage: String {
         (pendingDeleteOffsets?.count ?? 1) == 1
-            ? "This permanently deletes the game and its history — on this device and in the cloud, including any player picks or predictions submitted through their links."
-            : "This permanently deletes these games and their history — on this device and in the cloud, including any player picks or predictions submitted through their links."
+            ? AppString("This permanently deletes the game and its history — on this device and in the cloud, including any player picks or predictions submitted through their links.")
+            : AppString("This permanently deletes these games and their history — on this device and in the cloud, including any player picks or predictions submitted through their links.")
     }
 
     private func confirmDelete() {

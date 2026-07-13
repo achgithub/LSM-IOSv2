@@ -127,7 +127,7 @@ struct PublishPredictorView: View {
             // Include the id we attempted, so a "not found" can be cross-checked
             // against the server's publish_links table directly if needed.
             let attemptedId = game.predictorPublishLinkId?.uuidString ?? "(new)"
-            errorMessage = "Couldn't publish (id: \(attemptedId)): \(error.localizedDescription)"
+            errorMessage = AppString("Couldn't publish (id: \(attemptedId)): \(error.localizedDescription)")
         }
     }
 }

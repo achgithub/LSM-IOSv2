@@ -11,7 +11,7 @@ struct KillerCardView: View {
     var body: some View {
         ShareCardChrome(
             palette: .killer,
-            headerLabel: "ROUND",
+            headerLabel: AppString("ROUND"),
             roundNumber: data.roundNumber,
             gameName: data.gameName,
             appName: data.appName,

@@ -14,7 +14,7 @@ struct PredictorCardView: View {
     var body: some View {
         ShareCardChrome(
             palette: .predictor,
-            headerLabel: "MATCHDAY",
+            headerLabel: AppString("MATCHDAY"),
             roundNumber: data.matchdayNumber,
             gameName: data.gameName,
             appName: data.appName,

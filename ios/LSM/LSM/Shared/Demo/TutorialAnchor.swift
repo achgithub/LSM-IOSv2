@@ -54,8 +54,8 @@ struct TutorialAnchorModifier: ViewModifier {
 /// ResultsEntryView). Since sheets already focus attention, we skip the dim
 /// and just show a small guidance bar at the top.
 struct TutorialSheetBanner: View {
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {

@@ -19,7 +19,9 @@ struct PlayerLinkShareItem: Identifiable {
     /// share message, and on the card image — so the same phishing-style
     /// caution is consistent everywhere, not just wherever we remembered to
     /// add it.
-    static let safetyWarning = "Only tap this if you were expecting it — check with your manager first if you're not sure."
+    static var safetyWarning: String {
+        AppString("Only tap this if you were expecting it — check with your manager first if you're not sure.")
+    }
 
     /// Message text shared alongside the card image and URL — a bare UUID
     /// link embedded in a paragraph reads as suspicious to less tech-savvy

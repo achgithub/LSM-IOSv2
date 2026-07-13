@@ -21412,6 +21412,601 @@
           }
         }
       }
+    },
+    "MATCHDAY": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SPIELTAG"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JORNADA"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JOURNÉE"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GIORNATA"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SPEELRONDE"
+          }
+        }
+      }
+    },
+    "Couldn't publish (id: %@): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veröffentlichung fehlgeschlagen (ID: %@): %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo publicar (id: %@): %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de publier (id : %@) : %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile pubblicare (id: %@): %@"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kon niet publiceren (id: %@): %@"
+          }
+        }
+      }
+    },
+    "Couldn't prepare the export. Please try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export konnte nicht vorbereitet werden. Bitte versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo preparar la exportación. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de préparer l'export. Réessaie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile preparare l'esportazione. Riprova."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kon de export niet voorbereiden. Probeer het opnieuw."
+          }
+        }
+      }
+    },
+    "This permanently deletes the game and its history — on this device and in the cloud, including any player picks or predictions submitted through their links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies löscht das Spiel und seinen Verlauf endgültig — auf diesem Gerät und in der Cloud, einschließlich aller über Links eingereichten Spieler-Tipps oder Vorhersagen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto elimina permanentemente la partida y su historial — en este dispositivo y en la nube, incluidas las selecciones o predicciones enviadas por los jugadores a través de sus enlaces."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cela supprime définitivement la partie et son historique — sur cet appareil et dans le cloud, y compris les choix ou prédictions des joueurs soumis via leurs liens."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo elimina definitivamente la partita e la sua cronologia — su questo dispositivo e nel cloud, incluse le scelte o i pronostici dei giocatori inviati tramite i loro link."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dit verwijdert het spel en de geschiedenis ervan permanent — op dit apparaat en in de cloud, inclusief eventuele keuzes of voorspellingen van spelers die via hun links zijn ingediend."
+          }
+        }
+      }
+    },
+    "This permanently deletes these games and their history — on this device and in the cloud, including any player picks or predictions submitted through their links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies löscht diese Spiele und ihren Verlauf endgültig — auf diesem Gerät und in der Cloud, einschließlich aller über Links eingereichten Spieler-Tipps oder Vorhersagen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto elimina permanentemente estas partidas y su historial — en este dispositivo y en la nube, incluidas las selecciones o predicciones enviadas por los jugadores a través de sus enlaces."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cela supprime définitivement ces parties et leur historique — sur cet appareil et dans le cloud, y compris les choix ou prédictions des joueurs soumis via leurs liens."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo elimina definitivamente queste partite e la loro cronologia — su questo dispositivo e nel cloud, incluse le scelte o i pronostici dei giocatori inviati tramite i loro link."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dit verwijdert deze spellen en hun geschiedenis permanent — op dit apparaat en in de cloud, inclusief eventuele keuzes of voorspellingen van spelers die via hun links zijn ingediend."
+          }
+        }
+      }
+    },
+    "Tutorial fixtures loaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispielspiele geladen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partidos de ejemplo cargados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matchs d'exemple chargés"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partite di esempio caricate"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voorbeeldwedstrijden geladen"
+          }
+        }
+      }
+    },
+    "All fixtures are pre-selected. Tap Open ↑ to continue.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Spiele sind bereits ausgewählt. Tippe oben auf Öffnen, um fortzufahren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos los partidos ya están seleccionados. Toca Abrir arriba para continuar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les matchs sont déjà sélectionnés. Appuie sur Ouvrir en haut pour continuer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le partite sono già selezionate. Tocca Apri in alto per continuare."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle wedstrijden zijn al geselecteerd. Tik hierboven op Openen om door te gaan."
+          }
+        }
+      }
+    },
+    "Tutorial picks pre-assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispieltipps bereits vergeben"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciones de ejemplo ya asignadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choix d'exemple déjà attribués"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scelte di esempio già assegnate"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voorbeeldkeuzes al toegewezen"
+          }
+        }
+      }
+    },
+    "Each player's pick is set for the tutorial. Tap Done ↑ to save and continue.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für das Tutorial ist der Tipp jedes Spielers bereits festgelegt. Tippe oben auf Fertig, um zu speichern und fortzufahren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La selección de cada jugador ya está fijada para el tutorial. Toca Listo arriba para guardar y continuar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le choix de chaque joueur est déjà défini pour le tutoriel. Appuie sur Terminé en haut pour enregistrer et continuer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La scelta di ogni giocatore è già impostata per il tutorial. Tocca Fatto in alto per salvare e continuare."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De keuze van elke speler staat al vast voor de tutorial. Tik hierboven op Klaar om op te slaan en door te gaan."
+          }
+        }
+      }
+    },
+    "Tutorial results loaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispielergebnisse geladen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultados de ejemplo cargados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résultats d'exemple chargés"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risultati di esempio caricati"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voorbeelduitslagen geladen"
+          }
+        }
+      }
+    },
+    "Scores are pre-filled. Tap Close Round ↓ to eliminate and advance.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ergebnisse sind bereits ausgefüllt. Tippe unten auf Runde schließen, um zu eliminieren und fortzufahren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los resultados ya están rellenados. Toca Cerrar ronda abajo para eliminar y avanzar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les résultats sont déjà remplis. Appuie sur Clôturer la manche en bas pour éliminer et avancer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I risultati sono già compilati. Tocca Chiudi turno in basso per eliminare e avanzare."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uitslagen zijn al ingevuld. Tik hieronder op Ronde sluiten om te elimineren en verder te gaan."
+          }
+        }
+      }
+    },
+    "Tutorial scores loaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispielergebnisse geladen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puntuaciones de ejemplo cargadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scores d'exemple chargés"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punteggi di esempio caricati"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voorbeeldscores geladen"
+          }
+        }
+      }
+    },
+    "Final scores are pre-filled. Tap Close Round ↓ to calculate points.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Endergebnisse sind bereits ausgefüllt. Tippe unten auf Runde schließen, um Punkte zu berechnen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los resultados finales ya están rellenados. Toca Cerrar ronda abajo para calcular los puntos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les scores finaux sont déjà remplis. Appuie sur Clôturer la manche en bas pour calculer les points."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I punteggi finali sono già compilati. Tocca Chiudi turno in basso per calcolare i punti."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De eindscores zijn al ingevuld. Tik hieronder op Ronde sluiten om punten te berekenen."
+          }
+        }
+      }
+    },
+    "Enter your prediction": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib deine Vorhersage ein"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce tu predicción"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisis ta prédiction"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci il tuo pronostico"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voer je voorspelling in"
+          }
+        }
+      }
+    },
+    "Other players are pre-filled. Enter a score for the first fixture (try 2–0), then tap Done ↑.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für die anderen Spieler ist bereits ausgefüllt. Gib für das erste Spiel ein Ergebnis ein (versuch's mit 2:0) und tippe dann oben auf Fertig."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los demás jugadores ya están rellenados. Introduce un resultado para el primer partido (prueba 2-0) y luego toca Listo arriba."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les autres joueurs sont déjà remplis. Saisis un score pour le premier match (essaie 2-0), puis appuie sur Terminé en haut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli altri giocatori sono già compilati. Inserisci un risultato per la prima partita (prova 2-0), poi tocca Fatto in alto."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De andere spelers zijn al ingevuld. Voer een uitslag in voor de eerste wedstrijd (probeer 2-0) en tik dan hierboven op Klaar."
+          }
+        }
+      }
+    },
+    "Only tap this if you were expecting it — check with your manager first if you're not sure.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tippe hier nur, wenn du das erwartet hast — frag im Zweifel zuerst deinen Manager."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca esto solo si lo esperabas — consulta primero con tu mánager si no estás seguro."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "N'appuie ici que si tu t'y attendais — vérifie d'abord auprès de ton manager en cas de doute."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tocca qui solo se te lo aspettavi — in caso di dubbio, controlla prima con il tuo manager."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tik hier alleen op als je dit verwachtte — vraag bij twijfel eerst je manager."
+          }
+        }
+      }
+    },
+    "No clear winner": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein klarer Gewinner"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin ganador claro"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas de vainqueur clair"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun vincitore chiaro"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geen duidelijke winnaar"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

@@ -233,7 +233,7 @@ struct GameDetailView: View {
             let data = try await LeagueData.load(for: game.leagues)
             exportFiles = try GameExportFiles.write(for: game, data: data)
         } catch {
-            exportError = "Couldn't prepare the export. Please try again."
+            exportError = AppString("Couldn't prepare the export. Please try again.")
         }
     }
 
