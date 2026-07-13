@@ -167,6 +167,7 @@ struct PlayerDetailView: View {
     @Bindable var member: RosterMember
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(Entitlements.self) private var entitlements
 
     let pwaEnabled: Bool
 
@@ -179,7 +180,21 @@ struct PlayerDetailView: View {
     @State private var pendingRemoveLink = false
     @State private var renaming = false
     @State private var renameText = ""
+    @State private var showingLinkLimit = false
     @Query private var allMembers: [RosterMember]
+
+    /// Total PWA links currently minted across the whole roster — a link is
+    /// per-`RosterMember`, shared across every game that player is in, so
+    /// this count already matches `maxPWALinks`' "across all games combined"
+    /// definition with no double counting.
+    private var activeLinkCount: Int { allMembers.filter { $0.submissionTokenRaw != nil }.count }
+
+    /// `maxPWALinks` was defined on `Tier` but never actually checked anywhere
+    /// before minting a new link — this is the first enforcement point.
+    private var atLinkLimit: Bool {
+        guard let max = entitlements.maxPWALinks else { return false }
+        return activeLinkCount >= max
+    }
 
     private var linkURL: URL? {
         member.submissionToken.map { SubmissionsClient.playerLinkURL(token: $0.uuidString) }
@@ -342,6 +357,13 @@ struct PlayerDetailView: View {
         } message: {
             Text("Fully deactivates their PWA submission link, across every game they're in. They'll need a new link before they can submit again.")
         }
+        .alert("Link limit reached", isPresented: $showingLinkLimit) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let max = entitlements.maxPWALinks {
+                Text("Your \(entitlements.tier.label) plan includes \(max) player links. Remove an existing link or upgrade to add more.")
+            }
+        }
     }
 
     /// Renames the roster member and cascades the new name to every per-game
@@ -406,16 +428,24 @@ struct PlayerDetailView: View {
         case .error(let message):
             Text(message).font(.caption).foregroundStyle(.red)
             if linkURL == nil {
-                Button { mintLink() } label: {
+                Button { attemptMintLink() } label: {
                     Label("Get Submission Link", systemImage: "link.badge.plus")
                 }
             }
         case .idle:
             if linkURL == nil {
-                Button { mintLink() } label: {
+                Button { attemptMintLink() } label: {
                     Label("Get Submission Link", systemImage: "link.badge.plus")
                 }
             }
+        }
+    }
+
+    private func attemptMintLink() {
+        if atLinkLimit {
+            showingLinkLimit = true
+        } else {
+            mintLink()
         }
     }
 
