@@ -22,7 +22,7 @@ RUN_TEST=1
 SIM_NAME="${LSM_SIM_NAME:-iPhone 17}"
 # Andrew's iPhone ("Andy H", iPhone 16). `xcrun devicectl list devices` to refresh.
 DEVICE_ID="${LSM_DEVICE_ID:-E2185E12-6C9D-5CB4-9B82-DB42ED82C68E}"
-BUNDLE_ID="com.sportsmanager.LSM"
+BUNDLE_ID="com.sportsmanager.LMS"
 OUT="${LSM_OUT:-${TMPDIR:-/tmp}/lsm-run}"
 mkdir -p "$OUT/shots"
 

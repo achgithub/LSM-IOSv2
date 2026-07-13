@@ -5,7 +5,7 @@ description: Build, launch, and drive the LSM iOS app (Last Stand Manager) on th
 
 # Run the LSM iOS app
 
-LSM (`com.sportsmanager.LSM`) is a SwiftUI iOS app. It is **driven via
+LSM (`com.sportsmanager.LMS`) is a SwiftUI iOS app. It is **driven via
 XCUITest** — `simctl`/`devicectl` can launch the app but cannot tap, so UI
 navigation goes through the `LSMUITests` target, wrapped by `drive.sh`. The app
 reads live league data from the v2 Cloudflare Workers
