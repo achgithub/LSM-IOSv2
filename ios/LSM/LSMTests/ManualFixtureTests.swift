@@ -116,21 +116,24 @@ struct ManualFixtureTests {
         #expect(ManualFixtureService.manualTeams(for: g).count == 2)
     }
 
-    // MARK: - Horizon bypass at the actual enforcement point (openRound)
+    // MARK: - Manual fixtures are capped by the horizon's ceiling (openRound)
 
     /// `GameLogicService.openRound` is the real gate — `OpenRoundView`'s own
-    /// filtering is UX only. A manual fixture must be admitted into a round
-    /// even when it falls outside `FixtureHorizon`'s eligible window, and this
-    /// must hold in a Predictor game exactly as it does in LMS.
+    /// filtering is UX only. Fixed for issue #15: a manual fixture dated
+    /// implausibly far in the future is a full structural bypass of the
+    /// subscription-abuse gate if admitted unconditionally, so it's now
+    /// capped by `FixtureHorizon.manualFixtureCeiling` same as any other
+    /// fixture — this must hold in a Predictor game exactly as it does in LMS.
     @Test(arguments: [GameMode.lms, GameMode.predictor])
-    func manualFixtureBypassesTheHorizonGateOnOpenRound(mode: GameMode) throws {
+    func manualFixtureFarBeyondTheCeilingIsRejectedOnOpenRound(mode: GameMode) throws {
         let context = try makeContext()
         let g = game(mode: mode)
         context.insert(g)
 
         let manualLeagueId = ManualFixtureService.leagueId(for: g)
-        // Far outside any real horizon window (200 days out) — the manager
-        // deliberately chose this kick-off, so it must be admitted regardless.
+        // Far outside any real horizon window (200 days out) — no longer
+        // admitted regardless of the manager's choice; this is the abuse
+        // vector #15 closes.
         let manualKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(200 * 86400))
         let manualFixture = MatchDTO(
             id: 999, matchday: nil, kickoff: manualKickoff, status: "SCHEDULED",
@@ -145,7 +148,7 @@ struct ManualFixtureTests {
             leagueId: "REAL"
         )
         // …plus a real outlier well beyond that window's ceiling (10+35=45) —
-        // this one, unlike the manual fixture, must NOT be admitted.
+        // same fate as the manual fixture now, both must NOT be admitted.
         let outlierKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(90 * 86400))
         let outlierFixture = MatchDTO(
             id: 1001, matchday: nil, kickoff: outlierKickoff, status: "SCHEDULED",
@@ -161,9 +164,80 @@ struct ManualFixtureTests {
             context: context
         )
 
-        #expect(round.fixtureIds.contains(999))
+        #expect(!round.fixtureIds.contains(999))
         #expect(round.fixtureIds.contains(1000))
         #expect(!round.fixtureIds.contains(1001))
+    }
+
+    /// The flip side of the above: a manual fixture within the ceiling (e.g.
+    /// correcting/replaying a real fixture, or just a near-term one-off) must
+    /// still be admitted — the fix caps the abuse case, it doesn't disable
+    /// manual fixtures generally.
+    @Test(arguments: [GameMode.lms, GameMode.predictor])
+    func manualFixtureWithinTheCeilingIsStillAdmittedOnOpenRound(mode: GameMode) throws {
+        let context = try makeContext()
+        let g = game(mode: mode)
+        context.insert(g)
+
+        let manualLeagueId = ManualFixtureService.leagueId(for: g)
+        // Within the ceiling (anchor 10 + ceiling 35 = 45 days) — must still open.
+        let manualKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(20 * 86400))
+        let manualFixture = MatchDTO(
+            id: 999, matchday: nil, kickoff: manualKickoff, status: "SCHEDULED",
+            minute: nil, homeTeamId: 1, awayTeamId: 2, homeScore: nil, awayScore: nil, winner: nil,
+            leagueId: manualLeagueId
+        )
+        let anchorKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(10 * 86400))
+        let anchorFixture = MatchDTO(
+            id: 1000, matchday: nil, kickoff: anchorKickoff, status: "SCHEDULED",
+            minute: nil, homeTeamId: 3, awayTeamId: 4, homeScore: nil, awayScore: nil, winner: nil,
+            leagueId: "REAL"
+        )
+
+        let round = GameLogicService.openRound(
+            in: g,
+            fixtureIds: [999, 1000],
+            fixtures: [manualFixture, anchorFixture],
+            deadline: .now,
+            context: context
+        )
+
+        #expect(round.fixtureIds.contains(999))
+        #expect(round.fixtureIds.contains(1000))
+    }
+
+    /// A manual fixture correcting/replaying an already-admitted real fixture
+    /// (e.g. one postponed weeks ago) must stay admittable no matter how far
+    /// in the past its date now sits — only the future direction is capped.
+    @Test func manualFixtureDatedInThePastIsStillAdmittedOnOpenRound() throws {
+        let context = try makeContext()
+        let g = game(mode: .lms)
+        context.insert(g)
+
+        let manualLeagueId = ManualFixtureService.leagueId(for: g)
+        let manualKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(-30 * 86400))
+        let manualFixture = MatchDTO(
+            id: 999, matchday: nil, kickoff: manualKickoff, status: "SCHEDULED",
+            minute: nil, homeTeamId: 1, awayTeamId: 2, homeScore: nil, awayScore: nil, winner: nil,
+            leagueId: manualLeagueId
+        )
+        let anchorKickoff = ISO8601DateFormatter().string(from: .now.addingTimeInterval(10 * 86400))
+        let anchorFixture = MatchDTO(
+            id: 1000, matchday: nil, kickoff: anchorKickoff, status: "SCHEDULED",
+            minute: nil, homeTeamId: 3, awayTeamId: 4, homeScore: nil, awayScore: nil, winner: nil,
+            leagueId: "REAL"
+        )
+
+        let round = GameLogicService.openRound(
+            in: g,
+            fixtureIds: [999, 1000],
+            fixtures: [manualFixture, anchorFixture],
+            deadline: .now,
+            context: context
+        )
+
+        #expect(round.fixtureIds.contains(999))
+        #expect(round.fixtureIds.contains(1000))
     }
 
     // MARK: - Predictor scoring treats a manual fixture identically to a real one
