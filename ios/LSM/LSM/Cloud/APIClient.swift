@@ -6,10 +6,10 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .badURL: return "Invalid request URL."
+        case .badURL: return AppString("Invalid request URL.")
         case .badStatus(let code, let body):
-            guard let body, !body.isEmpty else { return "Server returned status \(code)." }
-            return "Server returned status \(code): \(body)"
+            guard let body, !body.isEmpty else { return AppString("Server returned status \(code).") }
+            return AppString("Server returned status \(code): \(body)")
         }
     }
 }

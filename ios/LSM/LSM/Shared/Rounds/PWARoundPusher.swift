@@ -14,9 +14,9 @@ enum PWAPushError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noLeagueData: return "Couldn't load league data."
-        case .noRound: return "This game has no round to send."
-        case .noCloudToken: return "This game isn't linked to the Player App yet."
+        case .noLeagueData: return AppString("Couldn't load league data.")
+        case .noRound: return AppString("This game has no round to send.")
+        case .noCloudToken: return AppString("This game isn't linked to the Player App yet.")
         }
     }
 }

@@ -15,14 +15,17 @@ struct ManagerLifecycleStatus: Decodable {
     var bannerMessage: String? {
         switch state {
         case "warned":
-            return "No activity for 45 days — your cloud data will be deleted in 15 days if no round is opened."
+            return AppString("No activity for 45 days — your cloud data will be deleted in 15 days if no round is opened.")
         case "pending_delete":
             if let days = daysUntilDeletion {
-                return days > 0
-                    ? "Subscription ended — cloud data will be deleted in \(days) day\(days == 1 ? "" : "s")."
-                    : "Cloud data is scheduled for deletion."
+                if days > 0 {
+                    return days == 1
+                        ? AppString("Subscription ended — cloud data will be deleted in \(days) day.")
+                        : AppString("Subscription ended — cloud data will be deleted in \(days) days.")
+                }
+                return AppString("Cloud data is scheduled for deletion.")
             }
-            return "Cloud data is scheduled for deletion."
+            return AppString("Cloud data is scheduled for deletion.")
         default:
             return nil
         }

@@ -104,7 +104,9 @@ struct PlayersView: View {
                 .onDelete(perform: deleteMembers)
             }
         } header: {
-            Text("\(filteredMembers.count) player\(filteredMembers.count == 1 ? "" : "s")")
+            Text(filteredMembers.count == 1
+                 ? AppString("\(filteredMembers.count) player")
+                 : AppString("\(filteredMembers.count) players"))
         }
     }
 
@@ -153,9 +155,9 @@ private enum LinkFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .all: return "All Players"
-        case .active: return "Has Link"
-        case .none: return "No Link"
+        case .all: return AppString("All Players")
+        case .active: return AppString("Has Link")
+        case .none: return AppString("No Link")
         }
     }
 }

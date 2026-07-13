@@ -56,7 +56,7 @@ struct CloudBackupSection: View {
                     HStack {
                         Button {
                             UIPasteboard.general.string = restoreCode.uuidString
-                            statusMessage = "Restore code copied."
+                            statusMessage = AppString("Restore code copied.")
                         } label: {
                             Label("Copy Code", systemImage: "doc.on.doc")
                         }
@@ -125,15 +125,17 @@ struct CloudBackupSection: View {
         do {
             try await SnapshotClient.shared.backup(bundle, id: id)
             restoreCodeRaw = id.uuidString
-            statusMessage = "Backed up \(games.count) game\(games.count == 1 ? "" : "s") just now."
+            statusMessage = games.count == 1
+                ? AppString("Backed up \(games.count) game just now.")
+                : AppString("Backed up \(games.count) games just now.")
         } catch {
-            statusMessage = "Backup failed: \(error.localizedDescription)"
+            statusMessage = AppString("Backup failed: \(error.localizedDescription)")
         }
     }
 
     private func restore() async {
         guard let id = UUID(uuidString: restoreCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            statusMessage = "That doesn't look like a valid restore code."
+            statusMessage = AppString("That doesn't look like a valid restore code.")
             return
         }
         isWorking = true
@@ -155,9 +157,11 @@ struct CloudBackupSection: View {
                 ManagerToken.restore(managerToken)
             }
             restoreCodeRaw = id.uuidString
-            statusMessage = "Restored \(bundle.games.count) game\(bundle.games.count == 1 ? "" : "s")."
+            statusMessage = bundle.games.count == 1
+                ? AppString("Restored \(bundle.games.count) game.")
+                : AppString("Restored \(bundle.games.count) games.")
         } catch {
-            statusMessage = "Restore failed: \(error.localizedDescription)"
+            statusMessage = AppString("Restore failed: \(error.localizedDescription)")
         }
     }
 }
