@@ -49,6 +49,12 @@ export function buildManifest() {
   return {
     app: { name: "Last Stand Manager", season: "2025/26", allowRepeatDefault: false },
     homeLeagueId: "PL",
+    // Lowest client version (CFBundleShortVersionString) still allowed to run
+    // against this API. Bump only for a genuinely breaking change — the app
+    // hard-blocks with an "Update Required" screen below this version (see
+    // ios/LSM/LSM/Cloud/VersionGate.swift). Currently == the shipping
+    // version, so this is a no-op until it's deliberately raised.
+    minVersion: "1.0",
     leagues,
   };
 }

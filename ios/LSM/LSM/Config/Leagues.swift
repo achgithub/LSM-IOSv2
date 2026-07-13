@@ -102,6 +102,10 @@ enum Leagues {
         let authorities: [String: String]?   // region key → base URL, e.g. "uk" → "https://api.uk.sportsmanager.site"
         let storefrontMap: [String: String]? // ISO 3166-1 alpha-3 → region key, e.g. "GBR" → "uk"
         let defaultAuthority: String?        // region key used when storefront is unmapped
+        // Lowest client version the Worker API still supports — see VersionGate.swift.
+        // Optional for the same stale-disk-cache reason as the fields above; nil
+        // (or unparseable) means "no gate", never a fail-closed block.
+        let minVersion: String?
     }
 
     /// Disk-cache key for the registry's manifest — see `refreshFromRegistry`.
@@ -246,6 +250,7 @@ enum Leagues {
         }
         await MaintenanceState.shared.clear()
         guard let fetched = try? JSONDecoder().decode(Manifest.self, from: data), !fetched.leagues.isEmpty else { return }
+        await VersionGateCheck.check(minVersion: fetched.minVersion)
         LeagueDataCache.save(fetched, key: manifestCacheKey)
     }
 }

@@ -14,6 +14,7 @@ struct AppRootView: View {
     /// reset to Games. Stays on Settings while you switch languages.
     @State private var selectedTab: RootTab = .games
     @StateObject private var maintenance = MaintenanceState.shared
+    @StateObject private var versionGate = VersionGateState.shared
 
     var body: some View {
         // The banner is a VStack sibling ABOVE the tab content, not a top
@@ -29,8 +30,17 @@ struct AppRootView: View {
             }
 
             ZStack(alignment: .top) {
-                RootTabView(splashActive: showSplash, selection: $selectedTab)
-                    .environment(EnabledLeagues.shared)
+                if versionGate.isBlocked && !showSplash {
+                    // Full-screen replacement, not a sibling banner — unlike
+                    // maintenance, a version-gated build genuinely can't
+                    // function correctly against the current API, so there's
+                    // no safe partial-use state to leave visible underneath.
+                    VersionGateView()
+                        .transition(.opacity)
+                } else {
+                    RootTabView(splashActive: showSplash, selection: $selectedTab)
+                        .environment(EnabledLeagues.shared)
+                }
 
                 if showSplash {
                     SplashView {
@@ -42,6 +52,7 @@ struct AppRootView: View {
             }
         }
         .animation(.easeInOut, value: maintenance.isActive)
+        .animation(.easeInOut, value: versionGate.isBlocked)
         .environment(localization)
         .environment(\.locale, localization.locale)
         .id(localization.language)
@@ -64,5 +75,41 @@ private struct MaintenanceBanner: View {
             .frame(maxWidth: .infinity)
             .background(.orange, in: Rectangle())
             .foregroundStyle(.black)
+    }
+}
+
+/// Full-screen hard block shown when `VersionGateState.isBlocked` — this
+/// build is older than the Worker API's `minVersion` (see VersionGate.swift).
+/// No dismiss/skip: a genuinely breaking API change means the app can't work
+/// correctly below that version, so the only way forward is updating.
+private struct VersionGateView: View {
+    /// App Store Connect Apple ID for Last Stand Manager (com.sportsmanager.LMS).
+    private static let appStoreURL = URL(string: "https://apps.apple.com/app/id6782657173")!
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "arrow.up.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.tint)
+            Text("Update Required")
+                .font(.title2.bold())
+            Text("This version of \(Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "the app") is no longer supported. Update to the latest version to keep playing.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Link(destination: Self.appStoreURL) {
+                Text("Update Now")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal, 40)
+            Spacer()
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
     }
 }
