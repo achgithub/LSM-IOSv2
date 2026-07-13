@@ -16,12 +16,25 @@ import Security
 /// just unannotated. Left un-fixed, this becomes a hard compile error under
 /// Swift 6's strict concurrency mode, not just a warning.
 nonisolated enum ManagerToken {
-    private static let keychainService = "com.sportsmanager.LSM"
+    // Was "com.sportsmanager.LSM" (issue #5: didn't match the app's real
+    // bundle id, com.sportsmanager.LMS, or the worker's APP_ATTEST_BUNDLE_ID).
+    // Fixed for consistency; `legacyKeychainService` below migrates any token
+    // already stored under the old name so existing testers aren't silently
+    // handed a new token (which would orphan their submission links and
+    // manager_lifecycle row — see `restore()`'s doc comment).
+    private static let keychainService = "com.sportsmanager.LMS"
+    private static let legacyKeychainService = "com.sportsmanager.LSM"
     private static let keychainAccount = "managerCloudToken"
     private static let legacyDefaultsKey = "lsmManagerCloudToken"
 
     static var current: String {
-        if let existing = keychainValue() { return existing }
+        if let existing = keychainValue(service: keychainService) { return existing }
+        // Migrate from the old Keychain service name if present.
+        if let legacy = keychainValue(service: legacyKeychainService) {
+            save(legacy)
+            deleteValue(service: legacyKeychainService)
+            return legacy
+        }
         // Migrate from UserDefaults if present.
         if let legacy = UserDefaults.standard.string(forKey: legacyDefaultsKey) {
             save(legacy)
@@ -44,10 +57,10 @@ nonisolated enum ManagerToken {
         save(token.lowercased())
     }
 
-    private static func keychainValue() -> String? {
+    private static func keychainValue(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: keychainAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
@@ -57,6 +70,15 @@ nonisolated enum ManagerToken {
               let data = result as? Data,
               let value = String(data: data, encoding: .utf8) else { return nil }
         return value
+    }
+
+    private static func deleteValue(service: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: keychainAccount,
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     private static func save(_ value: String) {

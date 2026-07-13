@@ -10,6 +10,11 @@ v1 (`lms-ios`) is untouched and keeps shipping independently. See
 - **Repo:** clean clone, history kept; v2 diverges from here.
 - **Bundle id:** `com.sportsmanager.LSM` (v1 is `com.sportsmanager.LMS`).
   Display name "Last Stand Manager". Target/scheme renamed `LMS` → `LSM`.
+  **Superseded (issue #5):** the app actually ships as `com.sportsmanager.LMS`
+  (see `project.pbxproj` `PRODUCT_BUNDLE_IDENTIFIER`) — v2 kept v1's bundle id
+  rather than switching to `.LSM` as originally planned here. Both worker
+  configs' `APP_ATTEST_BUNDLE_ID` and `ManagerToken`'s Keychain service now
+  agree with that reality.
 - **Data topology:** regional shards. Start with **UK + Europe** only, seeded by
   copying v1's per-league D1s across (`worker/MIGRATION.md`). Revisit Cloudflare
   provisioning + URL repoint later.
