@@ -16,6 +16,11 @@ interface Env {
   // go direct to KV and don't require these.
   WRK_UK_ADMIN_TOKEN?: string;
   WRK_EU_ADMIN_TOKEN?: string;
+  // Separate pair for worker-api (the authority Worker, not the sports shard)
+  // — its own UK_ADMIN_TOKEN/EU_ADMIN_TOKEN secrets are distinct values.
+  // Used only to proxy GET /admin/cleanup-preview (read-only dry run).
+  WRK_API_UK_ADMIN_TOKEN?: string;
+  WRK_API_EU_ADMIN_TOKEN?: string;
   // This Access application's team domain + Audience (AUD) tag — both from
   // the Zero Trust dashboard (Access > Applications > this app > Overview).
   // Team domain isn't secret (it's in the login redirect URL); AUD is set
@@ -38,6 +43,17 @@ const SHARD_URLS: Record<Shard, string> = {
   uk: "https://uk-api.sportsmanager.site",
   eu: "https://eu-api.sportsmanager.site",
 };
+
+// The authority Worker (worker-api/) — distinct deployment from the sports
+// shards above, holds player_tokens/round_pushes/publish_links/attest_devices/etc.
+const API_URLS: Record<Shard, string> = {
+  uk: "https://api.uk.sportsmanager.site",
+  eu: "https://api.eu.sportsmanager.site",
+};
+
+function apiToken(env: Env, shard: Shard): string | undefined {
+  return shard === "uk" ? env.WRK_API_UK_ADMIN_TOKEN : env.WRK_API_EU_ADMIN_TOKEN;
+}
 
 const LEAGUES = [
   { key: "pl",  name: "Premier League", id: "PL",  shard: "uk" as Shard },
@@ -267,6 +283,16 @@ function shellHtml(): Response {
     #outage-message { flex: 1; min-width: 14em; }
     .detail-row td { padding-top: 0.8rem; padding-bottom: 1rem; background: #111; }
     .count { color: #555; font-size: 12px; margin-left: 0.4rem; }
+    .cleanup-box { border: 1px solid #1a1a1a; border-radius: 6px; padding: 0.8rem 0.9rem;
+                   margin-bottom: 1.5rem; }
+    .cleanup-box h3 { margin-top: 0; }
+    .cleanup-result { margin-top: 0.6rem; font-size: 12px; }
+    .cleanup-result table { margin-bottom: 0.8rem; }
+    .cleanup-result th, .cleanup-result td { padding: 0.3rem 0.6rem; }
+    .cleanup-result .region-heading { color: #888; text-transform: uppercase;
+                                       font-size: 11px; letter-spacing: 0.05em;
+                                       margin: 0.6rem 0 0.3rem; }
+    .cleanup-result .sample { color: #555; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -275,6 +301,15 @@ function shellHtml(): Response {
     <button id="outage-toggle" class="api-toggle" onclick="toggleOutage()">…</button>
     <input id="outage-message" type="text" placeholder="Message shown to clients (optional)">
     <span id="outage-msg" class="season-msg"></span>
+  </div>
+  <div class="cleanup-box">
+    <h3>Cleanup preview (dry run — deletes nothing)</h3>
+    <div class="season-actions">
+      <input id="cleanup-days" type="number" value="100" style="width:7em">
+      <span style="color:#777;font-size:11px;align-self:center">days</span>
+      <button onclick="runCleanupPreview()">Preview</button>
+    </div>
+    <div id="cleanup-result" class="cleanup-result"></div>
   </div>
   <div class="toolbar">
     <input id="filter" type="text" placeholder="Filter by league, code or shard…" oninput="applyFilter()">
@@ -500,6 +535,44 @@ function shellHtml(): Response {
       } catch (e) { msg.textContent = 'Error: ' + e.message; }
     }
 
+    const CLEANUP_ROWS = [
+      ['revokedPlayerTokens', 'Revoked player tokens'],
+      ['roundPushesToWarn',   'Games newly warned (abandonment)'],
+      ['abandonedGames',      'Games deleted (abandonment)'],
+      ['stalePublishLinks',   'Stale publish links'],
+      ['staleAttestDevices',  'Stale attest devices'],
+      ['managerDeletesDue',   'Managers due for delete (unsubscribed, grace expired)'],
+      ['managersOverCap',     'Managers currently over their PWA link cap'],
+      ['managersOverCapGraceExpired', 'Managers over cap, grace expired (links would be revoked now)'],
+    ];
+
+    function renderCleanupRegion(label, result) {
+      if (!result.ok) {
+        return '<div class="region-heading">' + esc(label) + '</div><div class="missing">' + esc(result.error) + '</div>';
+      }
+      const p = result.preview;
+      const rows = CLEANUP_ROWS.map(([key, title]) => {
+        const cat = p[key];
+        const sample = cat.sample.length ? '<div class="sample">' + esc(cat.sample.join(', ')) + '</div>' : '';
+        return '<tr><td>' + esc(title) + '</td><td class="num">' + esc(cat.count) + '</td></tr>'
+          + (sample ? '<tr><td colspan="2">' + sample + '</td></tr>' : '');
+      }).join('');
+      return '<div class="region-heading">' + esc(label) + ' (days=' + esc(p.days) + ')</div>'
+        + '<table><tbody>' + rows + '</tbody></table>';
+    }
+
+    async function runCleanupPreview() {
+      const days = document.getElementById('cleanup-days').value || '100';
+      const out = document.getElementById('cleanup-result');
+      out.textContent = 'Running…';
+      try {
+        const d = await fetch('/action/cleanup-preview?days=' + encodeURIComponent(days)).then(r => r.json());
+        out.innerHTML = renderCleanupRegion('UK', d.uk) + renderCleanupRegion('EU', d.eu);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    }
+
     loadOverview();
     loadOutage();
   </script>
@@ -554,6 +627,38 @@ async function proxyProbe(url: string, token: string | undefined, leagueId: stri
   }
 }
 
+type CleanupCategory = { count: number; sample: string[] };
+type CleanupPreview = {
+  days: number;
+  revokedPlayerTokens: CleanupCategory;
+  roundPushesToWarn: CleanupCategory;
+  abandonedGames: CleanupCategory;
+  stalePublishLinks: CleanupCategory;
+  staleAttestDevices: CleanupCategory;
+  managerDeletesDue: CleanupCategory;
+  managersOverCap: CleanupCategory;
+  managersOverCapGraceExpired: CleanupCategory;
+};
+
+// GET /admin/cleanup-preview?days=N on the authority Worker — read-only, runs
+// the same WHERE clauses as the real cleanup cron without deleting anything.
+async function proxyCleanupPreview(
+  shard: Shard, env: Env, days: number,
+): Promise<{ ok: true; preview: CleanupPreview } | { ok: false; error: string }> {
+  const token = apiToken(env, shard);
+  if (!token) return { ok: false, error: `WRK_API_${shard.toUpperCase()}_ADMIN_TOKEN not configured` };
+  try {
+    const upstream = await fetch(`${API_URLS[shard]}/admin/cleanup-preview?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await upstream.json() as CleanupPreview & { error?: string };
+    if (!upstream.ok) return { ok: false, error: body.error ?? `HTTP ${upstream.status} from ${shard} authority` };
+    return { ok: true, preview: body };
+  } catch (err) {
+    return { ok: false, error: `${shard} authority unreachable: ${String(err)}` };
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const accessJwt = req.headers.get("Cf-Access-Jwt-Assertion");
@@ -568,6 +673,20 @@ export default {
     if (pathname === "/icon.svg")      return iconSvg();
 
     if (pathname === "/outage") return Response.json(await fetchOutage(env));
+
+    // Read-only dry run against both authority regions — deletes nothing.
+    if (pathname === "/action/cleanup-preview") {
+      const daysParam = searchParams.get("days");
+      const days = daysParam ? parseInt(daysParam, 10) : 100;
+      if (!Number.isFinite(days) || days < 0) {
+        return Response.json({ ok: false, error: "days must be a non-negative number" }, { status: 400 });
+      }
+      const [uk, eu] = await Promise.all([
+        proxyCleanupPreview("uk", env, days),
+        proxyCleanupPreview("eu", env, days),
+      ]);
+      return Response.json({ uk, eu });
+    }
 
     if (pathname === "/action/outage" && req.method === "POST") {
       const value = searchParams.get("value");

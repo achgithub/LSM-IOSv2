@@ -52,6 +52,21 @@ actor ManagerLifecycleClient {
         }
     }
 
+    /// Reports the manager's current PWA link cap so the server's over-cap
+    /// cascade cron has something to compare against — tier/entitlement is a
+    /// client-side (StoreKit) concept the server otherwise has no way to know.
+    /// Fire-and-forget, called once per launch (and on purchase/restore) right
+    /// after Entitlements.apply(tier:) resolves.
+    func reportEntitlements(maxPWALinks: Int?) async {
+        struct Body: Encodable { let maxPWALinks: Int? }
+        guard var req = await makeRequest(path: "/manager/entitlements", method: "POST") else { return }
+        req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONEncoder().encode(Body(maxPWALinks: maxPWALinks))
+        guard let (data, response) = try? await URLSession.shared.data(for: req) else { return }
+        try? await checkMaintenance(response, data: data)
+    }
+
     func unsubscribe() async {
         guard var req = await makeRequest(path: "/manager/unsubscribe", method: "POST") else { return }
         req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")

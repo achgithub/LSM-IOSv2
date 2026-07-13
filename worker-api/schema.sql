@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS attest_devices (
   public_key  TEXT NOT NULL,              -- base64 raw uncompressed P-256 point
   sign_count  INTEGER NOT NULL DEFAULT 0,
   environment TEXT NOT NULL,              -- 'production' | 'development'
+  manager_token TEXT,                     -- links this device to its owning manager, for cascade delete
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS player_tokens (
   manager_token TEXT,                     -- links this player to the owning manager
   manager_name  TEXT,                     -- display name for the PWA "Manager: X" line
   created_at   TEXT NOT NULL,
-  revoked_at   TEXT
+  revoked_at   TEXT,
+  last_used_at TEXT                       -- bumped on GET /s/:token (player or manager viewing-as-player)
 );
 
 CREATE INDEX IF NOT EXISTS idx_player_tokens_manager ON player_tokens (manager_token);
@@ -120,7 +122,9 @@ CREATE TABLE IF NOT EXISTS manager_lifecycle (
   manager_token        TEXT PRIMARY KEY,
   created_at           TEXT NOT NULL,
   unsubscribed_at      TEXT,
-  scheduled_delete_at  TEXT
+  scheduled_delete_at  TEXT,
+  max_pwa_links        INTEGER,          -- last-reported Tier.maxPWALinks cap; NULL = unknown/no PWA
+  link_cap_warned_at   TEXT              -- when the over-cap grace clock started (separate from scheduled_delete_at)
 );
 
 -- ── Manager backups ───────────────────────────────────────────────────────────
@@ -141,6 +145,7 @@ CREATE TABLE IF NOT EXISTS publish_links (
   r2_key               TEXT NOT NULL,
   owner_key_id         TEXT NOT NULL,
   owner_token          TEXT,
+  manager_token        TEXT,                -- links this link to its owning manager, for cascade delete
   unlock_attempts      INTEGER NOT NULL DEFAULT 0,
   unlock_locked_until  TEXT,
   created_at           TEXT NOT NULL,

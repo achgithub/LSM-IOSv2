@@ -212,6 +212,7 @@ actor AppAttestService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode([
             "keyId": keyId, "attestation": attestation, "challenge": challenge,
+            "managerToken": ManagerToken.current,
         ])
         let (data, response) = try await URLSession.shared.data(for: req)
         try await Self.check(response, data: data)

@@ -350,6 +350,10 @@ submissions.get("/s/:token", async (c) => {
   if (!pt) return c.json({ error: "Link not found." }, 404);
   if (pt.revoked_at) return c.json({ error: "This link has been revoked." }, 404);
 
+  await c.env.DB.prepare(
+    `UPDATE player_tokens SET last_used_at = ? WHERE token = ?`
+  ).bind(new Date().toISOString(), token).run();
+
   const enrollments = await c.env.DB.prepare(
     `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix, ge.local_player_id,
             rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled, rp.extra_json

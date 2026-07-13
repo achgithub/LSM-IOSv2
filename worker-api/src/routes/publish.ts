@@ -30,15 +30,18 @@ const UNLOCK_MAX_ATTEMPTS = 10;
 const UNLOCK_LOCKOUT_MINUTES = 30;
 
 // POST /publish
-// Body: { id?: string, ownerToken?: string, pin: string, snapshot: <PublishSnapshot> }
+// Body: { id?: string, ownerToken?: string, pin: string, snapshot: <PublishSnapshot>, managerToken?: string }
 // Omit `id` to mint a new link (response includes a fresh ownerToken to store
 // and send back on every future republish). JWT auth on write; ownerToken is
-// the ownership proof for republishing an existing link.
+// the ownership proof for republishing an existing link. managerToken is the
+// same client-generated id used on backup/round-push calls — stored purely so
+// a manager's publish links can be found and cascade-deleted on unsubscribe.
 publish.post("/", async (c) => {
-  const body = await c.req.json<{ id?: string; ownerToken?: string; pin?: string; snapshot?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ id?: string; ownerToken?: string; pin?: string; snapshot?: unknown; managerToken?: string }>().catch(() => null);
   if (!body?.pin || !body.snapshot) {
     return c.json({ error: "pin and snapshot are required" }, 400);
   }
+  const managerToken = body.managerToken?.toLowerCase() ?? null;
 
   // Lowercase always — Swift's UUID.uuidString is uppercase, server uses lowercase.
   let id = body.id?.toLowerCase();
@@ -70,11 +73,11 @@ publish.post("/", async (c) => {
   // problem by republishing should never stay locked out from their own fix.
   await c.env.DB
     .prepare(
-      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, owner_token, created_at, updated_at, unlock_attempts, unlock_locked_until)
-       VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?6, 0, NULL)
-       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, updated_at = ?6, unlock_attempts = 0, unlock_locked_until = NULL`,
+      `INSERT INTO publish_links (id, pin_salt, pin_hash, r2_key, owner_key_id, owner_token, manager_token, created_at, updated_at, unlock_attempts, unlock_locked_until)
+       VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?7, ?7, 0, NULL)
+       ON CONFLICT (id) DO UPDATE SET pin_salt = ?2, pin_hash = ?3, r2_key = ?4, manager_token = COALESCE(publish_links.manager_token, ?6), updated_at = ?7, unlock_attempts = 0, unlock_locked_until = NULL`,
     )
-    .bind(id, salt, hash, r2Key, ownerToken, now)
+    .bind(id, salt, hash, r2Key, ownerToken, managerToken, now)
     .run();
 
   return c.json({ id, ownerToken, region: c.env.REGION });

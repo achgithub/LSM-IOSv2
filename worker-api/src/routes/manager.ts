@@ -105,3 +105,42 @@ manager.post("/resubscribe", async (c) => {
   ).bind(token).run();
   return c.json({ ok: true });
 });
+
+// POST /manager/entitlements
+// Body: { maxPWALinks: number | null }. Called once per app launch (and on
+// purchase/restore) after Entitlements.apply(tier:) resolves — the server has
+// no other way to know a manager's PWA link cap, since tier/entitlement is a
+// client-side (StoreKit) concept. Used only by the cron's over-cap sweep; it
+// never triggers a deletion itself. If the manager is currently in an
+// over-cap grace and this report shows them back under cap (e.g. they
+// revoked links or re-upgraded), the grace is cancelled immediately rather
+// than waiting for the next cron run — same eager-cancel pattern as resubscribe.
+manager.post("/entitlements", async (c) => {
+  const token = tokenFromHeader(c);
+  if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+
+  const body = await c.req.json<{ maxPWALinks?: number | null }>().catch(() => null);
+  const maxPWALinks = typeof body?.maxPWALinks === "number" ? body.maxPWALinks : null;
+  const ts = now();
+
+  await c.env.DB.prepare(
+    `INSERT INTO manager_lifecycle (manager_token, created_at, max_pwa_links)
+     VALUES (?, ?, ?)
+     ON CONFLICT (manager_token) DO UPDATE SET max_pwa_links = excluded.max_pwa_links`
+  ).bind(token, ts, maxPWALinks).run();
+
+  if (maxPWALinks != null) {
+    const activeCount = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM player_tokens WHERE manager_token = ? AND revoked_at IS NULL`
+    ).bind(token).first<{ n: number }>();
+
+    if ((activeCount?.n ?? 0) <= maxPWALinks) {
+      await c.env.DB.prepare(
+        `UPDATE manager_lifecycle SET link_cap_warned_at = NULL
+         WHERE manager_token = ? AND link_cap_warned_at IS NOT NULL`
+      ).bind(token).run();
+    }
+  }
+
+  return c.json({ ok: true });
+});

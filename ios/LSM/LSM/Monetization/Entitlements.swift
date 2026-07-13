@@ -168,6 +168,11 @@ final class Entitlements {
     func apply(tier: Tier) {
         self.tier = tier
         self.verified = true
+        // Fire-and-forget — the server has no other way to learn a manager's
+        // PWA link cap (tier is a client-side/StoreKit concept), and needs it
+        // for the over-cap cascade cron. See ManagerLifecycleClient.
+        let maxPWALinks = tier.maxPWALinks
+        Task { await ManagerLifecycleClient.shared.reportEntitlements(maxPWALinks: maxPWALinks) }
     }
 
     func refresh() async {

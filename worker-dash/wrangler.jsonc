@@ -36,6 +36,12 @@
   // with the shard secrets of the same underlying value):
   //   pnpm wrangler secret put WRK_UK_ADMIN_TOKEN   (same value as uk shard's UK_ADMIN_TOKEN)
   //   pnpm wrangler secret put WRK_EU_ADMIN_TOKEN   (same value as eu shard's EU_ADMIN_TOKEN)
+  //
+  // Separate pair for the authority Worker (worker-api/) — its UK_ADMIN_TOKEN/
+  // EU_ADMIN_TOKEN are distinct secrets from the sports shard's, even though
+  // named the same; used for the cleanup-preview dry-run proxy below:
+  //   pnpm wrangler secret put WRK_API_UK_ADMIN_TOKEN   (same value as worker-api uk's UK_ADMIN_TOKEN)
+  //   pnpm wrangler secret put WRK_API_EU_ADMIN_TOKEN   (same value as worker-api eu's EU_ADMIN_TOKEN)
   "d1_databases": [
     { "binding": "UK_DB", "database_name": "lsm-uk-db", "database_id": "198a83ea-c3ac-489a-9f09-14a2f121d1a0" },
     { "binding": "EU_DB", "database_name": "lsm-eu-db", "database_id": "384ffb93-13af-43ac-b400-d4e1b0266264" }

@@ -56,12 +56,13 @@ actor SnapshotClient {
             let ownerToken: String?
             let pin: String
             let snapshot: PublishSnapshot
+            let managerToken: String
         }
         struct Response: Decodable { let id: String; let ownerToken: String; let region: String }
 
         var request = try await authorityRequest(path: "/publish", method: "POST")
         request.httpBody = try encoder.encode(
-            Body(id: existingLinkId?.uuidString, ownerToken: ownerToken, pin: pin, snapshot: snapshot)
+            Body(id: existingLinkId?.uuidString, ownerToken: ownerToken, pin: pin, snapshot: snapshot, managerToken: ManagerToken.current)
         )
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(request)

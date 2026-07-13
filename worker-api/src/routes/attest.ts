@@ -22,7 +22,7 @@ attest.post("/challenge", async (c) => {
 });
 
 attest.post("/register", async (c) => {
-  let body: { keyId?: string; attestation?: string; challenge?: string };
+  let body: { keyId?: string; attestation?: string; challenge?: string; managerToken?: string };
   try { body = await c.req.json(); } catch {
     return c.json({ error: "invalid json" }, 400);
   }
@@ -30,6 +30,10 @@ attest.post("/register", async (c) => {
   if (!keyId || !attestation || !challenge) {
     return c.json({ error: "keyId, attestation and challenge are required" }, 400);
   }
+  // managerToken is the same client-generated id used on backup/round-push
+  // calls — stored purely so a manager's attested devices can be found and
+  // cascade-deleted on unsubscribe.
+  const managerToken = body.managerToken?.toLowerCase() ?? null;
 
   const secret = getChallengeSecret(c.env);
   if (!(await verifyChallenge(secret, challenge, CHALLENGE_MAX_AGE_MS))) {
@@ -43,6 +47,7 @@ attest.post("/register", async (c) => {
       publicKey: verified.publicKey,
       signCount: verified.signCount,
       environment: verified.environment,
+      managerToken,
     });
     return c.json({ ok: true });
   } catch (err) {

@@ -9,6 +9,7 @@ export interface AttestDevice {
   publicKey: string; // base64 raw P-256 point
   signCount: number;
   environment: AttestEnvironment;
+  managerToken?: string | null;
 }
 
 interface DeviceRow {
@@ -34,18 +35,21 @@ export async function getDevice(db: D1Database, keyId: string): Promise<AttestDe
 
 export async function insertDevice(db: D1Database, device: AttestDevice): Promise<void> {
   const now = new Date().toISOString();
+  const managerToken = device.managerToken ?? null;
   // ON CONFLICT: re-registration of the same key (e.g. after the client lost its
   // local state) overwrites — the attestation was just cryptographically verified,
   // and the counter legitimately resets with a new attested key.
   await db
     .prepare(
-      `INSERT INTO attest_devices (key_id, public_key, sign_count, environment, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO attest_devices (key_id, public_key, sign_count, environment, manager_token, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(key_id) DO UPDATE SET
          public_key = excluded.public_key, sign_count = excluded.sign_count,
-         environment = excluded.environment, updated_at = excluded.updated_at`,
+         environment = excluded.environment,
+         manager_token = COALESCE(attest_devices.manager_token, excluded.manager_token),
+         updated_at = excluded.updated_at`,
     )
-    .bind(device.keyId, device.publicKey, device.signCount, device.environment, now, now)
+    .bind(device.keyId, device.publicKey, device.signCount, device.environment, managerToken, now, now)
     .run();
 }
 
