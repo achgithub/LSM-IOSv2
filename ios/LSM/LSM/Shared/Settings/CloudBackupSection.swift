@@ -22,6 +22,17 @@ struct CloudBackupSection: View {
 
     private var restoreCode: UUID? { UUID(uuidString: restoreCodeRaw) }
 
+    /// True while a downgraded manager's cloud data still genuinely exists
+    /// server-side — the `manager_lifecycle` row hasn't been purged by the
+    /// cleanup cron yet. Restore only *retrieves* already-paid-for data
+    /// (worker-api's backup route doesn't check tier at all), so there's no
+    /// reason to lock a manager out of their own backup during this window —
+    /// unlike Backup Now, which is the actual ongoing paid feature and stays
+    /// gated on `canUseCloud` alone (issue #18).
+    private var canReachExistingCloudData: Bool {
+        entitlements.canUseCloud || lifecycleStatus?.isPendingDelete == true
+    }
+
     var body: some View {
         Section {
             if entitlements.canUseCloud {
@@ -31,7 +42,11 @@ struct CloudBackupSection: View {
                     if isWorking { ProgressView() } else { Text("Back Up Now") }
                 }
                 .disabled(isWorking || games.isEmpty)
+            } else {
+                Button("Unlock Cloud Backup") { showPaywall = true }
+            }
 
+            if canReachExistingCloudData {
                 Button("Restore…") { showRestorePrompt = true }
                     .disabled(isWorking)
 
@@ -55,8 +70,6 @@ struct CloudBackupSection: View {
                 if let statusMessage {
                     Text(statusMessage).font(.caption).foregroundStyle(.secondary)
                 }
-            } else {
-                Button("Unlock Cloud Backup") { showPaywall = true }
             }
         } header: {
             Text("Cloud Backup")

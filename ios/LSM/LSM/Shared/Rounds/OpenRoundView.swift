@@ -192,6 +192,16 @@ struct OpenRoundView: View {
     /// and a single player could be "eliminated" into a nonsensical one-way tie.
     private var enoughPlayers: Bool { game.activePlayers.count >= 2 }
 
+    /// True when this game already has PWA in use, but the manager's current
+    /// tier means this round's push will be silently skipped by `create()` —
+    /// surfaced here instead of leaving it silent (issue #18). Deliberately
+    /// still blocked, not grace-windowed like Restore/the Submission Queue:
+    /// pushing a NEW round is the ongoing paid service itself, not access to
+    /// data that already exists, so there's no free-continuation case to make.
+    private var roundWontReachPlayers: Bool {
+        !entitlements.canUseCloud && pwaSubmissionsEnabled && game.cloudGameToken != nil
+    }
+
     private var form: some View {
         Form {
             if !enoughPlayers {
@@ -199,6 +209,16 @@ struct OpenRoundView: View {
                     Label("A game needs at least 2 players to start a round.",
                           systemImage: "person.2.slash")
                         .foregroundStyle(.orange)
+                }
+            }
+
+            if roundWontReachPlayers {
+                Section {
+                    Label(
+                        "Your subscription has lapsed — this round won't reach the Player App until you resubscribe. Players won't be notified and can't submit through their links for it.",
+                        systemImage: "wifi.exclamationmark"
+                    )
+                    .foregroundStyle(.orange)
                 }
             }
 

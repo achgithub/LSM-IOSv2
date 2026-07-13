@@ -23,6 +23,7 @@ struct PredictorGameDetailView: View {
     @State private var renameText = ""
     @State private var isResending = false
     @State private var resendMessage: String?
+    @State private var lifecycleStatus: ManagerLifecycleStatus?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
@@ -47,6 +48,15 @@ struct PredictorGameDetailView: View {
         PredictorScoringService.incompletePlayers(round: round, game: game)
     }
 
+    /// True while a downgraded manager's Submission Queue should still be
+    /// reachable — players keep submitting into it via the tier-blind `/s/:token`
+    /// routes regardless of the manager's tier, so hiding the queue only makes
+    /// the manager blind to it, it doesn't stop anything (issue #18). Same
+    /// grace-window rule as `CloudBackupSection`'s Restore.
+    private var canReachExistingCloudData: Bool {
+        entitlements.canUseCloud || lifecycleStatus?.isPendingDelete == true
+    }
+
     var body: some View {
         List {
             infoSection
@@ -56,6 +66,11 @@ struct PredictorGameDetailView: View {
         }
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if !entitlements.canUseCloud {
+                lifecycleStatus = await ManagerLifecycleClient.shared.status()
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -206,7 +221,7 @@ struct PredictorGameDetailView: View {
                     Text("Waiting on predictions: \(names)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button { sheet = .submissions } label: {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
                     }
