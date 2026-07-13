@@ -143,4 +143,24 @@ struct FixtureHorizonTests {
         let expected = Date.now.addingTimeInterval((10 + 3) * 86400)
         #expect(abs((end ?? .distantPast).timeIntervalSince(expected)) < 60)
     }
+
+    // MARK: - Manual fixture ceiling (issue #15)
+
+    @Test func manualFixtureCeilingIsAnchorPlusCeilingDaysFromRealFixturesOnly() {
+        // Anchor is the real fixtures' nearest kickoff (day 10); ceiling should
+        // be anchor + 35, regardless of what a manual fixture's own date is —
+        // a manual fixture can never move its own ceiling.
+        let real = (1...2).map { fixture($0, daysFromNow: 10) }
+        let ceiling = FixtureHorizon.manualFixtureCeiling(realFixtures: real)
+        let expected = Date.now.addingTimeInterval((10 + 35) * 86400)
+        #expect(abs(ceiling.timeIntervalSince(expected)) < 60)
+    }
+
+    @Test func manualFixtureCeilingFallsBackToNowWhenNoRealFixturesAreDated() {
+        // No real fixtures at all (or none dated) — ceiling anchors to now,
+        // same fallback the regular horizon anchor uses.
+        let ceiling = FixtureHorizon.manualFixtureCeiling(realFixtures: [])
+        let expected = Date.now.addingTimeInterval(35 * 86400)
+        #expect(abs(ceiling.timeIntervalSince(expected)) < 60)
+    }
 }

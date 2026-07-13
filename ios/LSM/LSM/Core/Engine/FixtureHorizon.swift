@@ -86,6 +86,24 @@ enum FixtureHorizon {
             .min() ?? now
     }
 
+    /// The furthest kickoff a hand-typed manual fixture (`ManualFixtureService`)
+    /// may carry to still be admitted into a round right now — same ceiling as
+    /// real fixtures, anchored off the game's real leagues only (never off
+    /// other manual fixtures, so a manager can't game the anchor by typing in
+    /// a fixture dated far away). Closes issue #15: without this, manual entry
+    /// was a full structural bypass of the horizon, since manual fixtures were
+    /// excluded from the real-fixture eligibility check entirely and admitted
+    /// unconditionally regardless of date.
+    ///
+    /// No floor/target — only the ceiling applies. A manual entry correcting
+    /// or replaying an already-admitted real fixture (e.g. one postponed
+    /// weeks ago) must stay admittable no matter how far in the past its
+    /// date now sits; only the "how far into the future" direction is the
+    /// abuse vector this closes.
+    static func manualFixtureCeiling(realFixtures: [MatchDTO], now: Date = .now, config: Config = .default) -> Date {
+        horizonAnchor(fixtures: realFixtures, now: now).addingTimeInterval(config.ceilingDays * 86400)
+    }
+
     // MARK: - Core algorithm (one league's worth of fixtures)
 
     private static func eligibleIds(in fixtures: [MatchDTO], anchor: Date, config: Config) -> Set<Int> {

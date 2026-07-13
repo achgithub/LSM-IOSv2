@@ -49,6 +49,7 @@ struct OpenRoundView: View {
     // cost behind the "Loading fixtures…" screen instead.
     @State private var cachedEligibleIds: Set<Int> = []
     @State private var cachedHorizonEnd: Date?
+    @State private var cachedManualCeiling: Date?
 
     /// The league(s) this game runs in — fixtures are pooled across them.
     private var gameLeagues: [LeagueOption] { game.leagues }
@@ -96,18 +97,28 @@ struct OpenRoundView: View {
     }
 
     /// Fixtures after every active filter, sorted by kickoff. Manual fixtures
-    /// skip the date-range filter and the horizon — the manager already
-    /// deliberately chose its kick-off when adding it by hand, so a filter
-    /// tuned for the real schedule shouldn't be able to hide it again.
+    /// skip the date-range filter — the manager already deliberately chose
+    /// its kick-off when adding it by hand, so a filter tuned for the real
+    /// schedule shouldn't be able to hide it again — but they're still capped
+    /// by the horizon's ceiling (`cachedManualCeiling`), same as the actual
+    /// admission check in `GameLogicService.openRound`. Without this, a
+    /// manual fixture dated implausibly far out would show as selectable here
+    /// only to be silently dropped from the round on Open (issue #15).
     private var visibleFixtures: [MatchDTO] {
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
         return allFixtures.filter { f in
             (f.leagueId.map { selectedLeagueIds.contains($0) } ?? false)
                 && (!unplayedOnly || Self.isUnplayed(f))
                 && (f.leagueId == manualLeagueId
-                    || (cachedEligibleIds.contains(f.id) && (!dateFilterOn || dateInRange(f))))
+                    ? manualFixtureWithinCeiling(f)
+                    : (cachedEligibleIds.contains(f.id) && (!dateFilterOn || dateInRange(f))))
         }
         .sorted { $0.kickoff < $1.kickoff }
+    }
+
+    private func manualFixtureWithinCeiling(_ f: MatchDTO) -> Bool {
+        guard let ceiling = cachedManualCeiling, let kickoff = FixtureFormat.kickoffDate(f.kickoff) else { return true }
+        return kickoff <= ceiling
     }
 
     /// Recomputes `cachedEligibleIds`/`cachedHorizonEnd` from the current
@@ -123,6 +134,7 @@ struct OpenRoundView: View {
         cachedHorizonEnd = gameLeagues
             .compactMap { FixtureHorizon.horizonEnd(leagueId: $0.id, fixtures: realFixtures) }
             .max()
+        cachedManualCeiling = FixtureHorizon.manualFixtureCeiling(realFixtures: realFixtures)
     }
 
     /// Names of every real (non-manual) team already loaded for this game's

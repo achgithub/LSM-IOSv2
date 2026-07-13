@@ -95,9 +95,19 @@ enum GameLogicService {
     /// caller's loaded fixture pool, used to look up each requested id's
     /// league/kickoff for that check — pass `[]` (the default) for synthetic
     /// callers like the tutorial, whose scripted fixture ids won't be found
-    /// in the pool and so pass through untouched, same as a manual fixture.
+    /// in the pool and so pass through untouched.
     /// This is the actual enforcement point (not the round-open UI), since
     /// every mode's round creation funnels through here.
+    ///
+    /// Manual fixtures (`ManualFixtureService`) get their own, looser check —
+    /// capped by the horizon's ceiling only, not its tighter target window —
+    /// rather than passing through untouched: unconditionally admitting them
+    /// was a full structural bypass of the subscription-abuse gate (issue
+    /// #15), since a manager willing to hand-type a fixture could open rounds
+    /// arbitrarily far ahead. The ceiling still leaves room for the manual
+    /// fixture's real purpose (correcting a postponed real fixture, filling a
+    /// provider gap) — only a fixture dated implausibly far in the future is
+    /// rejected.
     @discardableResult
     static func openRound(
         in game: Game,
@@ -109,9 +119,20 @@ enum GameLogicService {
     ) -> Round {
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
         let realFixtures = fixtures.filter { $0.leagueId != manualLeagueId }
+        let manualFixturesById = Dictionary(
+            uniqueKeysWithValues: fixtures.filter { $0.leagueId == manualLeagueId }.map { ($0.id, $0) }
+        )
         let eligible = FixtureHorizon.eligibleFixtureIds(fixtures: realFixtures)
         let knownRealIds = Set(realFixtures.map(\.id))
-        let admittedIds = fixtureIds.filter { !knownRealIds.contains($0) || eligible.contains($0) }
+        let manualCeiling = FixtureHorizon.manualFixtureCeiling(realFixtures: realFixtures)
+        let admittedIds = fixtureIds.filter { id in
+            if knownRealIds.contains(id) { return eligible.contains(id) }
+            if let manual = manualFixturesById[id] {
+                guard let kickoff = FixtureFormat.kickoffDate(manual.kickoff) else { return true }
+                return kickoff <= manualCeiling
+            }
+            return true // unknown id (e.g. tutorial's synthetic fixtures) — pass through untouched.
+        }
 
         let round = Round(
             roundNumber: nextRoundNumber(for: game),
