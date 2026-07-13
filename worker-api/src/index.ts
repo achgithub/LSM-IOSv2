@@ -62,7 +62,6 @@ app.route("/attest", attest);
 // /s/* and /s/:token/games/* are deliberately absent — player PWA is browser-only.
 
 app.use("/publish", requireJWT);   // write path only — /:id/unlock stays public
-app.use("/publish/:id", requireJWT);   // DELETE (unpublish) — /:id/unlock is a distinct path, unaffected
 app.use("/links", requireJWT);
 app.use("/links/*", requireJWT);
 app.use("/games/*", requireJWT);

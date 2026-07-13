@@ -72,19 +72,6 @@ actor SnapshotClient {
         return PublishResult(id: id, ownerToken: response.ownerToken, region: response.region)
     }
 
-    /// Fully removes a published link — the R2 snapshot and the D1 row both
-    /// go, so the page 404s immediately rather than staying PIN-gated forever
-    /// with no way to pull it down (issue #8). `ownerToken` is the same
-    /// republish ownership proof as `publish`.
-    func unpublish(id: UUID, ownerToken: String) async throws {
-        struct Body: Encodable { let ownerToken: String }
-
-        var request = try await authorityRequest(path: "/publish/\(id.uuidString.lowercased())", method: "DELETE")
-        request.httpBody = try encoder.encode(Body(ownerToken: ownerToken))
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        _ = try await send(request)
-    }
-
     // MARK: - Internals
 
     private func authorityRequest(path: String, method: String) async throws -> URLRequest {

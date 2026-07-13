@@ -120,27 +120,3 @@ publish.post("/:id/unlock", async (c) => {
   if (!object) return c.json({ error: "not found" }, 404);
   return new Response(object.body, { headers: { "Content-Type": "application/json" } });
 });
-
-// DELETE /publish/:id — JWT-gated (see index.ts), plus ownerToken ownership
-// check (same proof required to republish). Fully removes the link: the
-// snapshot in R2 and the publish_links row, so the page 404s immediately
-// rather than lingering PIN-gated forever with no way for the manager to
-// pull it down (issue #8).
-// Body: { ownerToken: string }
-publish.delete("/:id", async (c) => {
-  const id = c.req.param("id").toLowerCase();
-  const body = await c.req.json<{ ownerToken?: string }>().catch(() => null);
-
-  const existing = await c.env.DB
-    .prepare("SELECT owner_token, r2_key FROM publish_links WHERE id = ?1")
-    .bind(id)
-    .first<{ owner_token: string | null; r2_key: string }>();
-  if (!existing) return c.json({ error: "not found" }, 404);
-  if (existing.owner_token == null || existing.owner_token !== body?.ownerToken) {
-    return c.json({ error: "ownership cannot be verified" }, 401);
-  }
-
-  await c.env.BACKUPS.delete(existing.r2_key);
-  await c.env.DB.prepare("DELETE FROM publish_links WHERE id = ?1").bind(id).run();
-  return c.json({ ok: true });
-});
