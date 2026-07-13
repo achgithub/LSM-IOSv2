@@ -176,6 +176,7 @@ struct PlayerDetailView: View {
     @State private var linkShareItem: PlayerLinkShareItem?
     @State private var showGroupEditor = false
     @State private var pendingRemove = false
+    @State private var pendingRemoveLink = false
     @State private var renaming = false
     @State private var renameText = ""
     @Query private var allMembers: [RosterMember]
@@ -271,6 +272,13 @@ struct PlayerDetailView: View {
                             Label("Regenerate Link", systemImage: "arrow.triangle.2.circlepath")
                         }
                         .disabled(isBusy)
+
+                        Button(role: .destructive) {
+                            pendingRemoveLink = true
+                        } label: {
+                            Label("Remove Link", systemImage: "link.badge.minus")
+                        }
+                        .disabled(isBusy)
                     }
                 }
             }
@@ -323,6 +331,16 @@ struct PlayerDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This also deactivates their submission link, if they have one.")
+        }
+        .confirmationDialog(
+            "Remove \(member.name)'s link?",
+            isPresented: $pendingRemoveLink,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Link", role: .destructive) { removeLink() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Fully deactivates their PWA submission link, across every game they're in. They'll need a new link before they can submit again.")
         }
     }
 
@@ -475,6 +493,30 @@ struct PlayerDetailView: View {
             } catch {
                 await MainActor.run {
                     linkOp = .error("The old link stopped working, but we couldn't create a new one. Tap Get Submission Link to try again.")
+                }
+            }
+        }
+    }
+
+    /// Fully removes this player's PWA access without deleting them from the
+    /// roster (issue #8) — unlike Regenerate, no new link is minted. The
+    /// token is player-level (`RosterMember.submissionTokenRaw`), so revoking
+    /// it tears down PWA access across every game they're enrolled in, not
+    /// just one; the server marks `player_tokens.revoked_at` and the /s/:token
+    /// route 404s immediately for anyone still holding the old link.
+    private func removeLink() {
+        guard !isBusy, let token = member.submissionTokenRaw else { return }
+        linkOp = .revoking
+        Task {
+            do {
+                try await SubmissionsClient.shared.revokeLink(token: token)
+                await MainActor.run {
+                    member.submissionTokenRaw = nil
+                    linkOp = .idle
+                }
+            } catch {
+                await MainActor.run {
+                    linkOp = .error("Couldn't remove the link. Try again.")
                 }
             }
         }
