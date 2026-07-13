@@ -18,6 +18,8 @@ struct PublishPredictorView: View {
     @State private var errorMessage: String?
     @State private var didPublish = false
     @State private var pendingResetConfirm = false
+    @State private var pendingUnpublishConfirm = false
+    @State private var isUnpublishing = false
 
     /// The live Cloudflare Pages project for published Predictor leagues
     /// (deployed 2026-06-25; see pages/README.md).
@@ -39,6 +41,10 @@ struct PublishPredictorView: View {
                         LabeledContent("PIN", value: pin).font(.callout.monospaced())
                         ShareLink(item: "\(link)\nPIN: \(pin)")
                         Button("Reset PIN", role: .destructive) { pendingResetConfirm = true }
+                        Button(role: .destructive) { pendingUnpublishConfirm = true } label: {
+                            if isUnpublishing { ProgressView() } else { Text("Unpublish") }
+                        }
+                        .disabled(isUnpublishing)
                     } header: {
                         Text("Link & PIN")
                     } footer: {
@@ -84,6 +90,16 @@ struct PublishPredictorView: View {
             } message: {
                 Text("Generates a new PIN and republishes immediately. Anyone using the old PIN will need the new one.")
             }
+            .confirmationDialog(
+                "Unpublish this league?",
+                isPresented: $pendingUnpublishConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Unpublish", role: .destructive) { Task { await unpublish() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The link stops working immediately for anyone who has it. You can publish again later, which generates a new link.")
+            }
         }
     }
 
@@ -128,6 +144,26 @@ struct PublishPredictorView: View {
             // against the server's publish_links table directly if needed.
             let attemptedId = game.predictorPublishLinkId?.uuidString ?? "(new)"
             errorMessage = "Couldn't publish (id: \(attemptedId)): \(error.localizedDescription)"
+        }
+    }
+
+    /// Purges the link server-side (R2 snapshot + D1 row, issue #8) and clears
+    /// every publish-related field on `Game` so a future Publish mints a
+    /// fresh link rather than trying to reuse the now-deleted one.
+    private func unpublish() async {
+        guard let id = game.predictorPublishLinkId, let ownerToken = game.predictorPublishOwnerToken else { return }
+        isUnpublishing = true
+        errorMessage = nil
+        defer { isUnpublishing = false }
+        do {
+            try await SnapshotClient.shared.unpublish(id: id, ownerToken: ownerToken)
+            game.predictorPublishLinkId = nil
+            game.predictorPublishPin = nil
+            game.predictorPublishOwnerToken = nil
+            game.predictorPublishLinkRegion = nil
+            didPublish = false
+        } catch {
+            errorMessage = "Couldn't unpublish: \(error.localizedDescription)"
         }
     }
 }
