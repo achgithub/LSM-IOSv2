@@ -211,7 +211,7 @@ struct KillerOpenRoundView: View {
         try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             let name = managerName
-            Task { await PWARoundPusher.pushKiller(game: game, round: round, managerName: name, context: context) }
+            Task { try? await PWARoundPusher.pushKiller(game: game, round: round, managerName: name, context: context) }
         }
         onOpened()
         dismiss()

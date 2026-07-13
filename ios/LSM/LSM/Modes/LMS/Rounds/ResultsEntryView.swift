@@ -232,6 +232,6 @@ struct ResultsEntryView: View {
     private func pushGameCompleteIfNeeded() {
         guard entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil else { return }
         let name = managerName
-        Task { await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
+        Task { try? await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
     }
 }

@@ -26,6 +26,8 @@ struct KillerGameDetailView: View {
     @State private var pendingTiebreakIds: [UUID]?
     @State private var renaming = false
     @State private var renameText = ""
+    @State private var isResending = false
+    @State private var resendMessage: String?
 
     private var sortedByLives: [Player] {
         game.players.sorted { a, b in
@@ -150,12 +152,28 @@ struct KillerGameDetailView: View {
             // always safe to repeat (upserts, not appends).
             if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                 Button {
-                    let name = managerName
-                    Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+                    Task { await resend() }
                 } label: {
-                    Label("Resend to Player App", systemImage: "arrow.clockwise.icloud")
+                    if isResending { ProgressView() } else { Label("Resend to Player App", systemImage: "arrow.clockwise.icloud") }
+                }
+                .disabled(isResending)
+                if let resendMessage {
+                    Text(resendMessage).font(.caption).foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    private func resend() async {
+        isResending = true
+        resendMessage = nil
+        defer { isResending = false }
+        let name = managerName
+        do {
+            try await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context)
+            resendMessage = "Sent to Player App just now."
+        } catch {
+            resendMessage = "Send failed: \(error.localizedDescription)"
         }
     }
 

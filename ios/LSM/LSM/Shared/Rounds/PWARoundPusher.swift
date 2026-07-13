@@ -4,6 +4,23 @@ import OSLog
 
 private let pwaPushLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
+/// Thrown by the guard clauses that used to fail silently — lets the manual
+/// "Resend to Player App" button tell the user *why* nothing was sent,
+/// instead of just doing nothing with no feedback.
+enum PWAPushError: LocalizedError {
+    case noLeagueData
+    case noRound
+    case noCloudToken
+
+    var errorDescription: String? {
+        switch self {
+        case .noLeagueData: return "Couldn't load league data."
+        case .noRound: return "This game has no round to send."
+        case .noCloudToken: return "This game isn't linked to the Player App yet."
+        }
+    }
+}
+
 /// Central place for pushing PWA round state — used by all three triggers
 /// (round-open, game-complete, manual "resend") across all three modes, not
 /// just the round-open flow. Game-complete and manual-resend don't have a
@@ -20,9 +37,11 @@ enum PWARoundPusher {
     /// completed game keeps resending its final round's data unchanged).
     /// Always attempts to attach the most-recently-closed round's results,
     /// regardless of trigger — safe/idempotent to resend the same result twice.
-    static func pushLMSOrPredictor(game: Game, round: Round?, managerName: String, context: ModelContext) async {
-        guard let ld = try? await LeagueData.load(for: game.leagues) else { return }
-        guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else { return }
+    static func pushLMSOrPredictor(game: Game, round: Round?, managerName: String, context: ModelContext) async throws {
+        guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
+        guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
+            throw PWAPushError.noRound
+        }
 
         let fixtureItems: [FixturePushItem] = targetRound.fixtureIds.compactMap { fid in
             guard let m = ld.matches.first(where: { $0.id == fid }) else { return nil }
@@ -34,7 +53,7 @@ enum PWARoundPusher {
         if game.cloudGameTokenRaw == nil {
             game.cloudGameTokenRaw = UUID().uuidString.lowercased()
         }
-        guard let gameToken = game.cloudGameToken else { return }
+        guard let gameToken = game.cloudGameToken else { throw PWAPushError.noCloudToken }
 
         let fixtureTeamRefs: [TeamRef] = targetRound.fixtureIds.flatMap { fid -> [TeamRef] in
             guard let m = ld.matches.first(where: { $0.id == fid }) else { return [] }
@@ -127,6 +146,7 @@ enum PWARoundPusher {
             )
         } catch {
             pwaPushLog.warning("Round push failed: \(error.localizedDescription)")
+            throw error
         }
     }
 
@@ -179,9 +199,11 @@ enum PWARoundPusher {
     /// Same shape as `pushLMSOrPredictor` but for Killer's phase/roster
     /// `extra` payload and its own per-player result fields (lives/hits
     /// rather than survived/points).
-    static func pushKiller(game: Game, round: Round?, managerName: String, context: ModelContext) async {
-        guard let ld = try? await LeagueData.load(for: game.leagues) else { return }
-        guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else { return }
+    static func pushKiller(game: Game, round: Round?, managerName: String, context: ModelContext) async throws {
+        guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
+        guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
+            throw PWAPushError.noRound
+        }
 
         let fixtureItems: [FixturePushItem] = targetRound.fixtureIds.compactMap { fid in
             guard let m = ld.matches.first(where: { $0.id == fid }) else { return nil }
@@ -193,7 +215,7 @@ enum PWARoundPusher {
         if game.cloudGameTokenRaw == nil {
             game.cloudGameTokenRaw = UUID().uuidString.lowercased()
         }
-        guard let gameToken = game.cloudGameToken else { return }
+        guard let gameToken = game.cloudGameToken else { throw PWAPushError.noCloudToken }
 
         let phase = KillerScoringService.phase(for: targetRound, game: game)
         let extraJSON = killerExtraJSON(phase: phase, game: game)
@@ -254,6 +276,7 @@ enum PWARoundPusher {
             )
         } catch {
             pwaPushLog.warning("Killer round push failed: \(error.localizedDescription)")
+            throw error
         }
     }
 

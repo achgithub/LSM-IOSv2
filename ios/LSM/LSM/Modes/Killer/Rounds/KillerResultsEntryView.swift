@@ -182,6 +182,6 @@ struct KillerResultsEntryView: View {
     private func pushGameCompleteIfNeeded() {
         guard entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil else { return }
         let name = managerName
-        Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+        Task { try? await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
     }
 }

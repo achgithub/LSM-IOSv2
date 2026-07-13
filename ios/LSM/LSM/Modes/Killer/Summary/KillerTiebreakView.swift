@@ -75,7 +75,7 @@ struct KillerTiebreakView: View {
         // reasoning as `KillerResultsEntryView`'s single-survivor path.
         if entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil {
             let name = managerName
-            Task { await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+            Task { try? await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
         }
         dismiss()
     }
