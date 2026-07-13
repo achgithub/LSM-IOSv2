@@ -144,9 +144,9 @@ private struct FixturePredictionRow: View {
         VStack(alignment: .leading, spacing: 6) {
             FixtureLabel(fixture: fixture, teamsById: teamsById)
             HStack {
-                scoreStepper(value: home, idPrefix: "predictionHome-\(fixture.id)") { setScore(home: $0, away: away) }
+                scoreStepper(value: home, idPrefix: "predictionHome-\(fixture.id)", team: "Home") { setScore(home: $0, away: away) }
                 Text("–").foregroundStyle(.secondary)
-                scoreStepper(value: away, idPrefix: "predictionAway-\(fixture.id)") { setScore(home: home, away: $0) }
+                scoreStepper(value: away, idPrefix: "predictionAway-\(fixture.id)", team: "Away") { setScore(home: home, away: $0) }
                 Spacer()
                 if jokerEnabled {
                     Button {
@@ -163,13 +163,16 @@ private struct FixturePredictionRow: View {
         }
     }
 
-    private func scoreStepper(value: Int, idPrefix: String, onChange: @escaping (Int) -> Void) -> some View {
+    private func scoreStepper(value: Int, idPrefix: String, team: String, onChange: @escaping (Int) -> Void) -> some View {
         HStack(spacing: 4) {
             Button { onChange(max(0, value - 1)) } label: { Image(systemName: "minus.circle") }
                 .accessibilityIdentifier("\(idPrefix)-minus")
+                .accessibilityLabel("Decrease \(team) score")
             Text("\(value)").monospacedDigit().frame(width: 20)
+                .accessibilityLabel("\(team) score: \(value)")
             Button { onChange(value + 1) } label: { Image(systemName: "plus.circle") }
                 .accessibilityIdentifier("\(idPrefix)-plus")
+                .accessibilityLabel("Increase \(team) score")
         }
         .buttonStyle(.plain)
     }

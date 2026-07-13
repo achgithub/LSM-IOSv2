@@ -98,6 +98,7 @@ struct PicksEntryView: View {
                     Button { AdGate.run { showShare = true } } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
+                    .accessibilityLabel("Share")
                     .disabled(round.picks.isEmpty)
                 }
             }

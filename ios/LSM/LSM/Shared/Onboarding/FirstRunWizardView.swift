@@ -194,7 +194,9 @@ struct GameWizardView: View {
             // Follow-up round after a reinstating resolution — presented at the top
             // level (never stacked on the resolution sheet).
             .sheet(item: $autoOpenType) { type in
-                OpenRoundView(game: game!, roundType: type)
+                if let game {
+                    OpenRoundView(game: game, roundType: type)
+                }
             }
         }
     }

@@ -101,6 +101,7 @@ struct PredictorResultsEntryView: View {
                     Image(systemName: "xmark.circle").foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Un-void fixture")
             }
         } else if scores[fixture.id] != nil {
             HStack {
@@ -115,6 +116,7 @@ struct PredictorResultsEntryView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear result")
             }
         } else {
             HStack {
@@ -142,10 +144,14 @@ struct PredictorResultsEntryView: View {
     private func scoreField(for fixture: MatchDTO, isHome: Bool) -> some View {
         let current = scores[fixture.id]
         let value = isHome ? (current?.home ?? 0) : (current?.away ?? 0)
+        let team = isHome ? "Home" : "Away"
         return HStack(spacing: 4) {
             Button { adjust(fixture.id, isHome: isHome, by: -1) } label: { Image(systemName: "minus.circle") }
+                .accessibilityLabel("Decrease \(team) score")
             Text("\(value)").monospacedDigit().frame(width: 20)
+                .accessibilityLabel("\(team) score: \(value)")
             Button { adjust(fixture.id, isHome: isHome, by: 1) } label: { Image(systemName: "plus.circle") }
+                .accessibilityLabel("Increase \(team) score")
         }
         .buttonStyle(.plain)
     }

@@ -114,6 +114,7 @@ struct MatchesView: View {
                     Button { showSearch = true } label: {
                         Image(systemName: filtersActive ? "magnifyingglass.circle.fill" : "magnifyingglass")
                     }
+                    .accessibilityLabel(filtersActive ? "Search and filters (active)" : "Search and filters")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     // Greyed while throttled (within the 120s TTL) — the footer
@@ -121,6 +122,7 @@ struct MatchesView: View {
                     Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .accessibilityLabel("Refresh")
                     .disabled(isLoading || isThrottled)
                 }
             }

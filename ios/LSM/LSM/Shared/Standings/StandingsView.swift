@@ -74,6 +74,7 @@ struct StandingsView: View {
                     Button { refresh() } label: {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .accessibilityLabel("Refresh")
                     .disabled(isLoading || isThrottled)
                 }
             }

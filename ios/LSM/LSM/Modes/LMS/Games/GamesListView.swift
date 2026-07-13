@@ -70,6 +70,7 @@ struct GamesListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingWizard = true } label: { Image(systemName: "wand.and.stars") }
+                        .accessibilityLabel("Guided Setup")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
