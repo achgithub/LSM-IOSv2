@@ -23,6 +23,19 @@
   h1 { font-size: 2em; font-weight: 800; letter-spacing: 1px; color: #F97316; margin: 6px 0 18px; }
   .tagline { font-size: 1.1em; color: #F8FAFC; opacity: 0.9; max-width: 420px; margin-bottom: 2.5em; }
   p.desc { max-width: 480px; color: #94A3B8; line-height: 1.55; }
+  .modes { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; max-width: 520px; margin-bottom: 1em; }
+  .modes a {
+    display: block;
+    width: 150px;
+    padding: 16px 12px;
+    border: 1px solid #1E2D45;
+    border-radius: 14px;
+    color: #F8FAFC;
+    text-decoration: none;
+  }
+  .modes a:hover { border-color: #3DA8FF; }
+  .modes .mode-name { display: block; font-weight: 700; color: #F97316; margin-bottom: 4px; }
+  .modes .mode-desc { display: block; font-size: 0.82em; color: #94A3B8; line-height: 1.4; }
   .links { margin-top: 2.5em; }
   .links a { color: #3DA8FF; text-decoration: none; display: inline-block; margin: 0 14px; font-weight: 600; }
   .links a:hover { text-decoration: underline; }
@@ -37,14 +50,23 @@
 <p class="wordmark">SPORTS MANAGER</p>
 <h1>LAST STAND MANAGER</h1>
 <p class="tagline">Off the spreadsheet. Into the app.</p>
-<p class="desc">Slick, fast and built to save you time — set up your pool in
-minutes and let the app keep score.</p>
-<p class="desc">Scores, picks and eliminations tracked for you —
-the boring bits sorted, so you can just enjoy the game with friends,
-family or the office.</p>
-<p class="desc">Also built in: <a href="/predictor/">Predictor</a>, for score-prediction
-leagues, and Killer, a lives-based elimination mode with a Build Phase and a
-Kill Phase.</p>
+<p class="desc">One app, three ways to run a pool with friends, family or the
+office. Set up in minutes and let the app keep score — pick the mode that
+fits your group.</p>
+<div class="modes">
+  <a href="/lsm/lms/">
+    <span class="mode-name">Last Man Standing</span>
+    <span class="mode-desc">Pick a winner each round — get it wrong, you're out.</span>
+  </a>
+  <a href="/lsm/predictor/">
+    <span class="mode-name">Predictor</span>
+    <span class="mode-desc">Call the scoreline, rack up points across the season.</span>
+  </a>
+  <a href="/lsm/killer/">
+    <span class="mode-name">Killer</span>
+    <span class="mode-desc">Earn lives, then fight to be the last one standing.</span>
+  </a>
+</div>
 <div class="links">
   <a href="/lsm/privacy">Privacy Policy</a>
   <a href="/lsm/terms">Terms of Service</a>
