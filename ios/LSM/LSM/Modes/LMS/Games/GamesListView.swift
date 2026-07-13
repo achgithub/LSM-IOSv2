@@ -38,20 +38,22 @@ struct GamesListView: View {
                         Button("New Game") {
                             if atGameLimit { showingGameLimit = true } else { showingNew = true }
                         }
-                        Button { showingTutorial = true } label: {
-                            Label("See How It Works", systemImage: "play.circle")
-                        }
-                        .tint(.secondary)
+                        // Commented out, not deleted — the "Show Me" tutorial
+                        // walkthrough isn't good enough yet; revisit in the
+                        // future rather than polish it now that the guided
+                        // wizard exists as the primary on-ramp.
+                        // Button { showingTutorial = true } label: {
+                        //     Label("See How It Works", systemImage: "play.circle")
+                        // }
+                        // .tint(.secondary)
                     }
                 } else {
                     List {
                         ForEach(games) { game in
                             NavigationLink(value: game) { GameCard(game: game) }
                                 // Swipe a game right to (re)open its guided wizard —
-                                // it resumes at the game's current phase and loops on.
-                                // LMS-only: the wizard's phases (picks/results/tie
-                                // resolution) are built around Pick/elimination and
-                                // have no Predictor equivalent yet.
+                                // it resumes at the game's current phase and loops on,
+                                // for all three modes.
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                     Button { wizardGame = game } label: {
                                         Label("Wizard", systemImage: "wand.and.stars")

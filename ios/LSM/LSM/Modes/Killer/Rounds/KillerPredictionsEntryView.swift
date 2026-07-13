@@ -32,9 +32,7 @@ struct KillerPredictionsEntryView: View {
     }
 
     private func slateComplete(_ player: Player) -> Bool {
-        let fixtureIds = Set(roundFixtures.map(\.id))
-        let predicted = Set(KillerScoringService.predictions(for: player, in: round).map(\.fixtureId))
-        return !fixtureIds.isEmpty && fixtureIds.isSubset(of: predicted)
+        KillerScoringService.slateComplete(for: player, round: round, game: game)
     }
 
     var body: some View {

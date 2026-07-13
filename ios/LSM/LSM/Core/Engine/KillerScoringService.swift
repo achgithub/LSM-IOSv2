@@ -17,16 +17,17 @@ enum KillerScoringError: LocalizedError {
 }
 
 /// Result of a round's elimination pass, for the UI to react to. Only
-/// `.winner`/`.stillTied` are game-deciding — `.notApplicable` covers both
+/// `.winner`/`.split` are game-deciding — `.notApplicable` covers both
 /// "no one hit 0 this round" and "someone hit 0 but active players remain,"
-/// neither of which needs a tiebreak.
+/// neither of which ends the game.
 enum KillerTieOutcome: Equatable {
     /// A single simultaneous zero-lives crossing decided by the Accuracy
     /// Table (then hit-count) tiebreak — this player wins the game outright.
     case winner(UUID)
-    /// Still tied after both tiebreak criteria — a manual manager decision
-    /// (e.g. split the pot) among these candidate player ids, not auto-resolved.
-    case stillTied([UUID])
+    /// Still tied after both tiebreak criteria — the pot is auto-split among
+    /// these player ids (all marked `.winner`). Returned only so the UI can
+    /// message it (e.g. "Split between X and Y!"); not a pending decision.
+    case split([UUID])
     case notApplicable
 }
 
@@ -72,6 +73,29 @@ enum KillerScoringService {
 
     static func prediction(for player: Player, fixtureId: Int, in round: Round) -> KillerPrediction? {
         round.killerPredictions.first { $0.player?.id == player.id && $0.fixtureId == fixtureId }
+    }
+
+    /// Whether one player has fully completed their slate for a round: an
+    /// outcome guess for every MPG fixture, plus — Kill Phase only — a hit
+    /// target on each. Kill Phase's per-prediction hit target isn't optional
+    /// once an outcome guess exists — unlike LMS/Predictor's simpler
+    /// completeness check, this must also verify targets, or a player can
+    /// show "complete" while still missing a required attack.
+    static func slateComplete(for player: Player, round: Round, game: Game) -> Bool {
+        let fixtureIds = Set(round.fixtureIds)
+        guard !fixtureIds.isEmpty else { return false }
+        let playerPredictions = predictions(for: player, in: round)
+        let predictedIds = Set(playerPredictions.map(\.fixtureId))
+        guard fixtureIds.isSubset(of: predictedIds) else { return false }
+        guard phase(for: round, game: game) == .kill else { return true }
+        return playerPredictions.allSatisfy { $0.hitTargetPlayerId != nil }
+    }
+
+    /// Whether every active player has fully completed their slate for the
+    /// round — the gate `KillerResultsEntryView`'s "Close Round" checks
+    /// before scoring, so a no-show player doesn't silently score nothing.
+    static func allActivePlayersComplete(round: Round, game: Game) -> Bool {
+        game.activePlayers.allSatisfy { slateComplete(for: $0, round: round, game: game) }
     }
 
     /// Set or change a player's Home/Draw/Away guess for one MPG fixture.
@@ -229,10 +253,11 @@ enum KillerScoringService {
     /// Eliminates every active player whose lives crossed to 0 or below this
     /// round. If those zero-crossers are *everyone* still active (2+ of
     /// them) — i.e. this round would otherwise decide the game with no
-    /// survivor — the Accuracy Table/hit-count tiebreak resolves who wins
-    /// instead of just wiping the whole group out. Any other case (a
-    /// straightforward single elimination, or several eliminated while
-    /// others remain active) needs no tiebreak at all.
+    /// survivor — the Accuracy Table/hit-count tiebreak resolves who wins,
+    /// auto-splitting the pot if even that leaves a tie, instead of just
+    /// wiping the whole group out. Any other case (a straightforward single
+    /// elimination, or several eliminated while others remain active) needs
+    /// no tiebreak at all.
     @discardableResult
     private static func applyEliminations(in game: Game) -> KillerTieOutcome {
         let activeBefore = game.activePlayers
@@ -256,11 +281,11 @@ enum KillerScoringService {
                 player.status = player.id == winnerId ? .winner : .eliminated
             }
             game.status = .complete
-        case .stillTied:
-            // Leave every candidate's status untouched (still .active despite
-            // 0 lives) until the manager resolves via `applyTiebreakDecision`
-            // — surfaced through a `KillerTiebreakView`-style screen.
-            break
+        case .split(let winnerIds):
+            for player in candidates {
+                player.status = winnerIds.contains(player.id) ? .winner : .eliminated
+            }
+            game.status = .complete
         case .notApplicable:
             break
         }
@@ -270,7 +295,7 @@ enum KillerScoringService {
     /// Ranks a group of players who hit 0 lives in the same, game-deciding
     /// round: Accuracy Table (`correctPredictions`) desc, then
     /// `successfulHitsLanded` desc. A unique top scorer wins outright; a tie
-    /// on both criteria is surfaced to the manager instead of guessed at.
+    /// on both criteria auto-splits the win among the tied group.
     static func resolveSimultaneousZeros(candidates: [Player]) -> KillerTieOutcome {
         guard candidates.count >= 2 else { return .notApplicable }
         let ranked = candidates.sorted { a, b in
@@ -289,16 +314,6 @@ enum KillerScoringService {
         if topGroup.count == 1 {
             return .winner(top.id)
         }
-        return .stillTied(topGroup.map(\.id))
-    }
-
-    /// Applies the manager's manual decision for a `.stillTied` outcome —
-    /// e.g. split the pot (multiple winners) or pick one outright. Every
-    /// candidate not in `winnerIds` is eliminated; the game completes either way.
-    static func applyTiebreakDecision(candidates: [Player], winnerIds: Set<UUID>, game: Game) {
-        for player in candidates {
-            player.status = winnerIds.contains(player.id) ? .winner : .eliminated
-        }
-        game.status = .complete
+        return .split(topGroup.map(\.id))
     }
 }

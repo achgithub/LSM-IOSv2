@@ -39,6 +39,13 @@ struct PredictorGameDetailView: View {
     private var latestClosedRound: Round? {
         game.rounds.filter { $0.status == .closed }.max(by: { $0.roundNumber < $1.roundNumber })
     }
+    /// Active players with no prediction yet — informational only. Entering
+    /// the Results screen is never blocked on this (predictions can trickle
+    /// in via PWA links up to the deadline); `PredictorResultsEntryView` warns
+    /// about it softly at close time instead.
+    private func incompletePlayers(for round: Round) -> [Player] {
+        PredictorScoringService.incompletePlayers(round: round, game: game)
+    }
 
     var body: some View {
         List {
@@ -194,16 +201,21 @@ struct PredictorGameDetailView: View {
                     .tutorialAnchor(id: "pred.enterPredictions")
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
                     .tutorialAnchor(id: "pred.enterResults")
+                if !incompletePlayers(for: round).isEmpty {
+                    let names = incompletePlayers(for: round).map(\.name).joined(separator: ", ")
+                    Text("Waiting on predictions: \(names)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button { sheet = .submissions } label: {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
                     }
                 }
                 shareCardButton("Share Fixtures Card", .shareFixtures, enabled: true)
-                shareCardButton("Share Entry Closed Card", .shareEntryClosed, enabled: round.status != .open)
+                shareCardButton("Share Entry Closed Card", .shareEntryClosed, enabled: round.deadline < Date())
             } else {
                 Button { sheet = .open } label: { Label("Open Matchday", systemImage: "calendar.badge.plus") }
-                    .disabled(game.players.isEmpty)
+                    .disabled(game.players.count < 2)
                     .tutorialAnchor(id: "pred.openRound")
             }
         }

@@ -329,7 +329,9 @@ struct GameDetailView: View {
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
                     .tutorialAnchor(id: "lms.enterResults")
                     // Can't close with players unassigned — finish picks first
-                    // (Auto-Assign handles any latecomers).
+                    // (Auto-Assign handles any latecomers). Unlike Predictor/
+                    // Killer, LMS always has a way to reach 100% picks, so a
+                    // hard block here can't deadlock the round.
                     .disabled(!openRoundPicksComplete)
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button { sheet = .submissions } label: {

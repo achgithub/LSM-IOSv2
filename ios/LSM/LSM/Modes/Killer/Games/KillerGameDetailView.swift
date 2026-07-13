@@ -20,10 +20,6 @@ struct KillerGameDetailView: View {
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-    /// Set by `KillerResultsEntryView` when closing produces a `.stillTied`
-    /// outcome; presented at the top level (after that sheet dismisses)
-    /// rather than stacking a sheet on a sheet.
-    @State private var pendingTiebreakIds: [UUID]?
     @State private var renaming = false
     @State private var renameText = ""
     @State private var isResending = false
@@ -52,6 +48,14 @@ struct KillerGameDetailView: View {
     }
     private var latestClosedRound: Round? {
         game.rounds.filter { $0.status == .closed }.max(by: { $0.roundNumber < $1.roundNumber })
+    }
+    /// Mirrors LMS's `openRoundPicksComplete` — every active player has a
+    /// complete slate (predictions, plus a hit target on each in Kill Phase)
+    /// for the open round. Gates "Enter Results / Close" on the main screen
+    /// itself, not just the submit button inside that sheet.
+    private var openRoundComplete: Bool {
+        guard let round = openRound else { return false }
+        return KillerScoringService.allActivePlayersComplete(round: round, game: game)
     }
 
     var body: some View {
@@ -88,7 +92,7 @@ struct KillerGameDetailView: View {
                 if let round = openRound { KillerPredictionsEntryView(game: game, round: round) }
             case .results:
                 if let round = openRound {
-                    KillerResultsEntryView(game: game, round: round, pendingTiebreakIds: $pendingTiebreakIds)
+                    KillerResultsEntryView(game: game, round: round)
                 }
             case .scratchpad:
                 if let round = openRound { KillerScratchpadEntryView(game: game, round: round) }
@@ -110,14 +114,6 @@ struct KillerGameDetailView: View {
                 }
             case .shareWinner:
                 if let round = latestClosedRound { KillerShareView(game: game, round: round, type: .winner) }
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { pendingTiebreakIds != nil },
-            set: { if !$0 { pendingTiebreakIds = nil } }
-        )) {
-            if let ids = pendingTiebreakIds {
-                KillerTiebreakView(game: game, candidates: game.players.filter { ids.contains($0.id) })
             }
         }
         .confirmationDialog(
@@ -185,6 +181,10 @@ struct KillerGameDetailView: View {
                 Button { sheet = .predictions } label: { Label("Enter Predictions", systemImage: "checklist") }
                 Button { sheet = .scratchpad } label: { Label("Scratchpad (Paste Picks)", systemImage: "text.badge.plus") }
                 Button { sheet = .results } label: { Label("Enter Results / Close", systemImage: "flag.checkered") }
+                if !openRoundComplete {
+                    Text("Waiting on predictions before this round can close.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 shareCardButton("Share Fixtures Card", .shareFixtures, enabled: true)
                 if currentPhase == .kill {
                     shareCardButton("Share Player Key Card", .sharePlayerKey, enabled: true)
@@ -194,9 +194,11 @@ struct KillerGameDetailView: View {
                         Label("Submission Queue", systemImage: "tray.and.arrow.down")
                     }
                 }
+            } else if game.status == .complete {
+                Text("Game complete.").foregroundStyle(.secondary)
             } else {
                 Button { sheet = .open } label: { Label("Open Round", systemImage: "calendar.badge.plus") }
-                    .disabled(game.players.isEmpty)
+                    .disabled(game.activePlayers.count < 2)
             }
         }
     }
@@ -224,8 +226,6 @@ struct KillerGameDetailView: View {
                         Text(player.name)
                         if player.status == .eliminated {
                             Text("eliminated").font(.caption2).foregroundStyle(.secondary)
-                        } else if pendingTiebreakIds?.contains(player.id) == true {
-                            Text("tie pending").font(.caption2).foregroundStyle(.orange)
                         }
                         Spacer()
                         Text(String(repeating: "❤️", count: max(0, player.killerState?.lives ?? 0)))

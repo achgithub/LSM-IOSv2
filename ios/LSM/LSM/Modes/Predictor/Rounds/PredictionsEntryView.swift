@@ -33,9 +33,7 @@ struct PredictionsEntryView: View {
     }
 
     private func slateComplete(_ player: Player) -> Bool {
-        let fixtureIds = Set(roundFixtures.map(\.id))
-        let predicted = Set(PredictorScoringService.predictions(for: player, in: round).map(\.fixtureId))
-        return !fixtureIds.isEmpty && fixtureIds.isSubset(of: predicted)
+        PredictorScoringService.slateComplete(for: player, round: round)
     }
 
     var body: some View {

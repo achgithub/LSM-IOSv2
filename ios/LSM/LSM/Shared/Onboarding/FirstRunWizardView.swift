@@ -83,9 +83,7 @@ struct GameWizardView: View {
         switch game.mode {
         case .lms:       return lmsPhase(for: game)
         case .predictor: return predictorPhase(for: game)
-        // The tutorial only ever creates LMS/Predictor demo games — Killer has
-        // no guided wizard yet (see predictor-wizard-demo-todo memory).
-        case .killer:    return .complete
+        case .killer:    return killerPhase(for: game)
         }
     }
 
@@ -104,6 +102,19 @@ struct GameWizardView: View {
         }
         if game.players.count < 2 && latestClosedRound == nil { return .addPlayers }
         return .openMatchday
+    }
+
+    /// Simpler than `lmsPhase` — Killer's close-round always auto-resolves
+    /// (accuracy → hits → auto-split), so there's no unresolved-tie state to
+    /// surface here, unlike LMS.
+    private func killerPhase(for game: Game) -> WizardPhase {
+        if game.status == .complete { return .complete }
+        if let round = openRound {
+            return KillerScoringService.allActivePlayersComplete(round: round, game: game)
+                ? .enterKillerResults : .enterKillerPredictions
+        }
+        if game.activePlayers.count < 2 && latestClosedRound == nil { return .addPlayers }
+        return .openKillerRound
     }
 
     var body: some View {
@@ -266,8 +277,17 @@ struct GameWizardView: View {
                 primary: .init(label: "Resolve Round", sheet: .resolveTie),
                 shares: [.init(label: "Share Results Card", sheet: .shareResults)])
         case .complete:
-            var shares: [Action] = [.init(label: "Share Results Card", sheet: .shareResults)]
-            if game?.lastOutcome != nil { shares.append(.init(label: "Share Outcome Card", sheet: .shareOutcome)) }
+            let shares: [Action]
+            if game?.mode == .killer {
+                shares = [
+                    .init(label: "Share Weekly Results", sheet: .killerShareWeeklyResults),
+                    .init(label: "Share Final Result", sheet: .killerShareWinner)
+                ]
+            } else {
+                var lmsShares: [Action] = [.init(label: "Share Results Card", sheet: .shareResults)]
+                if game?.lastOutcome != nil { lmsShares.append(.init(label: "Share Outcome Card", sheet: .shareOutcome)) }
+                shares = lmsShares
+            }
             return PhaseCard(
                 icon: "party.popper.fill",
                 title: "That's a wrap!",
@@ -308,6 +328,40 @@ struct GameWizardView: View {
                 detail: "Add the final scores for each fixture, then close the matchday to award points.",
                 primary: .init(label: "Enter Results / Close", sheet: .predictorResults),
                 shares: [.init(label: "Share Entry Closed Card", sheet: .shareEntryClosed)])
+
+        // MARK: Killer phases
+
+        case .openKillerRound:
+            let shares: [Action] = latestClosedRound != nil ? [
+                .init(label: "Share Weekly Results", sheet: .killerShareWeeklyResults),
+                .init(label: "Share Accuracy Table", sheet: .killerShareStandings)
+            ] : []
+            return PhaseCard(
+                icon: "calendar.badge.plus",
+                title: "Open the next round",
+                detail: "Pick the Manager Picked Games this round runs on and set the predictions deadline.",
+                primary: .init(label: "Open Round", sheet: .killerOpenRound),
+                shares: shares)
+        case .enterKillerPredictions:
+            let isKillPhase = game.flatMap { g in openRound.map { KillerScoringService.phase(for: $0, game: g) } } == .kill
+            return PhaseCard(
+                icon: "checklist",
+                title: "Collect predictions",
+                detail: isKillPhase
+                    ? "Enter each player's Home/Draw/Away guess for every fixture, plus who they're targeting with each Hit."
+                    : "Enter each player's Home/Draw/Away guess for every fixture — correct guesses earn extra lives this early.",
+                hint: "Not everyone in yet? Close the wizard and come back any time — swipe the game right to resume here.",
+                primary: .init(label: "Enter Predictions", sheet: .killerPredictions),
+                shares: [.init(label: "Share Fixtures Card", sheet: .killerShareFixtures)],
+                secondaryActions: [.init(label: "Scratchpad (Paste Picks)", sheet: .killerScratchpad)])
+        case .enterKillerResults:
+            let isKillPhase = game.flatMap { g in openRound.map { KillerScoringService.phase(for: $0, game: g) } } == .kill
+            return PhaseCard(
+                icon: "flag.checkered",
+                title: "Enter results & close",
+                detail: "Pull the results (or set them), then close the round to work out who's out.",
+                primary: .init(label: "Enter Results / Close", sheet: .killerResults),
+                shares: isKillPhase ? [.init(label: "Share Player Key Card", sheet: .killerSharePlayerKey)] : [])
         }
     }
 
@@ -328,6 +382,12 @@ struct GameWizardView: View {
         case .predictorPredictions, .predictorResults, .submissionQueue,
              .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable:
             predictorSheetContent(which)
+        case .killerOpenRound:
+            if let game { KillerOpenRoundView(game: game) }
+        case .killerPredictions, .killerResults, .killerScratchpad,
+             .killerShareFixtures, .killerSharePlayerKey, .killerShareWeeklyResults,
+             .killerShareStandings, .killerShareWinner:
+            killerSheetContent(which)
         }
     }
 
@@ -393,6 +453,34 @@ struct GameWizardView: View {
         }
     }
 
+    /// Killer share cards route through `KillerShareView`/`KillerCardData`,
+    /// never `SummaryShareView` — that reads `round.picks`/`round.predictions`,
+    /// which are always empty for a Killer round and would render a blank card.
+    @ViewBuilder
+    private func killerSheetContent(_ which: WizardSheet) -> some View {
+        switch which {
+        case .killerPredictions:
+            if let game, let round = openRound { KillerPredictionsEntryView(game: game, round: round) }
+        case .killerScratchpad:
+            if let game, let round = openRound { KillerScratchpadEntryView(game: game, round: round) }
+        case .killerResults:
+            if let game, let round = openRound { KillerResultsEntryView(game: game, round: round) }
+        case .killerShareFixtures:
+            if let game, let round = openRound { KillerShareView(game: game, round: round, type: .fixtures) }
+        case .killerSharePlayerKey:
+            if let game, let round = openRound { KillerShareView(game: game, round: round, type: .playerKey) }
+        case .killerShareWeeklyResults:
+            if let game, let round = latestClosedRound { KillerShareView(game: game, round: round, type: .weeklyResults) }
+        case .killerShareStandings:
+            if let game, let round = latestClosedRound ?? openRound {
+                KillerShareView(game: game, round: round, type: .standings)
+            }
+        case .killerShareWinner:
+            if let game, let round = latestClosedRound { KillerShareView(game: game, round: round, type: .winner) }
+        default: EmptyView()
+        }
+    }
+
     /// Opens a step's screen. Share-card steps cost a rewarded ad for free users —
     /// the same gate the real screens use (GameDetailView / PicksEntryView) — so
     /// the wizard isn't an ad-free side door to the shareable cards.
@@ -433,6 +521,8 @@ private enum WizardPhase {
     case openRound, enterPicks, enterResults, resolveTie, complete
     // Predictor phases
     case openMatchday, enterPredictions, enterPredictorResults
+    // Killer phases
+    case openKillerRound, enterKillerPredictions, enterKillerResults
 }
 
 enum WizardSheet: String, Identifiable {
@@ -444,12 +534,18 @@ enum WizardSheet: String, Identifiable {
     // Predictor
     case predictorPredictions, predictorResults, submissionQueue
     case shareEntryClosed, shareWeeklyResults, shareLeagueTable
+    // Killer
+    case killerOpenRound, killerPredictions, killerResults, killerScratchpad
+    case killerShareFixtures, killerSharePlayerKey, killerShareWeeklyResults
+    case killerShareStandings, killerShareWinner
     var id: String { rawValue }
 
     var isShare: Bool {
         switch self {
         case .shareFixtures, .sharePicks, .shareResults, .shareOutcome,
-             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable: return true
+             .shareEntryClosed, .shareWeeklyResults, .shareLeagueTable,
+             .killerShareFixtures, .killerSharePlayerKey, .killerShareWeeklyResults,
+             .killerShareStandings, .killerShareWinner: return true
         default: return false
         }
     }

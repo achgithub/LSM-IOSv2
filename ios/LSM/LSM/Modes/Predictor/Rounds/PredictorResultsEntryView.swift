@@ -194,7 +194,11 @@ struct PredictorResultsEntryView: View {
             Text(closeError ?? "")
         }
         .sheet(isPresented: $showingCloseWarning) {
-            CloseRoundWarningSheet(dontShowAgain: $suppressCloseWarning, pendingSubmissionCount: pendingSubmissionCount) {
+            CloseRoundWarningSheet(
+                dontShowAgain: $suppressCloseWarning,
+                pendingSubmissionCount: pendingSubmissionCount,
+                incompletePlayerNames: PredictorScoringService.incompletePlayers(round: round, game: game).map(\.name)
+            ) {
                 if suppressCloseWarning { closeWarningSuppressed = true }
                 showingCloseWarning = false
                 // Let the sheet's dismissal transition finish before dismissing
@@ -219,7 +223,8 @@ struct PredictorResultsEntryView: View {
             let count = await fetchPendingSubmissionCount()
             await MainActor.run {
                 pendingSubmissionCount = count
-                if closeWarningSuppressed && count == 0 {
+                let hasIncompletePlayers = !PredictorScoringService.incompletePlayers(round: round, game: game).isEmpty
+                if closeWarningSuppressed && count == 0 && !hasIncompletePlayers {
                     close()
                 } else {
                     suppressCloseWarning = false
@@ -312,6 +317,7 @@ struct PredictorResultsEntryView: View {
 private struct CloseRoundWarningSheet: View {
     @Binding var dontShowAgain: Bool
     let pendingSubmissionCount: Int
+    let incompletePlayerNames: [String]
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -342,10 +348,17 @@ private struct CloseRoundWarningSheet: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if !incompletePlayerNames.isEmpty {
+                    Text("\(incompletePlayerNames.joined(separator: ", ")) \(incompletePlayerNames.count == 1 ? "hasn't" : "haven't") predicted yet — closing now scores them nothing this round.")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Toggle("Don't show this again", isOn: $dontShowAgain)
                     .font(.subheadline)
-                    .disabled(pendingSubmissionCount > 0)
+                    .disabled(pendingSubmissionCount > 0 || !incompletePlayerNames.isEmpty)
 
                 Spacer(minLength: 0)
 

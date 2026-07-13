@@ -543,6 +543,92 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "ManualFixtureRoundClosed")
     }
 
+    /// Verifies the Killer wizard fix: creates a Killer game, adds two
+    /// players, swipes it in the Games list to open the guided wizard, and
+    /// confirms it lands on the real "open the next round" phase — not the
+    /// old hard-coded "That's a wrap!" complete card the wizard used to show
+    /// for every Killer game regardless of actual state.
+    @MainActor
+    func testKillerWizardShowsRealPhaseNotComplete() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        completeOnboardingIfNeeded(app)
+
+        let suffix = UUID().uuidString.prefix(6)
+        let player1 = "KW Player A \(suffix)"
+        let player2 = "KW Player B \(suffix)"
+
+        // --- Create two roster players. ---
+        XCTAssertTrue(app.tabBars.buttons["Players"].waitForExistence(timeout: 15), "Players tab never appeared")
+        app.tabBars.buttons["Players"].tap()
+        let search = app.searchFields.firstMatch
+        for name in [player1, player2] {
+            app.navigationBars.buttons["Add player"].tap()
+            let nameField = app.alerts.textFields.firstMatch
+            XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Add player alert never appeared")
+            nameField.tap()
+            nameField.typeText(name)
+            app.alerts.buttons["Add"].tap()
+            XCTAssertTrue(search.waitForExistence(timeout: 10), "Search field missing from Players list")
+            search.tap()
+            search.typeText(name)
+            XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10), "\(name) never appeared in Players list")
+            search.buttons["Clear text"].tap()
+        }
+
+        // --- Create the Killer game. ---
+        app.tabBars.buttons["Games"].tap()
+        app.navigationBars.buttons["New Game"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Killer"].waitForExistence(timeout: 10), "Killer mode option never appeared")
+        app.staticTexts["Killer"].tap()
+        let gameName = "Killer Wizard Test \(suffix)"
+        let nameTextField = app.textFields["Game name"]
+        XCTAssertTrue(nameTextField.waitForExistence(timeout: 10), "Killer form never appeared")
+        nameTextField.tap()
+        nameTextField.typeText(gameName)
+        app.navigationBars.buttons["Create"].tap()
+
+        XCTAssertTrue(app.staticTexts[gameName].waitForExistence(timeout: 10), "New Killer game never appeared on Games list")
+        app.staticTexts[gameName].tap()
+        XCTAssertTrue(app.buttons["Add Players"].waitForExistence(timeout: 10), "Killer game detail screen never opened")
+
+        // --- Add the two roster players into this game. ---
+        app.buttons["Add Players"].tap()
+        let addPlayersSearch = app.searchFields.firstMatch
+        XCTAssertTrue(addPlayersSearch.waitForExistence(timeout: 10), "Search field missing from Add Players sheet")
+        for name in [player1, player2] {
+            addPlayersSearch.tap()
+            addPlayersSearch.typeText(name)
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", name)).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "\(name) missing from Add Players sheet")
+            row.tap()
+            addPlayersSearch.buttons["Clear text"].tap()
+        }
+        app.buttons["Done"].tap()
+
+        // --- Back to Games list, swipe the game to open its guided wizard. ---
+        app.navigationBars.buttons.firstMatch.tap()   // back to Games
+        XCTAssertTrue(app.staticTexts[gameName].waitForExistence(timeout: 10), "Games list never reappeared")
+        app.staticTexts[gameName].swipeRight()
+        let wizardButton = app.buttons["Wizard"]
+        XCTAssertTrue(wizardButton.waitForExistence(timeout: 10), "Wizard swipe action never appeared for a Killer game")
+        wizardButton.tap()
+
+        // The fix: killerPhase(for:) should surface the real "open the next
+        // round" phase for a fresh 2-player game with no round yet — not the
+        // old forced `.complete` card.
+        XCTAssertTrue(
+            app.staticTexts["Open the next round"].waitForExistence(timeout: 10),
+            "Killer wizard did not show the real open-round phase"
+        )
+        XCTAssertFalse(
+            app.staticTexts["That's a wrap!"].exists,
+            "Killer wizard incorrectly showed the complete card for a fresh, in-progress game"
+        )
+        attachScreenshot(named: "KillerWizardOpenRoundPhase")
+    }
+
     /// Verifies the downgrade-safety fix: a league already used by an active
     /// game stays fully usable after a subscription downgrade (no forced
     /// blocking screen, Create still works there), while starting a game in a

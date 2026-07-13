@@ -25,6 +25,21 @@ enum PredictorScoringService {
         round.predictions.first { $0.player?.id == player.id && $0.fixtureId == fixtureId }
     }
 
+    /// Whether one player has a prediction for every fixture in the round.
+    static func slateComplete(for player: Player, round: Round) -> Bool {
+        let fixtureIds = Set(round.fixtureIds)
+        guard !fixtureIds.isEmpty else { return false }
+        let predicted = Set(predictions(for: player, in: round).map(\.fixtureId))
+        return fixtureIds.isSubset(of: predicted)
+    }
+
+    /// Active players with no prediction at all for the round — informational/
+    /// warning use only, never a hard gate (predictions trickle in via PWA
+    /// links up to and past the deadline).
+    static func incompletePlayers(round: Round, game: Game) -> [Player] {
+        game.activePlayers.filter { !slateComplete(for: $0, round: round) }
+    }
+
     /// Set or change a player's predicted score for one fixture in a round.
     /// Mirrors `GameLogicService.setPick`'s delete-and-recreate approach —
     /// inserting a fresh `Prediction` updates synchronously, where mutating an

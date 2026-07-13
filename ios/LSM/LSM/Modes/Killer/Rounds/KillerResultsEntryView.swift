@@ -11,9 +11,6 @@ struct KillerResultsEntryView: View {
     @Environment(Entitlements.self) private var entitlements
     let game: Game
     let round: Round
-    /// Set when closing produces a `.stillTied` outcome; the parent presents
-    /// `KillerTiebreakView` at the top level once this sheet dismisses.
-    @Binding var pendingTiebreakIds: [UUID]?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
@@ -24,6 +21,8 @@ struct KillerResultsEntryView: View {
     @State private var voided: Set<Int> = []
     @State private var refresh = LiveMatchRefreshState()
     @State private var closeError: String?
+    @State private var splitMessage: String?
+    @State private var showingIncompleteWarning = false
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -33,6 +32,14 @@ struct KillerResultsEntryView: View {
 
     private var allResultsSet: Bool {
         !roundFixtures.isEmpty && roundFixtures.allSatisfy { outcomes[$0.id] != nil || voided.contains($0.id) }
+    }
+
+    /// Every active player must have a complete slate (predictions, plus a
+    /// hit target on each in Kill Phase) before the round can be closed —
+    /// otherwise a no-show player would silently score nothing with no
+    /// warning. Named players missing a slate are surfaced in the footer.
+    private var incompletePlayers: [Player] {
+        game.activePlayers.filter { !KillerScoringService.slateComplete(for: $0, round: round, game: game) }
     }
 
     var body: some View {
@@ -110,7 +117,13 @@ struct KillerResultsEntryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Button { close() } label: {
+            if allResultsSet, !incompletePlayers.isEmpty {
+                let names = incompletePlayers.map(\.name).joined(separator: ", ")
+                Text("Waiting on: \(names)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button { attemptClose() } label: {
                 Text("Close Round").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -127,6 +140,25 @@ struct KillerResultsEntryView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(closeError ?? "")
+        }
+        .confirmationDialog(
+            "Round not fully settled",
+            isPresented: $showingIncompleteWarning,
+            titleVisibility: .visible
+        ) {
+            Button("Close Anyway", role: .destructive) { close() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            let names = incompletePlayers.map(\.name).joined(separator: ", ")
+            Text("\(names) still \(incompletePlayers.count == 1 ? "hasn't" : "haven't") finished predicting — closing now leaves them scoring nothing this round.")
+        }
+        .alert("Split win", isPresented: Binding(
+            get: { splitMessage != nil },
+            set: { if !$0 { splitMessage = nil } }
+        )) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text(splitMessage ?? "")
         }
     }
 
@@ -158,22 +190,36 @@ struct KillerResultsEntryView: View {
         seedOutcomesFromCache()
     }
 
+    /// Missing predictions are a soft warning, not a hard block — Killer has
+    /// no Auto-Assign-style escape hatch for an unresponsive player, so a hard
+    /// gate here would let one no-show deadlock the round forever.
+    private func attemptClose() {
+        if incompletePlayers.isEmpty {
+            close()
+        } else {
+            showingIncompleteWarning = true
+        }
+    }
+
     private func close() {
         do {
             let outcome = try KillerScoringService.closeRound(
                 round, game: game, finalOutcomes: outcomes, voidFixtureIds: voided, context: context
             )
             try context.save()
-            if case .stillTied(let ids) = outcome {
-                pendingTiebreakIds = ids
-            } else if game.status == .complete {
-                // Single-survivor or immediate-tiebreak-winner path — the
+            if game.status == .complete {
+                // Single-survivor, outright-winner, or auto-split path — the
                 // game just ended with no further round to open, so push
                 // explicitly rather than relying on the next round-open's
                 // piggyback (there is no next round). See `PWARoundPusher`.
                 pushGameCompleteIfNeeded()
             }
-            dismiss()
+            if case .split(let ids) = outcome {
+                let names = game.players.filter { ids.contains($0.id) }.map(\.name).joined(separator: ", ")
+                splitMessage = "Tied on accuracy and hits — the win splits between \(names)."
+            } else {
+                dismiss()
+            }
         } catch {
             closeError = error.localizedDescription
         }
