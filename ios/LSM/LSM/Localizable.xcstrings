@@ -20887,6 +20887,531 @@
           }
         }
       }
+    },
+    "Killer Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Killer-Einstellungen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes de Killer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages Killer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni Killer"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Killer-instellingen"
+          }
+        }
+      }
+    },
+    "Everyone starts with 1 life. During the Build Phase, a correct prediction earns +1 life (up to the cap). After that, the Kill Phase begins: predictions also fire a Hit at a chosen opponent.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jeder startet mit 1 Leben. Während der Build Phase bringt eine richtige Vorhersage +1 Leben (bis zur Obergrenze). Danach beginnt die Kill Phase: Vorhersagen lösen zusätzlich einen Hit auf einen gewählten Gegner aus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos empiezan con 1 vida. Durante la Fase de Construcción, una predicción correcta da +1 vida (hasta el límite). Después empieza la Fase de Eliminación: las predicciones también lanzan un Hit contra un rival elegido."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout le monde commence avec 1 vie. Pendant la Phase de Construction, une prédiction correcte rapporte +1 vie (jusqu'au plafond). Ensuite commence la Phase d'Élimination : les prédictions déclenchent aussi un Hit sur un adversaire choisi."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutti iniziano con 1 vita. Durante la Fase di Costruzione, un pronostico corretto dà +1 vita (fino al limite). Dopo inizia la Fase di Eliminazione: i pronostici lanciano anche un Hit contro un avversario scelto."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iedereen begint met 1 leven. Tijdens de Opbouwfase levert een juiste voorspelling +1 leven op (tot het maximum). Daarna begint de Kill-fase: voorspellingen lossen ook een Hit op een gekozen tegenstander uit."
+          }
+        }
+      }
+    },
+    "Your plan doesn't cover an extra league right now. Leagues already in use by another game stay available to pick from — upgrade to add a new one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein Tarif deckt derzeit keine weitere Liga ab. Ligen, die bereits von einem anderen Spiel genutzt werden, bleiben wählbar — upgrade, um eine neue hinzuzufügen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu plan no cubre ahora mismo una liga adicional. Las ligas ya usadas por otra partida siguen disponibles para elegir — mejora tu plan para añadir una nueva."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton forfait ne couvre pas une ligue supplémentaire pour l'instant. Les ligues déjà utilisées par une autre partie restent disponibles au choix — passe à un forfait supérieur pour en ajouter une nouvelle."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo piano non copre un altro campionato al momento. I campionati già usati da un'altra partita restano selezionabili — esegui l'upgrade per aggiungerne uno nuovo."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Je abonnement dekt op dit moment geen extra competitie. Competities die al door een ander spel worden gebruikt, blijven beschikbaar om te kiezen — upgrade om een nieuwe toe te voegen."
+          }
+        }
+      }
+    },
+    "Delete this game?": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Spiel löschen?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar esta partida?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer cette partie ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare questa partita?"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dit spel verwijderen?"
+          }
+        }
+      }
+    },
+    "Delete %lld games?": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Spiele löschen?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar %lld partidas?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer %lld parties ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare %lld partite?"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld spellen verwijderen?"
+          }
+        }
+      }
+    },
+    "Build Phase: %lld round": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build Phase: %lld Runde"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fase de Construcción: %lld ronda"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phase de Construction : %lld manche"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fase di Costruzione: %lld turno"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opbouwfase: %lld ronde"
+          }
+        }
+      }
+    },
+    "Build Phase: %lld rounds": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build Phase: %lld Runden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fase de Construcción: %lld rondas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phase de Construction : %lld manches"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fase di Costruzione: %lld turni"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opbouwfase: %lld ronden"
+          }
+        }
+      }
+    },
+    "Voided — no result": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulliert — kein Ergebnis"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anulado — sin resultado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulé — pas de résultat"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annullato — nessun risultato"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ongeldig gemaakt — geen uitslag"
+          }
+        }
+      }
+    },
+    "ENTRIES CLOSED": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ANMELDUNG GESCHLOSSEN"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INSCRIPCIONES CERRADAS"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INSCRIPTIONS CLOSES"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ISCRIZIONI CHIUSE"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INSCHRIJVINGEN GESLOTEN"
+          }
+        }
+      }
+    },
+    "LEAGUE TABLE": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TABELLE"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TABLA DE CLASIFICACIÓN"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLASSEMENT"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLASSIFICA"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "COMPETITIETABEL"
+          }
+        }
+      }
+    },
+    "FINAL STANDINGS": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ENDSTAND"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLASIFICACIÓN FINAL"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLASSEMENT FINAL"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLASSIFICA FINALE"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EINDSTAND"
+          }
+        }
+      }
+    },
+    "%lld player · Matchday %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Spieler · Spieltag %lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld jugador · Jornada %lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld joueur · Journée %lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld giocatore · Giornata %lld"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld speler · Speelronde %lld"
+          }
+        }
+      }
+    },
+    "%lld players · Matchday %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Spieler · Spieltag %lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld jugadores · Jornada %lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld joueurs · Journée %lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld giocatori · Giornata %lld"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld spelers · Speelronde %lld"
+          }
+        }
+      }
+    },
+    "1 player submission hasn't been reviewed yet — it will be left unresolved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Spielereinreichung wurde noch nicht geprüft — sie bleibt ungeklärt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 envío de jugador aún no se ha revisado — quedará sin resolver."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 soumission de joueur n'a pas encore été vérifiée — elle restera non résolue."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 invio di un giocatore non è ancora stato controllato — resterà irrisolto."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 inzending van een speler is nog niet beoordeeld — deze blijft onopgelost."
+          }
+        }
+      }
+    },
+    "%lld player submissions haven't been reviewed yet — they will be left unresolved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Spielereinreichungen wurden noch nicht geprüft — sie bleiben ungeklärt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld envíos de jugadores aún no se han revisado — quedarán sin resolver."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld soumissions de joueurs n'ont pas encore été vérifiées — elles resteront non résolues."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld invii di giocatori non sono ancora stati controllati — resteranno irrisolti."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld inzendingen van spelers zijn nog niet beoordeeld — deze blijven onopgelost."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

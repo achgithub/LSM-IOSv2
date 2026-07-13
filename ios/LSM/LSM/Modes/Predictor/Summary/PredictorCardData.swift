@@ -11,11 +11,11 @@ enum PredictorCardType: Equatable {
 extension PredictorCardType {
     var sectionLabel: String {
         switch self {
-        case .fixtures:      return "FIXTURES"
-        case .entryClosed:   return "ENTRIES CLOSED"
-        case .weeklyResults: return "WEEKLY RESULTS"
-        case .league:        return "LEAGUE TABLE"
-        case .winner:        return "FINAL STANDINGS"
+        case .fixtures:      return AppString("FIXTURES")
+        case .entryClosed:   return AppString("ENTRIES CLOSED")
+        case .weeklyResults: return AppString("WEEKLY RESULTS")
+        case .league:        return AppString("LEAGUE TABLE")
+        case .winner:        return AppString("FINAL STANDINGS")
         }
     }
 }

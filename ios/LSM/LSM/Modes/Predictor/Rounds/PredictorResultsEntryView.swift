@@ -355,7 +355,8 @@ private struct CloseRoundWarningSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !incompletePlayerNames.isEmpty {
-                    Text("\(incompletePlayerNames.joined(separator: ", ")) \(incompletePlayerNames.count == 1 ? "hasn't" : "haven't") predicted yet — closing now scores them nothing this round.")
+                    let names = incompletePlayerNames.joined(separator: ", ")
+                    Text("Still to predict: \(names) — closing now scores them nothing this round.")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
                         .multilineTextAlignment(.center)

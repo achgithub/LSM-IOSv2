@@ -223,7 +223,9 @@ struct PredictorCardView: View {
 
     private var predictorFooter: some View {
         VStack(spacing: 6) {
-            Text("\(data.entrantCount) \(data.entrantCount == 1 ? "player" : "players") · Matchday \(data.matchdayNumber)")
+            Text(data.entrantCount == 1
+                 ? AppString("\(data.entrantCount) player · Matchday \(data.matchdayNumber)")
+                 : AppString("\(data.entrantCount) players · Matchday \(data.matchdayNumber)"))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(p.accent)
             Text(data.appName)

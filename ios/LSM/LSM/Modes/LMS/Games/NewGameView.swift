@@ -451,7 +451,9 @@ struct NewGameView: View {
             }
 
             Section {
-                Stepper("Build Phase: \(killerBuildPhaseRounds) round\(killerBuildPhaseRounds == 1 ? "" : "s")",
+                Stepper(killerBuildPhaseRounds == 1
+                        ? AppString("Build Phase: \(killerBuildPhaseRounds) round")
+                        : AppString("Build Phase: \(killerBuildPhaseRounds) rounds"),
                         value: $killerBuildPhaseRounds, in: 1...10)
                 Stepper("Max additional lives: \(killerMaxAdditionalLives)",
                         value: $killerMaxAdditionalLives, in: 0...20)

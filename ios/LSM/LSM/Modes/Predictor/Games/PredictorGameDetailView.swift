@@ -198,9 +198,9 @@ struct PredictorGameDetailView: View {
         let name = managerName
         do {
             try await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context)
-            resendMessage = "Sent to Player App just now."
+            resendMessage = AppString("Sent to Player App just now.")
         } catch {
-            resendMessage = "Send failed: \(error.localizedDescription)"
+            resendMessage = AppString("Send failed: \(error.localizedDescription)")
         }
     }
 
