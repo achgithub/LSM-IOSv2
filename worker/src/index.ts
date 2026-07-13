@@ -13,7 +13,7 @@
 
 import { Hono } from "hono";
 import { admin } from "./routes/admin";
-import { runDailyCleanup, runDailySync } from "./cron";
+import { runDailySync } from "./cron";
 import { data } from "./routes/data";
 import { outageGate } from "./outage";
 // Sports data shard — league discovery + read-only data (teams, fixtures,
@@ -54,8 +54,9 @@ export default {
   fetch: app.fetch,
   // Cron scheduled handler — activate by setting triggers.crons in wrangler.jsonc,
   // e.g. "0 4 * * *" for the uk shard, "0 2 * * *" for eu (match MAINTENANCE_WINDOW_UTC).
+  // D1/R2 cleanup used to run here too but moved to worker-api (#6) — it needs
+  // the authority schema, not this shard's.
   scheduled: async (_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) => {
-    await runDailyCleanup(env);
     await runDailySync(env);
   },
 } satisfies ExportedHandler<Env>;

@@ -68,7 +68,12 @@
       // both Worker types so a single write reaches every route in the region.
       "kv_namespaces": [
         { "binding": "FLAGS", "id": "c65ea1d30cb345f2b39e4c0a48a5f39d" }
-      ]
+      ],
+
+      // Daily cleanup cron (worker-api/src/cron.ts) — moved here from worker/
+      // (#6, it needs this authority schema). Explicit empty list — NOT yet
+      // activated (#12 parked until current test cycle finishes).
+      "triggers": { "crons": [] }
     },
 
     "eu": {
@@ -104,7 +109,9 @@
       // see the uk env's FLAGS binding above for why.
       "kv_namespaces": [
         { "binding": "FLAGS", "id": "37b6e5767a0a4ed4bdc48deba5a31e61" }
-      ]
+      ],
+
+      "triggers": { "crons": [] }
     }
   }
 }

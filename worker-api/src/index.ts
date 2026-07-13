@@ -22,6 +22,7 @@ import { submissions } from "./routes/submissions";
 import { migrate } from "./routes/migrate";
 import { requireJWT } from "./middleware/jwt";
 import { outageGate } from "./middleware/outage";
+import { runDailyCleanup } from "./cron";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -81,4 +82,12 @@ app.onError((err, c) => {
   return c.json({ error: "internal error" }, 500);
 });
 
-export default { fetch: app.fetch } satisfies ExportedHandler<Env>;
+export default {
+  fetch: app.fetch,
+  // Cron scheduled handler — NOT activated yet (#12 parked until current test
+  // cycle finishes). Activate by setting triggers.crons in wrangler.jsonc,
+  // e.g. "0 3 * * *" for a 3am UTC daily run.
+  scheduled: async (_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) => {
+    await runDailyCleanup(env);
+  },
+} satisfies ExportedHandler<Env>;
