@@ -19,8 +19,8 @@ struct AboutView: View {
                 Link(destination: URL(string: "https://www.football-data.org")!) {
                     Text(verbatim: "Data provided by football-data.org")
                 }
-                Link("Privacy Policy", destination: URL(string: "https://sportsmanager-site.pages.dev/lsm/privacy")!)
-                Link("Terms of Service", destination: URL(string: "https://sportsmanager-site.pages.dev/lsm/terms")!)
+                Link("Privacy Policy", destination: URL(string: "https://sportsmanager.site/lsm/privacy")!)
+                Link("Terms of Service", destination: URL(string: "https://sportsmanager.site/lsm/terms")!)
                 // Apple requires a link to its standard EULA (or a custom one
                 // containing Apple's mandated minimum terms — ours above
                 // doesn't) since subscriptions are sold via In-App Purchase.
