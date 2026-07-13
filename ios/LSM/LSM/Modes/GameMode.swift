@@ -16,8 +16,9 @@ enum GameMode: String, Codable, CaseIterable, Identifiable {
     /// accumulating into a running league table. No elimination. New in v2.
     case predictor
     /// Lives-based elimination with a Build Phase (earn lives) then a Kill
-    /// Phase (predictions also fire a Hit at a chosen opponent). On-device only
-    /// for now — no cloud/PWA support yet.
+    /// Phase (predictions also fire a Hit at a chosen opponent). Shares Cloud
+    /// Backup and PWA player links with the other modes; has no Cloud Publish
+    /// standings page yet.
     case killer
 
     var id: String { rawValue }
