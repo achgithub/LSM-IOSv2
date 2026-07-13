@@ -23,6 +23,8 @@ struct KillerResultsEntryView: View {
     @State private var closeError: String?
     @State private var splitMessage: String?
     @State private var showingIncompleteWarning = false
+    @State private var pendingSubmissionCount = 0
+    @State private var showingPendingSubmissionsWarning = false
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -152,6 +154,18 @@ struct KillerResultsEntryView: View {
             let names = incompletePlayers.map(\.name).joined(separator: ", ")
             Text("\(names) still \(incompletePlayers.count == 1 ? "hasn't" : "haven't") finished predicting — closing now leaves them scoring nothing this round.")
         }
+        .confirmationDialog(
+            pendingSubmissionCount == 1
+                ? AppString("1 player submission not yet reviewed")
+                : AppString("\(pendingSubmissionCount) player submissions not yet reviewed"),
+            isPresented: $showingPendingSubmissionsWarning,
+            titleVisibility: .visible
+        ) {
+            Button("Close Anyway", role: .destructive) { checkIncompleteThenClose() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Closing this round leaves them unresolved in the Submission Queue. Review them first, or close anyway.")
+        }
         .alert("Split win", isPresented: Binding(
             get: { splitMessage != nil },
             set: { if !$0 { splitMessage = nil } }
@@ -190,10 +204,35 @@ struct KillerResultsEntryView: View {
         seedOutcomesFromCache()
     }
 
+    /// Checks for unreviewed player submissions before falling through to the
+    /// incomplete-predictions check, so pending PWA submissions aren't
+    /// silently stranded once the round closes (mirrors LMS/Predictor's
+    /// ResultsEntryView — issue #9 hadn't been extended to Killer yet).
+    /// Skips the check entirely when PWA submissions aren't in use.
+    private func attemptClose() {
+        guard entitlements.canUseCloud, pwaSubmissionsEnabled, let gameToken = game.cloudGameToken else {
+            checkIncompleteThenClose()
+            return
+        }
+        Task {
+            let count = (try? await SubmissionsClient.shared.listSubmissions(
+                gameToken: gameToken, round: round.roundNumber
+            ))?.filter { $0.status == "pending" }.count ?? 0
+            await MainActor.run {
+                if count > 0 {
+                    pendingSubmissionCount = count
+                    showingPendingSubmissionsWarning = true
+                } else {
+                    checkIncompleteThenClose()
+                }
+            }
+        }
+    }
+
     /// Missing predictions are a soft warning, not a hard block — Killer has
     /// no Auto-Assign-style escape hatch for an unresponsive player, so a hard
     /// gate here would let one no-show deadlock the round forever.
-    private func attemptClose() {
+    private func checkIncompleteThenClose() {
         if incompletePlayers.isEmpty {
             close()
         } else {
