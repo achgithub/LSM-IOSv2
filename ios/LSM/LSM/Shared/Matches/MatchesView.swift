@@ -251,8 +251,13 @@ struct MatchesView: View {
                     dates.append(Date())
                 }
             }
+            // Fetch team names before publishing `items` — otherwise the list
+            // renders with cached matches while teamsById is still empty,
+            // showing "Team <id>" placeholders that flip to real names once
+            // this (potentially slow, network-bound) call resolves.
+            let teams = (try? await LeagueData.load(for: enabled.leagues))?.teamsById ?? teamsById
             items = allItems
-            teamsById = (try? await LeagueData.load(for: enabled.leagues))?.teamsById ?? teamsById
+            teamsById = teams
             lastRefreshed = dates.max()
         } catch {
             // Keep whatever was already loaded/cached rather than wiping a
