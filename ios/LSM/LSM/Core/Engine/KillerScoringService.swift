@@ -45,11 +45,16 @@ enum KillerScoringService {
     }
 
     /// Manager Picked Games count for a round, given the active player count.
-    /// `N = min(maxMPG, activePlayers - 1)` — the only formula that guarantees
-    /// the Kill Phase's "each Hit targets a different opponent" constraint is
-    /// always satisfiable (N Hits need N distinct opponents).
+    /// Each player's opponent pool is everyone else (`activePlayers - 1` —
+    /// you can never target yourself). `N = min(maxMPG, activePlayers - 2)`
+    /// deliberately leaves exactly one opponent in that pool un-targeted each
+    /// round, rather than the previous `activePlayers - 1` (which hit every
+    /// possible opponent, leaving no one safe). Floored at 1 for the final
+    /// head-to-head (`activePlayers == 2`), where the pool is just one
+    /// opponent — there's no one left to spare.
     static func requiredMPGCount(activePlayers: Int, maxMPG: Int) -> Int {
-        max(0, min(maxMPG, activePlayers - 1))
+        guard activePlayers > 1 else { return 0 }
+        return max(1, min(maxMPG, activePlayers - 2))
     }
 
     // MARK: - Player state

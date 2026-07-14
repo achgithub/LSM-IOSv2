@@ -55,9 +55,10 @@ final class Game {
     /// 1 life), so max total lives = 1 + this.
     var killerMaxAdditionalLives: Int = 10
     /// Ceiling on Manager Picked Games per round; the actual count is
-    /// `min(killerMaxMPG, activePlayers.count - 1)`, which guarantees the Kill
-    /// Phase's "each Hit targets a different opponent" constraint is always
-    /// satisfiable.
+    /// `min(killerMaxMPG, activePlayers.count - 2)` (floored at 1 for the
+    /// final head-to-head), which leaves exactly one opponent safe each
+    /// round instead of targeting the whole pool — see
+    /// `KillerScoringService.requiredMPGCount`.
     var killerMaxMPG: Int = 5
 
     // Cloud Publish (Phase 2, Predictor only) — set at GAME level, not typed in
