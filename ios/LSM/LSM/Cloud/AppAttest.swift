@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Security
 import StoreKit
 #if canImport(DeviceCheck)
 import DeviceCheck
@@ -103,7 +104,7 @@ actor AppAttestService {
             // Stored key's public key in the authority DB doesn't verify — stale
             // registration (e.g. re-install, or DB was seeded from a dev session).
             // Clear the key so attestedKeyId generates and registers a fresh one.
-            defaults.removeObject(forKey: keyIdDefaultsKey)
+            deleteKeyId()
             return try await attemptJWT(freshAttest: true)
         }
     }
@@ -228,7 +229,68 @@ actor AppAttestService {
     }
 
     // MARK: - Key persistence (single key, not per-host)
+    //
+    // Keychain-backed, not UserDefaults — matches ManagerToken's rationale
+    // (UserDefaults is plaintext-readable via backup tools / device access).
+    // The keyId itself grants nothing without the Secure-Enclave-protected
+    // private key to sign assertions, but Keychain storage is the low-cost
+    // consistent choice. Migrates any value left in UserDefaults from
+    // earlier builds, then deletes it there.
 
-    private func storedKeyId() -> String? { defaults.string(forKey: keyIdDefaultsKey) }
-    private func storeKeyId(_ keyId: String) { defaults.set(keyId, forKey: keyIdDefaultsKey) }
+    private static let keychainService = "com.sportsmanager.LMS"
+    private static let keychainAccount = "appattestKeyId"
+
+    private func storedKeyId() -> String? {
+        if let value = Self.keychainValue() { return value }
+        if let legacy = defaults.string(forKey: keyIdDefaultsKey) {
+            Self.saveKeyId(legacy)
+            defaults.removeObject(forKey: keyIdDefaultsKey)
+            return legacy
+        }
+        return nil
+    }
+
+    private func storeKeyId(_ keyId: String) { Self.saveKeyId(keyId) }
+
+    private func deleteKeyId() {
+        defaults.removeObject(forKey: keyIdDefaultsKey)
+        Self.deleteKeyIdFromKeychain()
+    }
+
+    private static func keychainValue() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let value = String(data: data, encoding: .utf8) else { return nil }
+        return value
+    }
+
+    private static func saveKeyId(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecValueData as String: data,
+        ]
+        SecItemDelete(query as CFDictionary) // remove any prior value
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    private static func deleteKeyIdFromKeychain() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
 }

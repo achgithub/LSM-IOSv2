@@ -35,6 +35,20 @@ async function ensureManagerLifecycle(env: Env, managerToken: string): Promise<v
   ).bind(managerToken, new Date().toISOString()).run();
 }
 
+// The owning manager_token for a game, as recorded on its round_pushes row.
+// `undefined` = no such game; `null` = game exists but predates ownership
+// binding (grandfathered — allowed through until the next push claims it).
+async function loadGameOwner(env: Env, gameToken: string): Promise<string | null | undefined> {
+  const row = await env.DB.prepare(
+    `SELECT manager_token FROM round_pushes WHERE game_token = ?`
+  ).bind(gameToken).first<{ manager_token: string | null }>();
+  return row ? row.manager_token : undefined;
+}
+
+function managerTokenHeader(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  return c.req.header("X-Manager-Token")?.toLowerCase() ?? null;
+}
+
 // ─── Manager-facing ──────────────────────────────────────────────────────────
 
 // POST /links
@@ -149,6 +163,16 @@ submissions.post("/games/:gameToken/push", async (c) => {
   const ts = now();
   const mgrToken = managerToken?.toLowerCase() ?? null;
 
+  // gameToken alone isn't proof of ownership — it's disclosed to every player
+  // enrolled in the game via GET /s/:token, so anything mutating here must
+  // also check the (non-disclosed) managerToken that claimed the game on its
+  // first push. Games pushed before this check existed have manager_token
+  // NULL and are grandfathered through — this push will claim them.
+  const owner = await loadGameOwner(c.env, gameToken);
+  if (owner && owner !== mgrToken) {
+    return c.json({ error: "forbidden" }, 403);
+  }
+
   await c.env.DB.prepare(
     `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at, extra_json)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -240,6 +264,10 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const round = c.req.query("round");
 
+  const owner = await loadGameOwner(c.env, gameToken);
+  if (owner === undefined) return c.json({ error: "game not found" }, 404);
+  if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
+
   let rows;
   if (round) {
     const rn = parseInt(round, 10);
@@ -284,6 +312,11 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
 submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const id = c.req.param("id").toLowerCase();
+
+  const owner = await loadGameOwner(c.env, gameToken);
+  if (owner === undefined) return c.json({ error: "game not found" }, 404);
+  if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
+
   const ts = now();
   const result = await c.env.DB.prepare(
     `UPDATE submissions SET status = 'approved', decided_at = ?
@@ -312,6 +345,11 @@ submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
 submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const id = c.req.param("id").toLowerCase();
+
+  const owner = await loadGameOwner(c.env, gameToken);
+  if (owner === undefined) return c.json({ error: "game not found" }, 404);
+  if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
+
   const ts = now();
   const result = await c.env.DB.prepare(
     `UPDATE submissions SET status = 'rejected', decided_at = ?
@@ -327,6 +365,11 @@ submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
 // one global link per player, shared across all of a player's games.
 submissions.delete("/games/:gameToken", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
+
+  const owner = await loadGameOwner(c.env, gameToken);
+  if (owner === undefined) return c.json({ error: "game not found" }, 404);
+  if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
+
   await c.env.DB.batch([
     c.env.DB.prepare(`DELETE FROM round_pushes WHERE game_token = ?`).bind(gameToken),
     c.env.DB.prepare(`DELETE FROM game_enrollments WHERE game_token = ?`).bind(gameToken),

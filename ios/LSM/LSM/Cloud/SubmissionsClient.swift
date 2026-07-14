@@ -184,7 +184,8 @@ actor SubmissionsClient {
     func listSubmissions(gameToken: UUID, round: Int) async throws -> [SubmissionItem] {
         struct Response: Decodable { let submissions: [SubmissionItem] }
         let req = try await request(
-            path: "/games/\(gameToken.uuidString.lowercased())/submissions?round=\(round)", method: "GET"
+            path: "/games/\(gameToken.uuidString.lowercased())/submissions?round=\(round)", method: "GET",
+            includeManagerToken: true
         )
         let data = try await send(req)
         return try decoder.decode(Response.self, from: data).submissions
@@ -192,14 +193,14 @@ actor SubmissionsClient {
 
     func approve(submissionId: String, gameToken: UUID) async throws -> ApproveResult {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/approve"
-        let req = try await request(path: path, method: "POST")
+        let req = try await request(path: path, method: "POST", includeManagerToken: true)
         let data = try await send(req)
         return try decoder.decode(ApproveResult.self, from: data)
     }
 
     func reject(submissionId: String, gameToken: UUID) async throws {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/reject"
-        let req = try await request(path: path, method: "POST")
+        let req = try await request(path: path, method: "POST", includeManagerToken: true)
         _ = try await send(req)
     }
 
@@ -207,20 +208,29 @@ actor SubmissionsClient {
     /// Call when the game is deleted on-device so cloud data doesn't linger.
     func deleteGame(gameToken: UUID) async throws {
         let req = try await request(
-            path: "/games/\(gameToken.uuidString.lowercased())", method: "DELETE"
+            path: "/games/\(gameToken.uuidString.lowercased())", method: "DELETE", includeManagerToken: true
         )
         _ = try await send(req)
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
-    private func request(path: String, method: String) async throws -> URLRequest {
+    /// `includeManagerToken` gates the `X-Manager-Token` header for routes
+    /// that read or mutate an existing game — the server checks it against
+    /// the managerToken that claimed the game on its first push, since
+    /// gameToken alone is disclosed to every enrolled player and isn't proof
+    /// of ownership. `push` sends its managerToken in the body instead
+    /// (pre-existing convention), so it doesn't need the header.
+    private func request(path: String, method: String, includeManagerToken: Bool = false) async throws -> URLRequest {
         let base = await AppAttestService.shared.authorityURL()
         guard let url = URL(string: path, relativeTo: base) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = method
         for (field, value) in await AppAttestService.shared.authorizationHeaders() {
             req.setValue(value, forHTTPHeaderField: field)
+        }
+        if includeManagerToken {
+            req.setValue(ManagerToken.current, forHTTPHeaderField: "X-Manager-Token")
         }
         return req
     }
