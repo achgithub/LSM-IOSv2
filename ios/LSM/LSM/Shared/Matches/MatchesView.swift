@@ -107,6 +107,24 @@ struct MatchesView: View {
                     }
                 }
             }
+            // The guard above only covers the true first-ever-empty load. Once
+            // `items` holds anything (e.g. the enabled-league set changes and
+            // `load()` re-runs, possibly re-resolving team names over the
+            // network), that reload was previously silent — the list just sat
+            // there unchanged for however long it took, which read as the app
+            // hanging rather than working. Surface it without replacing the
+            // still-valid stale content underneath.
+            .safeAreaInset(edge: .top) {
+                if isLoading && !items.isEmpty {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.bar)
+                }
+            }
             .appBackground()
             .navigationTitle("Matches")
             .toolbar {

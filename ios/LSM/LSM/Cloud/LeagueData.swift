@@ -29,6 +29,36 @@ struct LeagueData {
     /// the Fixtures-view courtesy prompt (`CacheTTL.fixturesCourtesyAge`).
     let matchesDate: Date?
 
+    /// Per-league result of the load below — leagues are independent, so
+    /// gathering these concurrently is safe; only the final merge needs
+    /// to be sequential (dictionary keys are globally unique anyway).
+    private struct LeagueLoadResult {
+        let teams: [TeamDTO]
+        let matches: [MatchDTO]
+        let standings: [StandingDTO]
+        let standingsDate: Date?
+        let matchesDate: Date?
+    }
+
+    private static func loadOne(_ league: LeagueOption) async throws -> LeagueLoadResult {
+        var teams = try await cachedTeams(for: league)
+        let (matchItems, matchDate) = cachedMatches(for: league)
+        let (rows, date) = cachedStandings(for: league)
+
+        // After promotion/relegation the server has new team IDs before
+        // our 7-day cache expires. If any match or standing references an
+        // unknown team, bypass the TTL and re-fetch immediately so names
+        // resolve correctly instead of falling back to "Team 60" etc.
+        let knownIds = Set(teams.map { $0.externalId })
+        let referencedIds = Set(matchItems.flatMap { [$0.homeTeamId, $0.awayTeamId] } + rows.map { $0.teamId })
+        if !referencedIds.subtracting(knownIds).isEmpty {
+            let key = LeagueDataCache.teamsKey(league.id)
+            teams = (try? await fetchTeams(league, key: key, fallback: teams)) ?? teams
+        }
+
+        return LeagueLoadResult(teams: teams, matches: matchItems, standings: rows, standingsDate: date, matchesDate: matchDate)
+    }
+
     /// Load and merge data for a set of leagues (a game's leagues).
     static func load(for leagues: [LeagueOption]) async throws -> LeagueData {
         let targets = leagues.isEmpty ? [Leagues.home] : leagues
@@ -40,31 +70,31 @@ struct LeagueData {
         var oldestStandings: Date?
         var oldestMatches: Date?
 
-        // 1–3 leagues typically, so a sequential merge is fine.
-        for league in targets {
-            var teams = try await cachedTeams(for: league)
-            let (matchItems, matchDate) = cachedMatches(for: league)
-            let (rows, date) = cachedStandings(for: league)
-
-            // After promotion/relegation the server has new team IDs before
-            // our 7-day cache expires. If any match or standing references an
-            // unknown team, bypass the TTL and re-fetch immediately so names
-            // resolve correctly instead of falling back to "Team 60" etc.
-            let knownIds = Set(teams.map { $0.externalId })
-            let referencedIds = Set(matchItems.flatMap { [$0.homeTeamId, $0.awayTeamId] } + rows.map { $0.teamId })
-            if !referencedIds.subtracting(knownIds).isEmpty {
-                let key = LeagueDataCache.teamsKey(league.id)
-                teams = (try? await fetchTeams(league, key: key, fallback: teams)) ?? teams
+        // Leagues are independent, so resolve them concurrently rather than
+        // one at a time. Almost always this is instant either way (everything
+        // is cache-only apart from the teams TTL check), but when several
+        // leagues' 7-day teams caches lapse around the same time — e.g. added
+        // to the game on the same day — a sequential loop summed every
+        // resulting network fetch's latency; this overlaps them instead, so
+        // total time is bounded by the slowest single league, not the sum.
+        let results = try await withThrowingTaskGroup(of: (Int, LeagueLoadResult).self) { group in
+            for (index, league) in targets.enumerated() {
+                group.addTask { (index, try await loadOne(league)) }
             }
+            var collected: [Int: LeagueLoadResult] = [:]
+            for try await (index, result) in group { collected[index] = result }
+            return targets.indices.map { collected[$0]! }
+        }
 
-            matches.append(contentsOf: matchItems)
-            for team in teams {
+        for (league, result) in zip(targets, results) {
+            matches.append(contentsOf: result.matches)
+            for team in result.teams {
                 teamsById[team.externalId] = team
                 teamsCountByTeam[team.externalId] = league.teamsCount
             }
-            for standing in rows { standingsByTeam[standing.teamId] = standing }
-            if let date { oldestStandings = min(oldestStandings ?? date, date) }
-            if let matchDate { oldestMatches = min(oldestMatches ?? matchDate, matchDate) }
+            for standing in result.standings { standingsByTeam[standing.teamId] = standing }
+            if let date = result.standingsDate { oldestStandings = min(oldestStandings ?? date, date) }
+            if let matchDate = result.matchesDate { oldestMatches = min(oldestMatches ?? matchDate, matchDate) }
         }
 
         // A manual (manager-typed) league can go stale if a real team is later
