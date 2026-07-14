@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Cloud feature level derived from tier. Backup, Publish, and PWA all unlock
+/// Cloud feature level derived from tier. Backup and PWA both unlock
 /// together at `leagues_3` — quantity caps (`maxActiveGames`, `maxPWALinks`)
 /// do the differentiation above that point, not a feature split.
 enum CloudLevel {
@@ -44,11 +44,11 @@ enum Tier: String, CaseIterable, Identifiable {
         case .noAds:
             return AppString("No ads · 1 league · 3 games")
         case .leagues3:
-            return AppString("No ads · 3 leagues · 9 games · Cloud backup, publish & PWA (60 links)")
+            return AppString("No ads · 3 leagues · 9 games · Cloud backup & PWA (60 links)")
         case .leagues5:
-            return AppString("No ads · 5 leagues · 15 games · Cloud backup, publish & PWA (100 links)")
+            return AppString("No ads · 5 leagues · 15 games · Cloud backup & PWA (100 links)")
         case .leagues7:
-            return AppString("No ads · 7 leagues · 21 games · Cloud backup, publish & PWA (140 links)")
+            return AppString("No ads · 7 leagues · 21 games · Cloud backup & PWA (140 links)")
         }
     }
 
@@ -75,7 +75,7 @@ enum Tier: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Cloud features (Backup, Publish, PWA) bundled into every league tier.
+    /// Cloud features (Backup, PWA) bundled into every league tier.
     var cloudLevel: CloudLevel {
         switch self {
         case .free, .noAds:               return .none
@@ -149,7 +149,7 @@ final class Entitlements {
     /// `nil` means PWA is unavailable at the current tier.
     var maxPWALinks: Int? { tier.maxPWALinks }
 
-    /// Gates all cloud features (Backup, Publish, PWA). True when the tier
+    /// Gates all cloud features (Backup, PWA). True when the tier
     /// includes cloud — `leagues_3` and above.
     var canUseCloud: Bool { tier.cloudLevel == .full }
 

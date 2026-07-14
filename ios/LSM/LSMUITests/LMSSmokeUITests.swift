@@ -715,6 +715,36 @@ final class LMSSmokeUITests: XCTestCase {
         attachScreenshot(named: "DowngradeBlockedNewLeague")
     }
 
+    /// Not a regression test — a one-off capture for App Store Connect's
+    /// subscription "Review Information" screenshot requirement (Settings ▸
+    /// Subscription ▸ Upgrade opens PaywallView as a sheet). Run with
+    /// `-only-testing:LSMUITests/LMSSmokeUITests/testCapturePaywallScreenshot`.
+    @MainActor
+    func testCapturePaywallScreenshot() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitests", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        completeOnboardingIfNeeded(app)
+
+        XCTAssertTrue(
+            app.tabBars.buttons["Settings"].waitForExistence(timeout: 15),
+            "Settings tab never appeared"
+        )
+        app.tabBars.buttons["Settings"].tap()
+        app.staticTexts["Subscription"].tap()
+
+        let upgrade = app.buttons["Upgrade"]
+        XCTAssertTrue(upgrade.waitForExistence(timeout: 10), "Upgrade button never appeared on Subscription screen")
+        upgrade.tap()
+
+        // PaywallView renders as a sheet titled "Go Premium" (navigationTitle).
+        XCTAssertTrue(
+            app.navigationBars["Go Premium"].waitForExistence(timeout: 10),
+            "Paywall (Go Premium) never appeared"
+        )
+        attachScreenshot(named: "Paywall")
+    }
+
     private func attachScreenshot(named name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
