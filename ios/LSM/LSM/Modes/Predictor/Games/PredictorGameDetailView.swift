@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum PredictorSheet: String, Identifiable {
-    case open, predictions, results, standings, publish, submissions
+    case open, predictions, results, standings, submissions
     case shareFixtures, shareEntryClosed, shareWeeklyResults, shareLeague, shareWinner
     var id: String { rawValue }
 }
@@ -97,8 +97,6 @@ struct PredictorGameDetailView: View {
                 if let round = openRound { PredictorResultsEntryView(game: game, round: round) }
             case .standings:
                 NavigationStack { PredictorStandingsView(game: game) }
-            case .publish:
-                PublishPredictorView(game: game)
             case .submissions:
                 if let round = openRound, let gameToken = game.cloudGameToken {
                     NavigationStack {
@@ -163,16 +161,6 @@ struct PredictorGameDetailView: View {
             LabeledContent("Matchday", value: "\(currentRound?.roundNumber ?? 0)")
             Button { sheet = .standings } label: {
                 Label("Standings", systemImage: "list.number")
-            }
-            // Hidden for new use — Publish League's rough edges (issues #14,
-            // #16, #17) aren't worth polishing right now. Left reachable only
-            // for a game that already has a live published link, so an
-            // existing manager can still get back in to unpublish/manage it
-            // rather than being stranded with an orphaned public page.
-            if entitlements.canUseCloud && game.predictorPublishLinkId != nil {
-                Button { sheet = .publish } label: {
-                    Label("Publish League…", systemImage: "globe")
-                }
             }
             // Safety net for the auto push on round-open — re-sends current
             // fixtures/state plus the last round's results, always safe to
