@@ -3,15 +3,13 @@ import Foundation
 /// AdMob unit IDs. The App ID also goes in Info.plist as `GADApplicationIdentifier`
 /// (real always — only the ad UNIT ids switch for test ads, never the App ID).
 ///
-/// `useTestAds = true` while the app is TestFlight-only: AdMob can't review an
-/// app with no App Store URL yet, so the real ad units serve no fill at all
-/// pre-review. Google's own guidance for this exact situation is to use their
-/// demo ad unit IDs (`Demo` below) rather than real ones, partly to avoid any
-/// risk of invalid-traffic flags on real inventory during testing. **Flip this
-/// to `false` once submitting to the App Store** (Phase 5 of the route-to-live
-/// plan) — that's the one deliberate edit this file needs before release.
+/// Was `true` while the app was TestFlight-only: AdMob can't review an app
+/// with no App Store URL yet, so the real ad units served no fill at all
+/// pre-review, and Google's own guidance for that situation is to use their
+/// demo ad unit IDs (`Demo` below) rather than real ones. Flipped to `false`
+/// for App Store submission — real ad units now serve live inventory.
 enum AdUnitIDs {
-    static let useTestAds = true
+    static let useTestAds = false
 
     static let appID = "ca-app-pub-3510617456822042~1632957503"
 
