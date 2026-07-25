@@ -172,7 +172,7 @@ struct KillerCardData {
             }
     }
 
-    private static func makeStandings(game: Game) -> [KillerStandingEntry] {
+    static func makeStandings(game: Game) -> [KillerStandingEntry] {
         game.players
             .sorted { a, b in
                 let livesA = a.killerState?.lives ?? 0
