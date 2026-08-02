@@ -8,11 +8,12 @@ import { LEAGUE_SHARD, type ShardRegion } from "./shards";
 // Both shard workers serve the identical full manifest, so the app gets every
 // league from whichever one it asks.
 
-// Public base URL of each shard worker (workers.dev). Filled in after the first
-// deploy prints the URLs — see worker/MIGRATION.md.
+// Public base URL of each shard worker — the zone custom domain, not the
+// workers.dev subdomain, so this traffic is covered by Cloudflare zone-level
+// protections (WAF, rate limiting, Bot Fight Mode) on sportsmanager.site.
 export const SHARD_BASE: Record<ShardRegion, string> = {
-  uk: "https://lsm-uk-worker.sportsmanager.workers.dev",
-  eu: "https://lsm-eu-worker.sportsmanager.workers.dev",
+  uk: "https://uk-api.sportsmanager.site",
+  eu: "https://eu-api.sportsmanager.site",
 };
 
 interface LeagueMeta {
