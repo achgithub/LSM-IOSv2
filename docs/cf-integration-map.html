@@ -352,6 +352,7 @@
       <li><a href="#external" class="idx-link"><span class="idx">07</span>External integrations</a></li>
       <li><a href="#findings" class="idx-link"><span class="idx">08</span>Known issues</a></li>
       <li><a href="#cleanup" class="idx-link"><span class="idx">09</span>Legacy cleanup log</a></li>
+      <li><a href="#backup-removal" class="idx-link"><span class="idx">10</span>Cloud Backup/Publish removal</a></li>
     </ol>
   </nav>
 
@@ -359,10 +360,10 @@
     <header class="hero" id="overview">
       <p class="eyebrow">Architecture reference · LSM-IOSv2</p>
       <h1>Everything the app says to Cloudflare, and everything Cloudflare says back</h1>
-      <p class="lede">Three Worker codebases, three D1 databases, one shared R2 bucket, region-scoped KV, and a Pages-hosted PWA — mapped end to end from the iOS Swift call sites down to the wrangler bindings. Updated 2026-08-02 after committing the custom-domain fix and tearing down the never-deployed EU authority env plus a full sweep of unused legacy v1 Cloudflare resources (see §09).</p>
+      <p class="lede">Three Worker codebases, three D1 databases, region-scoped KV, and a Pages-hosted PWA — mapped end to end from the iOS Swift call sites down to the wrangler bindings. Updated 2026-08-02 after committing the custom-domain fix, tearing down the never-deployed EU authority env, a full sweep of unused legacy v1 Cloudflare resources (§09), and removing Cloud Backup/Publish along with R2 entirely (§10).</p>
       <div class="meta">
         <span>3 worker codebases</span><span>·</span>
-        <span>27 app-facing routes</span><span>·</span>
+        <span>23 app-facing routes</span><span>·</span>
         <span>4 auth schemes</span><span>·</span>
         <span>1 authority region (uk) · 2 sports shards (uk / eu)</span>
       </div>
@@ -391,7 +392,6 @@
         <div class="tier-label">Storage &amp; upstream</div>
         <div class="tier">
           <div class="node"><div class="name">D1 ×3</div><div class="desc">2 sports-shard + 1 authority (uk-only — eu authority torn down)</div></div>
-          <div class="node"><div class="name">R2 · lsm-cloud-bundle</div><div class="desc">shared bucket, both authority + shard</div></div>
           <div class="node"><div class="name">KV · region-scoped</div><div class="desc">shared across all 3 workers per region</div></div>
           <div class="node dim"><div class="name">football-data.org</div><div class="desc">upstream fixtures/scores provider</div></div>
         </div>
@@ -404,19 +404,19 @@
           <dt>Envs</dt><dd class="plain">uk (lsm-uk-worker) · eu (lsm-eu-worker)</dd>
           <dt>Domains</dt><dd>uk-api.sportsmanager.site · eu-api.sportsmanager.site</dd>
           <dt>workers.dev</dt><dd class="plain" style="color: var(--crit); font-family: var(--sans); font-weight: 600;">still enabled on both envs — see finding 08.2</dd>
-          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · R2 <code>BACKUPS</code> · KV <code>SCORES</code></dd>
+          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · KV <code>SCORES</code></dd>
           <dt>Cron</dt><dd class="plain"><span class="status s-parked">built, not scheduled</span></dd>
         </dl>
       </div>
 
       <div class="service-card">
         <div class="head"><h3>lsm-api <span class="pill pill-jwt">authority</span></h3><span class="worker-name">worker-api/</span></div>
-        <p class="purpose">Owns everything that isn't sports data: App Attest device registry + JWT issuance, manager lifecycle, the PWA submission queue, cloud backup/publish to R2, region-migration stubs, and the shared outage flag.</p>
+        <p class="purpose">Owns everything that isn't sports data: App Attest device registry + JWT issuance, manager lifecycle, the PWA submission queue, region-migration stubs, and the shared outage flag. Cloud Backup/Publish (and its R2 binding) removed 2026-08-02 — see §10.</p>
         <dl class="kv-grid">
           <dt>Envs</dt><dd class="plain">uk (lsm-api-uk) only — <strong>eu env torn down 2026-08-02</strong>, was never deployed (D1 id was PLACEHOLDER, JWT keys were {})</dd>
           <dt>Domains</dt><dd>api.uk.sportsmanager.site</dd>
           <dt>workers.dev</dt><dd class="plain" style="color: var(--crit); font-family: var(--sans); font-weight: 600;">still enabled — see finding 08.2</dd>
-          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · R2 <code>BACKUPS</code> · KV <code>FLAGS</code></dd>
+          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · KV <code>FLAGS</code></dd>
           <dt>Cron</dt><dd class="plain"><span class="status s-parked">built, parked pending test cycle</span></dd>
         </dl>
       </div>
@@ -485,10 +485,6 @@
             <tr><td class="method m-DELETE">DELETE</td><td class="path"><code>/games/:token</code></td><td>JWT + Manager</td><td>wipe cloud rows for a deleted game</td><td>iOS · <code>deleteGame</code></td></tr>
             <tr><td class="method m-GET">GET</td><td class="path"><code>/s/:token</code></td><td><span class="pill pill-public">Public</span></td><td>player fetches active games + history</td><td>PWA · <code>fetchPlayer</code></td></tr>
             <tr><td class="method m-POST">POST</td><td class="path"><code>/s/:token/games/:gameToken</code></td><td><span class="pill pill-public">Public</span></td><td>player submits pick/prediction/killer</td><td>PWA · submit*</td></tr>
-            <tr><td class="method m-PUT">PUT</td><td class="path"><code>/backup/:id</code></td><td><span class="pill pill-jwt">JWT</span></td><td>cloud backup blob → R2</td><td>iOS · <code>SnapshotClient.backup</code></td></tr>
-            <tr><td class="method m-GET">GET</td><td class="path"><code>/backup/:id</code></td><td><span class="pill pill-jwt">JWT</span></td><td>restore blob from R2</td><td>iOS · <code>SnapshotClient.restore</code></td></tr>
-            <tr><td class="method m-POST">POST</td><td class="path"><code>/publish</code></td><td><span class="pill pill-jwt">JWT</span></td><td>publish Predictor snapshot to R2 + PIN</td><td>iOS · <code>SnapshotClient.publish</code></td></tr>
-            <tr><td class="method m-POST">POST</td><td class="path"><code>/publish/:id/unlock</code></td><td><span class="pill pill-public">Public + PIN</span></td><td>viewer unlocks a published snapshot</td><td>Pages Function <code>l/[region]/[id].js</code></td></tr>
             <tr><td class="method m-GET">GET</td><td class="path"><code>/manager/status</code></td><td><span class="pill pill-mgr">Manager</span></td><td>lifecycle state for Cloud Settings</td><td>iOS · <code>ManagerLifecycleClient.status</code></td></tr>
             <tr><td class="method m-POST">POST</td><td class="path"><code>/manager/unsubscribe</code></td><td><span class="pill pill-mgr">Manager</span></td><td>start 14-day deletion grace</td><td>iOS · <code>unsubscribe</code></td></tr>
             <tr><td class="method m-POST">POST</td><td class="path"><code>/manager/resubscribe</code></td><td><span class="pill pill-mgr">Manager</span></td><td>cancel deletion grace</td><td>iOS · <code>resubscribe</code></td></tr>
@@ -536,10 +532,6 @@
         <p>The App Attest / JWT client. <code>authorityURL()</code> resolves once per install from StoreKit storefront, persisted to <code>UserDefaults</code>, correctly falling back to the <strong>custom domain</strong> <code>api.&lt;region&gt;.sportsmanager.site</code>. Drives <code>fetchChallenge</code> → <code>register</code> → <code>mintJWT</code>, with one retry on a stale-registration 403. Key lives in Keychain.</p>
       </div>
       <div class="filecard">
-        <span class="fname">SnapshotClient.swift</span><span class="floc">Cloud/SnapshotClient.swift · 102 lines</span>
-        <p>Backup and publish. <code>backup(_:id:)</code> → <code>PUT /backup/:id</code>; <code>restore(id:)</code> → <code>GET /backup/:id</code>; <code>publish(...)</code> → <code>POST /publish</code>. All routed through <code>authorityRequest(path:method:)</code>.</p>
-      </div>
-      <div class="filecard">
         <span class="fname">SubmissionsClient.swift</span><span class="floc">Cloud/SubmissionsClient.swift · 251 lines</span>
         <p>Manager-facing half of the PWA submission queue. <code>playerBase</code> is hardcoded to <code>submit.sportsmanager.site</code> — the PWA's own domain, separate from the authority API.</p>
         <ul>
@@ -575,17 +567,8 @@
     <!-- 04 STORAGE -->
     <section id="storage">
       <h2>04 · Storage layer</h2>
-      <p class="section-sub">One R2 bucket shared by two Workers, two D1 schemas across four (planned) databases, and per-region KV namespaces that are quietly the same namespace under three different binding names.</p>
+      <p class="section-sub">Two D1 schemas across three databases (R2 removed 2026-08-02 — see §10), and per-region KV namespaces that are quietly the same namespace under three different binding names.</p>
       <div class="storage-grid">
-        <div class="storage-card">
-          <h4><span class="icon icon-r2">R2</span>lsm-cloud-bundle</h4>
-          <p>One bucket, bound identically into both lsm-worker and lsm-api, uk and eu — a backup/publish blob is self-contained and not league-scoped, so any shard can serve it.</p>
-          <ul>
-            <li><code>backups/&lt;restoreCode&gt;.json</code> — keep last 2 per manager</li>
-            <li><code>publish/&lt;id&gt;.json</code> — deleted 100 days after last publish</li>
-            <li>lsm-worker's own <code>backup.ts</code>/<code>publish.ts</code> are dead — live logic is entirely in worker-api</li>
-          </ul>
-        </div>
         <div class="storage-card">
           <h4><span class="icon icon-d1">D1</span>Sports-shard schema</h4>
           <p><code>worker/schema.sql</code> — <code>leagues</code>, <code>teams</code>, <code>fixtures</code>, <code>standings</code>, <code>sync_meta</code>, legacy <code>attest_devices</code>, plus a dormant Layer-2 sketch (<code>games</code>, <code>players</code>, <code>picks</code>...).</p>
@@ -596,11 +579,11 @@
         </div>
         <div class="storage-card">
           <h4><span class="icon icon-d1">D1</span>Authority schema</h4>
-          <p><code>worker-api/schema.sql</code> — <code>attest_devices</code>, <code>player_tokens</code>, <code>game_enrollments</code>, <code>round_pushes</code>, <code>round_results</code>, <code>submissions</code>, <code>manager_lifecycle</code>, <code>manager_backups</code>, <code>publish_links</code>.</p>
+          <p><code>worker-api/schema.sql</code> — <code>attest_devices</code>, <code>player_tokens</code>, <code>game_enrollments</code>, <code>round_pushes</code>, <code>round_results</code>, <code>submissions</code>, <code>manager_lifecycle</code>. <code>manager_backups</code> and <code>publish_links</code> dropped 2026-08-02 — see §10.</p>
           <ul>
             <li>lsm-api-uk-db — provisioned</li>
             <li>lsm-api-eu-db — never existed; the eu env was torn down 2026-08-02</li>
-            <li>5 hand-applied migrations in <code>worker-api/migrations/</code></li>
+            <li>6 hand-applied migrations in <code>worker-api/migrations/</code></li>
           </ul>
         </div>
         <div class="storage-card">
@@ -632,7 +615,7 @@
             <tr>
               <td class="mono">lsm-api</td>
               <td class="mono">runDailyCleanup</td>
-              <td>9-phase retention sweep: submissions, revoked tokens, abandoned games, manager deletes, R2 backup pruning, stale publish links, stale attest devices, PWA-link over-cap cascade</td>
+              <td>7-phase retention sweep: submissions, revoked tokens, abandoned games, manager deletes, stale attest devices, PWA-link over-cap cascade (R2 backup pruning and stale-publish-link phases removed 2026-08-02 — see §10)</td>
               <td><span class="status s-parked">parked</span> — explicitly held until current test cycle finishes</td>
             </tr>
             <tr>
@@ -650,7 +633,7 @@
     <!-- 06 AUTH -->
     <section id="auth">
       <h2>06 · Auth mechanisms</h2>
-      <p class="section-sub">Five schemes, layered by how sensitive the route is — from full device attestation down to a rate-limited PIN.</p>
+      <p class="section-sub">Four schemes, layered by how sensitive the route is.</p>
       <ol class="auth-list">
         <li class="auth-item">
           <div>
@@ -662,7 +645,7 @@
         <li class="auth-item">
           <div>
             <h4>Anonymous device / manager tokens <span class="pill pill-mgr">no login, no PII</span></h4>
-            <p><code>ManagerToken.current</code> — client-generated UUID, Keychain-persisted, sent as <code>X-Manager-Token</code>. Scopes ownership of games, publish links, backups, lifecycle rows, and is the <em>sole</em> credential on <code>/manager/*</code> — deliberately kept out of JWT claims and URLs to avoid leaking into logs.</p>
+            <p><code>ManagerToken.current</code> — client-generated UUID, Keychain-persisted, sent as <code>X-Manager-Token</code>. Scopes ownership of games and lifecycle rows, and is the <em>sole</em> credential on <code>/manager/*</code> — deliberately kept out of JWT claims and URLs to avoid leaking into logs.</p>
             <p>Player tokens are a second, unrelated tier: one unguessable UUID per player, the only credential in the public <code>/s/&lt;token&gt;</code> PWA link, deliberately outside GDPR personal-data scope.</p>
           </div>
         </li>
@@ -678,13 +661,8 @@
             <p>Gates worker-dash at the edge (policy lives in the Zero Trust dashboard, not the repo) and is independently re-verified against the team's JWKS, RS256, audience-scoped. Fails closed on any verification failure, including an unreachable JWKS endpoint.</p>
           </div>
         </li>
-        <li class="auth-item">
-          <div>
-            <h4>PIN-based unlock <span class="pill pill-public">access control, not identity</span></h4>
-            <p><code>publish_links.pin_hash</code>/<code>pin_salt</code> (salted SHA-256), checked in <code>POST /publish/:id/unlock</code>. Brute-force protected: 10 attempts, 30-minute lockout, reset on republish.</p>
-          </div>
-        </li>
       </ol>
+      <div class="note-box">A fifth scheme, PIN-based unlock for Cloud Publish's viewer, was removed 2026-08-02 along with the feature — see §10.</div>
     </section>
 
     <!-- 07 EXTERNAL -->
@@ -725,11 +703,10 @@
           </div>
         </div>
         <div class="finding">
-          <div class="sev"><span class="status s-parked">warning</span></div>
+          <div class="sev"><span class="status s-live">resolved 2026-08-02</span></div>
           <div>
-            <h4>lsm-publish's WORKER_BASE_URL is still the old workers.dev host</h4>
-            <p>The Cloud Publish viewer's live env var still points at <code>https://lsm-uk-worker.sportsmanager.workers.dev</code> instead of the <code>uk-api.sportsmanager.site</code> custom domain — same underlying issue as the two findings above, in a Pages project instead of the app binary. Lower urgency: it's a Pages env var, fixable with a redeploy, no app rebuild required.</p>
-            <p class="cite">pages/README.md</p>
+            <h4>lsm-publish's stale WORKER_BASE_URL — moot, the whole project is gone</h4>
+            <p>Previously flagged: the Cloud Publish viewer's live env var still pointed at the old workers.dev host instead of the custom domain. Rather than fix it, Cloud Publish itself was removed (§10) — <code>lsm-publish</code> Pages project deleted, <code>pages/</code> removed from the repo.</p>
           </div>
         </div>
         <div class="finding">
@@ -838,7 +815,36 @@
         </table>
       </div>
 
-      <div class="note-box">Post-cleanup verification: account now holds exactly 5 Workers (<code>clubroom-submissions</code>, <code>lsm-api-uk</code>, <code>lsm-eu-worker</code>, <code>lsm-uk-worker</code>, <code>lsm-v2-dash-worker</code>), 3 KV namespaces (<code>eu-SCORES</code>, <code>uk-SCORES</code>, <code>SUBMISSIONS</code>), 3 D1 databases, 1 R2 bucket, 3 Pages projects, and 5 custom domains on sportsmanager.site — matching §01–§04 above exactly, nothing extra and nothing missing.</div>
+      <div class="note-box">Post-cleanup verification (as of this pass): account held exactly 5 Workers (<code>clubroom-submissions</code>, <code>lsm-api-uk</code>, <code>lsm-eu-worker</code>, <code>lsm-uk-worker</code>, <code>lsm-v2-dash-worker</code>), 3 KV namespaces (<code>eu-SCORES</code>, <code>uk-SCORES</code>, <code>SUBMISSIONS</code>), 3 D1 databases, 1 R2 bucket, 3 Pages projects, and 5 custom domains on sportsmanager.site. The R2 bucket and one of the three Pages projects were removed later the same day — see §10.</div>
+    </section>
+
+    <!-- 10 BACKUP REMOVAL -->
+    <section id="backup-removal">
+      <h2>10 · Cloud Backup/Publish removal — 2026-08-02</h2>
+      <p class="section-sub">Later the same day as §09's legacy sweep: Andrew's call, ahead of a rebuild, to shed R2 as an operational dependency entirely. Cloud Publish was already unreachable from any app UI (no call site ever invoked <code>SnapshotClient.publish</code>); Cloud Backup is planned to be replaced by a per-game export/import feature, not yet built. PWA player links are untouched — a separate D1/KV-backed system, never gated on R2.</p>
+
+      <h3>App (ios/LSM)</h3>
+      <p style="font-size:13.5px;color:var(--slate);margin:0 0 12px;">Removed: <code>Cloud/SnapshotClient.swift</code>, <code>Shared/Settings/CloudBackupSection.swift</code>, <code>Shared/Settings/BackupSettingsView.swift</code>, <code>Core/Backup/GameSnapshot.swift</code>, <code>Core/Backup/PublishSnapshot.swift</code>, and their unit tests. <code>Game</code>'s four <code>predictorPublish*</code> stored properties dropped (verified: app launches clean over Andy H's iPhone's existing on-device data — SwiftData migration is fine). The Settings → "Backup & Cloud" row is gone. The manager-downgrade lifecycle sync (unsubscribe/resubscribe against <code>manager_lifecycle</code>) moved from that settings screen's <code>.task</code> into <code>Entitlements.apply(tier:)</code>, so it now runs every launch/purchase/restore instead of only when that screen happened to be open.</p>
+
+      <h3>Cloudflare</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Resource</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">worker-api routes /backup/*, /publish, /publish/:id/unlock</td><td>removed, plus the pin-hashing module (<code>pin.ts</code>) only they used</td></tr>
+            <tr><td class="mono">worker/src/routes/backup.ts, publish.ts, pin.ts(+.test.ts)</td><td>deleted — already-dead, unmounted duplicates in the sports shard</td></tr>
+            <tr><td class="mono">R2 binding <code>BACKUPS</code></td><td>removed from worker-api (uk) and worker (uk, eu)</td></tr>
+            <tr><td class="mono">R2 bucket <code>lsm-cloud-bundle</code></td><td>confirmed empty (0 objects), then deleted</td></tr>
+            <tr><td class="mono">D1 tables <code>manager_backups</code>, <code>publish_links</code></td><td>dropped via <code>migrations/0006_drop_backup_publish_tables.sql</code> against lsm-api-uk-db (1 orphaned backup-metadata row and 0 publish-link rows — no live data lost)</td></tr>
+            <tr><td class="mono">Pages project <code>lsm-publish</code></td><td>deleted; <code>pages/</code> removed from the repo</td></tr>
+            <tr><td class="mono">worker-api's parked cleanup cron + <code>/admin/cleanup-preview</code></td><td>R2 backup pruning and stale-publish-link phases removed; <code>StalePreview</code>/worker-dash's mirrored <code>CleanupPreview</code>/<code>CLEANUP_ROWS</code> updated to match</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--slate);">All three Workers (<code>lsm-api-uk</code>, <code>lsm-uk-worker</code>, <code>lsm-eu-worker</code>) redeployed; <code>/health</code> and <code>/leagues.json</code> confirmed 200 post-deploy, <code>/publish</code> and <code>/backup/:id</code> confirmed 404.</p>
+
+      <h3>Copy</h3>
+      <p style="font-size:13.5px;color:var(--slate);margin:0;">Updated to drop Backup/Publish mentions: <code>Entitlements.swift</code>'s tier <code>detail</code> strings (now "PWA player links (N)" instead of "Cloud backup & PWA"), <code>docs/pricing-model.md</code>, and the legal pages <code>web/site/lsm/terms.html</code> / <code>privacy.html</code> (both re-dated 2 August 2026).</p>
     </section>
 
     <footer class="doc-foot">
