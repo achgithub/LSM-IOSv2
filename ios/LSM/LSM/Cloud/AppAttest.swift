@@ -94,16 +94,24 @@ actor AppAttestService {
 
     private func attemptJWT(freshAttest: Bool) async throws -> String {
         let authority = await authorityURL()
-        let keyId     = try await attestedKeyId(authority: authority, fresh: freshAttest)
-        let challenge = try await fetchChallenge(baseURL: authority)
-        let assertion = try await assertion(keyId: keyId, challenge: challenge)
         do {
+            let keyId     = try await attestedKeyId(authority: authority, fresh: freshAttest)
+            let challenge = try await fetchChallenge(baseURL: authority)
+            let assertion = try await assertion(keyId: keyId, challenge: challenge)
             return try await mintJWT(authority: authority, keyId: keyId,
                                      challenge: challenge, assertion: assertion)
-        } catch APIError.badStatus(403, _) where !freshAttest {
-            // Stored key's public key in the authority DB doesn't verify — stale
-            // registration (e.g. re-install, or DB was seeded from a dev session).
-            // Clear the key so attestedKeyId generates and registers a fresh one.
+        } catch {
+            guard !freshAttest else { throw error }
+            // Stored keyId doesn't work anymore. Two ways that happens: the
+            // authority rejects the assertion with 403 (its stored public key
+            // doesn't verify — stale server-side registration), OR Apple's
+            // Secure Enclave throws before we ever reach the network (a
+            // DCError from `assertion()`'s generateAssertion call) because it
+            // has no record of this key anymore — which is exactly what
+            // happens after the app is deleted and reinstalled: our own
+            // Keychain record of the keyId string survives uninstall, but the
+            // App Attest key it refers to does not. Either failure mode means
+            // the same fix: clear the key and enrol a brand-new one.
             deleteKeyId()
             return try await attemptJWT(freshAttest: true)
         }
