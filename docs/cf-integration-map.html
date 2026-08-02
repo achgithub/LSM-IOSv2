@@ -571,7 +571,7 @@
       <div class="storage-grid">
         <div class="storage-card">
           <h4><span class="icon icon-d1">D1</span>Sports-shard schema</h4>
-          <p><code>worker/schema.sql</code> — <code>leagues</code>, <code>teams</code>, <code>fixtures</code>, <code>standings</code>, <code>sync_meta</code>, legacy <code>attest_devices</code>, plus a dormant Layer-2 sketch (<code>games</code>, <code>players</code>, <code>picks</code>...).</p>
+          <p><code>worker/schema.sql</code> — <code>leagues</code>, <code>teams</code>, <code>fixtures</code>, <code>standings</code>, <code>sync_meta</code>, legacy <code>attest_devices</code>, plus a dormant Layer-2 sketch (<code>games</code>, <code>players</code>, <code>picks</code>, <code>predictions</code>, <code>player_tokens</code>, <code>round_pushes</code>, <code>submissions</code>, <code>manager_lifecycle</code>, <code>game_enrollments</code> — orphaned duplicates of worker-api's live tables, from before that queue moved wholesale to the authority; not touched by any currently-mounted route). Its <code>manager_backups</code>/<code>publish_links</code> tables (same dormant category, plus 8 rows of 2026-06-25/26 dev/test data in lsm-uk-db's <code>publish_links</code>) were dropped 2026-08-02 via <code>migrate-phase9.sql</code>, alongside worker-api's copies — see §10.</p>
           <ul>
             <li>lsm-uk-db — provisioned</li>
             <li>lsm-eu-db — provisioned</li>
@@ -835,7 +835,8 @@
             <tr><td class="mono">worker/src/routes/backup.ts, publish.ts, pin.ts(+.test.ts)</td><td>deleted — already-dead, unmounted duplicates in the sports shard</td></tr>
             <tr><td class="mono">R2 binding <code>BACKUPS</code></td><td>removed from worker-api (uk) and worker (uk, eu)</td></tr>
             <tr><td class="mono">R2 bucket <code>lsm-cloud-bundle</code></td><td>confirmed empty (0 objects), then deleted</td></tr>
-            <tr><td class="mono">D1 tables <code>manager_backups</code>, <code>publish_links</code></td><td>dropped via <code>migrations/0006_drop_backup_publish_tables.sql</code> against lsm-api-uk-db (1 orphaned backup-metadata row and 0 publish-link rows — no live data lost)</td></tr>
+            <tr><td class="mono">D1 tables <code>manager_backups</code>, <code>publish_links</code> (worker-api)</td><td>dropped via <code>migrations/0006_drop_backup_publish_tables.sql</code> against lsm-api-uk-db (1 orphaned backup-metadata row and 0 publish-link rows — no live data lost)</td></tr>
+            <tr><td class="mono">D1 tables <code>manager_backups</code>, <code>publish_links</code> (worker, both shards)</td><td>separate, older duplicate copies in the sports-shard schema (dormant since the queue moved to worker-api) — dropped via <code>worker/migrate-phase9.sql</code> against both lsm-uk-db and lsm-eu-db (0 rows in manager_backups; 8 rows of 2026-06-25/26 dev/test data in lsm-uk-db's publish_links, 0 in lsm-eu-db's — no live data lost)</td></tr>
             <tr><td class="mono">Pages project <code>lsm-publish</code></td><td>deleted; <code>pages/</code> removed from the repo</td></tr>
             <tr><td class="mono">worker-api's parked cleanup cron + <code>/admin/cleanup-preview</code></td><td>R2 backup pruning and stale-publish-link phases removed; <code>StalePreview</code>/worker-dash's mirrored <code>CleanupPreview</code>/<code>CLEANUP_ROWS</code> updated to match</td></tr>
           </tbody>
