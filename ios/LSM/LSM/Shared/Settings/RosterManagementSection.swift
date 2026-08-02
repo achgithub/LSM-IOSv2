@@ -81,9 +81,7 @@ struct RosterManagementSection: View {
                     Label("Export CSV", systemImage: "square.and.arrow.up")
                 }
                 .disabled(members.isEmpty)
-                // Single localized string key — can't wrap without changing the key.
-                // swiftlint:disable:next line_length
-                Text("One name per row. Add a group with `Name, Group`. Rows without one go to the selected import group above. `Name, Email` still works (email ignored).")
+                Text("One name per row. Add a group with `Name, Group`. Rows without one go to the selected import group above.")
                     .font(.caption).foregroundStyle(.secondary)
                 if let message {
                     Text(message).font(.caption)
