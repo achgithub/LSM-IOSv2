@@ -1,0 +1,869 @@
+<title>LSM ↔ Cloudflare Integration Map</title>
+<style>
+  :root {
+    --ink: #151a21;
+    --paper: #f3f5f6;
+    --paper-raised: #ffffff;
+    --slate: #5c6773;
+    --slate-soft: #8992a0;
+    --line: #dbe1e6;
+    --line-soft: #e8ecef;
+    --accent: #d9642f;
+    --accent-soft: #f4e2d6;
+    --accent-ink: #7a3416;
+    --good: #2f8f4e;
+    --good-soft: #e1f2e6;
+    --warn: #b9791a;
+    --warn-soft: #faedd6;
+    --crit: #c23b3b;
+    --crit-soft: #fbe2e2;
+    --mono: ui-monospace, "SF Mono", "Menlo", "Cascadia Code", monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --shadow: 0 1px 2px rgba(21,26,33,0.04), 0 8px 24px -12px rgba(21,26,33,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8ebee;
+      --paper: #14171c;
+      --paper-raised: #1b1f26;
+      --slate: #9aa3ae;
+      --slate-soft: #6b7480;
+      --line: #2a2f37;
+      --line-soft: #21252c;
+      --accent: #ec8250;
+      --accent-soft: #3a2417;
+      --accent-ink: #f4b088;
+      --good: #57c07c;
+      --good-soft: #17291d;
+      --warn: #e0a83f;
+      --warn-soft: #2e2413;
+      --crit: #ef6a6a;
+      --crit-soft: #331919;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e8ebee; --paper: #14171c; --paper-raised: #1b1f26; --slate: #9aa3ae; --slate-soft: #6b7480;
+    --line: #2a2f37; --line-soft: #21252c; --accent: #ec8250; --accent-soft: #3a2417; --accent-ink: #f4b088;
+    --good: #57c07c; --good-soft: #17291d; --warn: #e0a83f; --warn-soft: #2e2413; --crit: #ef6a6a; --crit-soft: #331919;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  :root[data-theme="light"] {
+    --ink: #151a21; --paper: #f3f5f6; --paper-raised: #ffffff; --slate: #5c6773; --slate-soft: #8992a0;
+    --line: #dbe1e6; --line-soft: #e8ecef; --accent: #d9642f; --accent-soft: #f4e2d6; --accent-ink: #7a3416;
+    --good: #2f8f4e; --good-soft: #e1f2e6; --warn: #b9791a; --warn-soft: #faedd6; --crit: #c23b3b; --crit-soft: #fbe2e2;
+    --shadow: 0 1px 2px rgba(21,26,33,0.04), 0 8px 24px -12px rgba(21,26,33,0.12);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  code, .mono { font-family: var(--mono); font-size: 0.88em; }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    nav.toc { display: none; }
+  }
+
+  /* ---- Sidebar TOC ---- */
+  nav.toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 18px 32px 28px;
+    border-right: 1px solid var(--line);
+  }
+  nav.toc .brand {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 22px;
+    font-weight: 600;
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    display: block;
+    padding: 6px 10px;
+    margin: 1px 0;
+    border-radius: 6px;
+    color: var(--slate);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--ink); background: var(--line-soft); }
+  nav.toc a.active { color: var(--accent-ink); background: var(--accent-soft); border-left-color: var(--accent); font-weight: 600; }
+  nav.toc .idx { font-family: var(--mono); color: var(--slate-soft); margin-right: 6px; font-size: 12px; }
+
+  /* ---- Main ---- */
+  main { padding: 40px 44px 120px; min-width: 0; }
+  @media (max-width: 640px) { main { padding: 28px 18px 80px; } }
+
+  header.hero {
+    padding-bottom: 36px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent-ink); font-weight: 700; margin: 0 0 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.12;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+  .hero p.lede {
+    max-width: 62ch;
+    color: var(--slate);
+    font-size: 16.5px;
+    margin: 0;
+  }
+  .hero .meta {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    margin-top: 18px; font-size: 12.5px; color: var(--slate-soft);
+    font-family: var(--mono);
+  }
+
+  section { margin: 0 0 64px; scroll-margin-top: 20px; }
+  section > h2 {
+    font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  section > .section-sub { color: var(--slate); margin: 0 0 24px; max-width: 68ch; font-size: 14.5px; }
+  h3 { font-size: 16.5px; margin: 28px 0 12px; }
+  h3:first-child { margin-top: 0; }
+
+  p { max-width: 72ch; }
+
+  /* ---- Diagram ---- */
+  .diagram {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 30px 26px 26px;
+    box-shadow: var(--shadow);
+  }
+  .diagram .tier-label {
+    font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--slate-soft); font-weight: 700; margin: 0 0 10px;
+  }
+  .diagram .tier { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .diagram .connector {
+    height: 26px; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .diagram .connector::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+    border-left: 1.5px dashed var(--line);
+  }
+  .node {
+    flex: 1 1 160px;
+    min-width: 150px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--paper);
+  }
+  .node .name { font-weight: 700; font-size: 13.5px; }
+  .node .desc { color: var(--slate); font-size: 12px; margin-top: 3px; }
+  .node.accent { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+  .node.dim { opacity: 0.72; border-style: dashed; }
+  .node code { color: var(--accent-ink); }
+
+  /* ---- Service cards ---- */
+  .service-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 24px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .service-card .head {
+    display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px;
+    margin-bottom: 4px;
+  }
+  .service-card h3 { margin: 0; font-size: 18px; }
+  .service-card .worker-name { font-family: var(--mono); color: var(--accent-ink); font-size: 13px; }
+  .service-card .purpose { color: var(--slate); margin: 6px 0 16px; font-size: 14px; max-width: 70ch; }
+  .kv-grid {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 8px 14px;
+    font-size: 13.5px;
+  }
+  .kv-grid dt { color: var(--slate-soft); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+  .kv-grid dd { margin: 0; font-family: var(--mono); font-size: 12.8px; word-break: break-word; }
+  .kv-grid dd .plain { font-family: var(--sans); }
+
+  /* ---- Pills / badges ---- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 99px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+    font-family: var(--sans); white-space: nowrap;
+  }
+  .pill-jwt { background: var(--accent-soft); color: var(--accent-ink); }
+  .pill-public { background: var(--good-soft); color: var(--good); }
+  .pill-admin { background: var(--warn-soft); color: var(--warn); }
+  .pill-access { background: var(--crit-soft); color: var(--crit); }
+  .pill-mgr { background: var(--line-soft); color: var(--slate); }
+  .pill-none { background: var(--line-soft); color: var(--slate-soft); }
+
+  .status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 600;
+  }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .status.s-live::before { background: var(--good); }
+  .status.s-parked::before { background: var(--warn); }
+  .status.s-off::before { background: var(--crit); }
+  .status.s-live { color: var(--good); }
+  .status.s-parked { color: var(--warn); }
+  .status.s-off { color: var(--crit); }
+
+  /* ---- Tables ---- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 640px; }
+  thead th {
+    text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--slate-soft); font-weight: 700;
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: var(--line-soft);
+    position: sticky; top: 0;
+  }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--line-soft); }
+  td.path code { color: var(--accent-ink); }
+  td.method { font-family: var(--mono); font-weight: 700; font-size: 12px; }
+  .m-GET { color: var(--good); }
+  .m-POST { color: var(--accent-ink); }
+  .m-PUT { color: var(--warn); }
+  .m-DELETE { color: var(--crit); }
+  .m-sched { color: var(--slate); font-style: italic; }
+
+  /* ---- iOS file cards ---- */
+  .filecard {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
+    padding: 16px 20px; margin-bottom: 12px; box-shadow: var(--shadow);
+  }
+  .filecard .fname { font-family: var(--mono); font-weight: 700; font-size: 13.5px; color: var(--accent-ink); }
+  .filecard .floc { font-family: var(--mono); font-size: 11px; color: var(--slate-soft); margin-left: 8px; }
+  .filecard p { margin: 8px 0 0; font-size: 13.5px; color: var(--slate); max-width: 74ch; }
+  .filecard ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+  .filecard li { margin: 3px 0; }
+  .filecard.inert { opacity: 0.68; }
+
+  /* ---- Storage cards ---- */
+  .storage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .storage-card {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
+    padding: 18px 20px; box-shadow: var(--shadow);
+  }
+  .storage-card h4 { margin: 0 0 4px; font-size: 14.5px; display: flex; align-items: center; gap: 8px; }
+  .storage-card .icon { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; font-family: var(--mono); flex: none; }
+  .icon-r2 { background: var(--accent-soft); color: var(--accent-ink); }
+  .icon-d1 { background: var(--good-soft); color: var(--good); }
+  .icon-kv { background: var(--warn-soft); color: var(--warn); }
+  .storage-card p { font-size: 13px; color: var(--slate); margin: 6px 0 0; }
+  .storage-card ul { font-size: 12.5px; margin: 8px 0 0; padding-left: 16px; color: var(--slate); }
+
+  /* ---- Auth flow list ---- */
+  .auth-list { list-style: none; margin: 0; padding: 0; counter-reset: auth; }
+  .auth-item {
+    counter-increment: auth;
+    display: grid; grid-template-columns: 34px 1fr; gap: 14px;
+    padding: 18px 0; border-bottom: 1px solid var(--line-soft);
+  }
+  .auth-item:last-child { border-bottom: none; }
+  .auth-item::before {
+    content: counter(auth); font-family: var(--mono); font-weight: 700; font-size: 15px;
+    color: var(--accent); border: 1.5px solid var(--accent); border-radius: 50%;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  }
+  .auth-item h4 { margin: 3px 0 6px; font-size: 14.5px; }
+  .auth-item p { margin: 0; font-size: 13.5px; color: var(--slate); }
+  .auth-item p + p { margin-top: 6px; }
+
+  /* ---- Findings ---- */
+  .finding {
+    display: grid; grid-template-columns: 90px 1fr; gap: 16px;
+    padding: 16px 0; border-bottom: 1px solid var(--line-soft);
+  }
+  .finding:last-child { border-bottom: none; }
+  .finding .sev { padding-top: 2px; }
+  .finding h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .finding p { margin: 0 0 6px; font-size: 13.5px; color: var(--slate); }
+  .finding .cite { font-family: var(--mono); font-size: 11.5px; color: var(--slate-soft); }
+  .findings-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised); padding: 4px 22px; box-shadow: var(--shadow); }
+
+  /* ---- Cron table extras ---- */
+  .note-box {
+    border: 1px solid var(--line); border-left: 3px solid var(--slate-soft);
+    background: var(--line-soft); border-radius: 0 10px 10px 0;
+    padding: 12px 16px; font-size: 13px; color: var(--slate); margin: 14px 0;
+  }
+
+  footer.doc-foot {
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    color: var(--slate-soft); font-size: 12px;
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="brand">LSM ✕ Cloudflare</div>
+    <ol id="toc-list">
+      <li><a href="#overview" class="idx-link"><span class="idx">00</span>Overview</a></li>
+      <li><a href="#services" class="idx-link"><span class="idx">01</span>Worker services</a></li>
+      <li><a href="#endpoints" class="idx-link"><span class="idx">02</span>Endpoint reference</a></li>
+      <li><a href="#ios" class="idx-link"><span class="idx">03</span>iOS call sites</a></li>
+      <li><a href="#storage" class="idx-link"><span class="idx">04</span>Storage layer</a></li>
+      <li><a href="#cron" class="idx-link"><span class="idx">05</span>Cron jobs</a></li>
+      <li><a href="#auth" class="idx-link"><span class="idx">06</span>Auth mechanisms</a></li>
+      <li><a href="#external" class="idx-link"><span class="idx">07</span>External integrations</a></li>
+      <li><a href="#findings" class="idx-link"><span class="idx">08</span>Known issues</a></li>
+      <li><a href="#cleanup" class="idx-link"><span class="idx">09</span>Legacy cleanup log</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero" id="overview">
+      <p class="eyebrow">Architecture reference · LSM-IOSv2</p>
+      <h1>Everything the app says to Cloudflare, and everything Cloudflare says back</h1>
+      <p class="lede">Three Worker codebases, three D1 databases, one shared R2 bucket, region-scoped KV, and a Pages-hosted PWA — mapped end to end from the iOS Swift call sites down to the wrangler bindings. Updated 2026-08-02 after committing the custom-domain fix and tearing down the never-deployed EU authority env plus a full sweep of unused legacy v1 Cloudflare resources (see §09).</p>
+      <div class="meta">
+        <span>3 worker codebases</span><span>·</span>
+        <span>27 app-facing routes</span><span>·</span>
+        <span>4 auth schemes</span><span>·</span>
+        <span>1 authority region (uk) · 2 sports shards (uk / eu)</span>
+      </div>
+    </header>
+
+    <!-- 01 SERVICES -->
+    <section id="services">
+      <h2>01 · Worker services</h2>
+      <p class="section-sub">Three independently deployed Workers, each with its own wrangler config, domain, and reason to exist. The diagram shows who talks to whom; the cards below give the deployment specifics.</p>
+
+      <div class="diagram" style="margin-bottom: 28px;">
+        <div class="tier-label">Clients</div>
+        <div class="tier">
+          <div class="node accent"><div class="name">iOS App</div><div class="desc">Swift · Cloud/* actors</div></div>
+          <div class="node accent"><div class="name">Player PWA</div><div class="desc">submit.sportsmanager.site</div></div>
+          <div class="node"><div class="name">Ops browser</div><div class="desc">Cloudflare Access session</div></div>
+        </div>
+        <div class="connector"></div>
+        <div class="tier-label">Workers (uk / eu shards)</div>
+        <div class="tier">
+          <div class="node"><div class="name">lsm-worker</div><div class="desc">sports data · <code>*-api.sportsmanager.site</code></div></div>
+          <div class="node"><div class="name">lsm-api</div><div class="desc">authority · <code>api.*.sportsmanager.site</code></div></div>
+          <div class="node"><div class="name">lsm-v2-dash-worker</div><div class="desc">ops console · <code>dash.sportsmanager.site</code></div></div>
+        </div>
+        <div class="connector"></div>
+        <div class="tier-label">Storage &amp; upstream</div>
+        <div class="tier">
+          <div class="node"><div class="name">D1 ×3</div><div class="desc">2 sports-shard + 1 authority (uk-only — eu authority torn down)</div></div>
+          <div class="node"><div class="name">R2 · lsm-cloud-bundle</div><div class="desc">shared bucket, both authority + shard</div></div>
+          <div class="node"><div class="name">KV · region-scoped</div><div class="desc">shared across all 3 workers per region</div></div>
+          <div class="node dim"><div class="name">football-data.org</div><div class="desc">upstream fixtures/scores provider</div></div>
+        </div>
+      </div>
+
+      <div class="service-card">
+        <div class="head"><h3>lsm-worker <span class="pill pill-public">sports data</span></h3><span class="worker-name">worker/</span></div>
+        <p class="purpose">League discovery and read-only sports data (teams, fixtures, standings, scores), backed by D1 with a KV stale-while-revalidate cache against football-data.org. Also hosts <code>/admin/*</code> ops endpoints for the dash to proxy into.</p>
+        <dl class="kv-grid">
+          <dt>Envs</dt><dd class="plain">uk (lsm-uk-worker) · eu (lsm-eu-worker)</dd>
+          <dt>Domains</dt><dd>uk-api.sportsmanager.site · eu-api.sportsmanager.site</dd>
+          <dt>workers.dev</dt><dd class="plain" style="color: var(--crit); font-family: var(--sans); font-weight: 600;">still enabled on both envs — see finding 08.2</dd>
+          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · R2 <code>BACKUPS</code> · KV <code>SCORES</code></dd>
+          <dt>Cron</dt><dd class="plain"><span class="status s-parked">built, not scheduled</span></dd>
+        </dl>
+      </div>
+
+      <div class="service-card">
+        <div class="head"><h3>lsm-api <span class="pill pill-jwt">authority</span></h3><span class="worker-name">worker-api/</span></div>
+        <p class="purpose">Owns everything that isn't sports data: App Attest device registry + JWT issuance, manager lifecycle, the PWA submission queue, cloud backup/publish to R2, region-migration stubs, and the shared outage flag.</p>
+        <dl class="kv-grid">
+          <dt>Envs</dt><dd class="plain">uk (lsm-api-uk) only — <strong>eu env torn down 2026-08-02</strong>, was never deployed (D1 id was PLACEHOLDER, JWT keys were {})</dd>
+          <dt>Domains</dt><dd>api.uk.sportsmanager.site</dd>
+          <dt>workers.dev</dt><dd class="plain" style="color: var(--crit); font-family: var(--sans); font-weight: 600;">still enabled — see finding 08.2</dd>
+          <dt>Bindings</dt><dd class="plain">D1 <code>DB</code> · R2 <code>BACKUPS</code> · KV <code>FLAGS</code></dd>
+          <dt>Cron</dt><dd class="plain"><span class="status s-parked">built, parked pending test cycle</span></dd>
+        </dl>
+      </div>
+
+      <div class="service-card">
+        <div class="head"><h3>lsm-v2-dash-worker <span class="pill pill-access">internal only</span></h3><span class="worker-name">worker-dash/</span></div>
+        <p class="purpose">Single-page ops console: toggle league phase, force a sync, inspect D1/KV state, flip the global outage flag, and proxy dry-run cleanup previews. Never called by the iOS app or PWA.</p>
+        <dl class="kv-grid">
+          <dt>Domain</dt><dd>dash.sportsmanager.site</dd>
+          <dt>workers.dev</dt><dd class="plain" style="color: var(--good); font-family: var(--sans); font-weight: 600;">disabled — the one properly locked-down worker</dd>
+          <dt>Bindings</dt><dd class="plain">D1 <code>UK_DB</code>/<code>EU_DB</code> · KV <code>UK_KV</code>/<code>EU_KV</code></dd>
+          <dt>Auth</dt><dd class="plain">Cloudflare Access at the edge, re-verified in code</dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- 02 ENDPOINTS -->
+    <section id="endpoints">
+      <h2>02 · Endpoint reference</h2>
+      <p class="section-sub">Every route each Worker exposes. Auth column reads as: <span class="pill pill-jwt">JWT</span> App Attest–derived bearer token, <span class="pill pill-mgr">Manager</span> anonymous <code>X-Manager-Token</code> header, <span class="pill pill-admin">Admin</span> bearer secret, <span class="pill pill-public">Public</span> unauthenticated by design, <span class="pill pill-access">Access</span> Cloudflare Access JWT.</p>
+
+      <h3>lsm-worker — sports data</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Purpose</th><th>Caller</th></tr></thead>
+          <tbody>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/health</code></td><td><span class="pill pill-none">none</span></td><td>liveness + league count</td><td>ops</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues.json</code></td><td><span class="pill pill-none">none</span></td><td>full cross-shard league manifest</td><td>iOS · <code>Leagues.refreshFromRegistry</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues</code></td><td><span class="pill pill-none">none</span></td><td>metadata-only league list, this shard</td><td>ops / dash</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues/:id/teams</code></td><td><span class="pill pill-jwt">JWT</span></td><td>team roster</td><td>iOS · <code>APIClient.teams()</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues/:id/standings</code></td><td><span class="pill pill-jwt">JWT</span></td><td>league table, SWR-refreshed live</td><td>iOS · <code>APIClient.standings()</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues/:id/scores</code></td><td><span class="pill pill-jwt">JWT</span></td><td>live/recent scores, KV-cached</td><td>iOS · <code>APIClient.scores()</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/leagues/:id/fixtures</code></td><td><span class="pill pill-jwt">JWT</span></td><td>fixture list</td><td>iOS · <code>APIClient.fixtures()</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/admin/sync</code></td><td><span class="pill pill-admin">Admin</span></td><td>force upstream re-sync</td><td>dash proxy / manual</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/admin/probe-standings</code></td><td><span class="pill pill-admin">Admin</span></td><td>read-only upstream check</td><td>dash proxy</td></tr>
+            <tr><td class="method m-POST">GET/POST</td><td class="path"><code>/admin/phase</code></td><td><span class="pill pill-admin">Admin</span></td><td>per-league season-phase gate</td><td>dash / ops</td></tr>
+            <tr><td class="method m-POST">GET/POST</td><td class="path"><code>/admin/outage</code></td><td><span class="pill pill-admin">Admin</span></td><td>global client-facing outage flag</td><td>dash / ops</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/admin/sync-if-due</code></td><td><span class="pill pill-admin">Admin</span></td><td>self-gating daily maintenance trigger</td><td>cron (once enabled)</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/admin/leagues</code></td><td><span class="pill pill-admin">Admin</span></td><td>full league row dump, this shard</td><td>dash / ops</td></tr>
+            <tr><td class="method m-sched">scheduled</td><td class="path"><code>cron → runDailySync</code></td><td><span class="pill pill-none">n/a</span></td><td>per-league football-data.org refresh</td><td><span class="status s-parked">not enabled</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note-box"><strong>Dead code:</strong> <code>worker/src/routes/{games,backup,publish,manager,demo,teams,scores,standings,fixtures}.ts</code> exist on disk but aren't mounted in <code>worker/src/index.ts</code> — superseded by <code>data.ts</code> and by worker-api's equivalents.</div>
+
+      <h3>lsm-api — authority</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Purpose</th><th>Caller</th></tr></thead>
+          <tbody>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/health</code></td><td><span class="pill pill-none">none</span></td><td>liveness + device count</td><td>ops</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/attest/challenge</code></td><td><span class="pill pill-none">none</span></td><td>issue HMAC challenge nonce</td><td>iOS · <code>AppAttestService.fetchChallenge</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/attest/register</code></td><td>cert chain</td><td>enrol Secure Enclave key</td><td>iOS · <code>AppAttestService.register</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/attest/assert</code></td><td>assertion headers</td><td>verify + mint 15-min JWT</td><td>iOS · <code>AppAttestService.mintJWT</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/attest/devices</code></td><td><span class="pill pill-admin">Admin</span></td><td>list enrolled devices</td><td>ops</td></tr>
+            <tr><td class="method m-DELETE">DELETE</td><td class="path"><code>/attest/devices/:keyId</code></td><td><span class="pill pill-admin">Admin</span></td><td>force re-attestation</td><td>ops</td></tr>
+            <tr><td class="method m-POST">GET/POST</td><td class="path"><code>/admin/outage</code></td><td><span class="pill pill-admin">Admin</span></td><td>global outage flag (shared KV)</td><td>dash / ops</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/admin/cleanup-preview</code></td><td><span class="pill pill-admin">Admin</span></td><td>dry-run retention cron</td><td>dash / ops</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/links</code></td><td><span class="pill pill-jwt">JWT</span></td><td>mint anonymous PWA player token</td><td>iOS · <code>SubmissionsClient.mintLink</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/links/:token/revoke</code></td><td><span class="pill pill-jwt">JWT</span></td><td>revoke a player link</td><td>iOS · <code>SubmissionsClient.revokeLink</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/links/revoke-by-name</code></td><td><span class="pill pill-jwt">JWT</span></td><td>self-heal revoke by name</td><td>iOS · <code>revokeLinkByName</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/games/:token/push</code></td><td><span class="pill pill-jwt">JWT</span></td><td>open/refresh a round, enroll players</td><td>iOS · <code>SubmissionsClient.pushRound</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/games/:token/submissions</code></td><td>JWT + Manager</td><td>review pending picks/predictions</td><td>iOS · <code>listSubmissions</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/games/:token/submissions/:id/approve</code></td><td>JWT + Manager</td><td>approve a submission</td><td>iOS · <code>approve</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/games/:token/submissions/:id/reject</code></td><td>JWT + Manager</td><td>reject a submission</td><td>iOS · <code>reject</code></td></tr>
+            <tr><td class="method m-DELETE">DELETE</td><td class="path"><code>/games/:token</code></td><td>JWT + Manager</td><td>wipe cloud rows for a deleted game</td><td>iOS · <code>deleteGame</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/s/:token</code></td><td><span class="pill pill-public">Public</span></td><td>player fetches active games + history</td><td>PWA · <code>fetchPlayer</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/s/:token/games/:gameToken</code></td><td><span class="pill pill-public">Public</span></td><td>player submits pick/prediction/killer</td><td>PWA · submit*</td></tr>
+            <tr><td class="method m-PUT">PUT</td><td class="path"><code>/backup/:id</code></td><td><span class="pill pill-jwt">JWT</span></td><td>cloud backup blob → R2</td><td>iOS · <code>SnapshotClient.backup</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/backup/:id</code></td><td><span class="pill pill-jwt">JWT</span></td><td>restore blob from R2</td><td>iOS · <code>SnapshotClient.restore</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/publish</code></td><td><span class="pill pill-jwt">JWT</span></td><td>publish Predictor snapshot to R2 + PIN</td><td>iOS · <code>SnapshotClient.publish</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/publish/:id/unlock</code></td><td><span class="pill pill-public">Public + PIN</span></td><td>viewer unlocks a published snapshot</td><td>Pages Function <code>l/[region]/[id].js</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/manager/status</code></td><td><span class="pill pill-mgr">Manager</span></td><td>lifecycle state for Cloud Settings</td><td>iOS · <code>ManagerLifecycleClient.status</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/manager/unsubscribe</code></td><td><span class="pill pill-mgr">Manager</span></td><td>start 14-day deletion grace</td><td>iOS · <code>unsubscribe</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/manager/resubscribe</code></td><td><span class="pill pill-mgr">Manager</span></td><td>cancel deletion grace</td><td>iOS · <code>resubscribe</code></td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/manager/entitlements</code></td><td><span class="pill pill-mgr">Manager</span></td><td>report RevenueCat-derived link cap</td><td>iOS · <code>reportEntitlements</code></td></tr>
+            <tr><td class="method m-POST">GET/POST</td><td class="path"><code>/manager/export</code> · <code>/import</code></td><td><span class="pill pill-jwt">JWT</span></td><td>region-migration stubs — <strong>501</strong></td><td>not wired on iOS yet</td></tr>
+            <tr><td class="method m-sched">scheduled</td><td class="path"><code>cron → runDailyCleanup</code></td><td><span class="pill pill-none">n/a</span></td><td>9-phase retention sweep</td><td><span class="status s-parked">not enabled</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note-box">CORS on <code>/s/*</code> is locked to <code>origin: "https://submit.sportsmanager.site"</code>, registered ahead of the outage gate.</div>
+
+      <h3>lsm-v2-dash-worker — ops console</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/</code></td><td>HTML ops console (inline-rendered)</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/overview</code></td><td>per-league phase + season summary, both shards</td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/data/:leagueKey</code></td><td>detailed D1/KV sync diagnostics, one league</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/action/outage</code></td><td>write shared outage flag to both regions' KV</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/action/:leagueKey/phase</code></td><td>direct KV write of season phase</td></tr>
+            <tr><td class="method m-POST">POST</td><td class="path"><code>/action/:leagueKey/sync</code> · <code>/probe</code></td><td>proxy to lsm-worker's <code>/admin/sync</code> · <code>/probe-standings</code></td></tr>
+            <tr><td class="method m-GET">GET</td><td class="path"><code>/action/cleanup-preview</code></td><td>proxy to both authorities' <code>/admin/cleanup-preview</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px; color:var(--slate);">Every route requires a valid <code>Cf-Access-Jwt-Assertion</code> header — <span class="pill pill-access">Access</span> gates the whole worker, not individual routes.</p>
+    </section>
+
+    <!-- 03 IOS -->
+    <section id="ios">
+      <h2>03 · iOS call sites</h2>
+      <p class="section-sub">Everything under <code>ios/LSM/LSM/Cloud/</code> plus the two config files that decide where those calls go. Each is a Swift <code>actor</code> — one per concern, no shared network layer.</p>
+
+      <div class="filecard">
+        <span class="fname">APIClient.swift</span><span class="floc">Cloud/APIClient.swift · 63 lines</span>
+        <p>One instance per league. Calls <code>teams()</code>, <code>standings()</code>, <code>scores()</code>, <code>fixtures()</code> against the league's <code>workerBaseURL</code>. Attaches App Attest/JWT headers via <code>AppAttestService.shared.authorizationHeaders()</code>. Non-2xx responses route through <code>MaintenanceCheck</code>.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">Leagues.swift</span><span class="floc">Config/Leagues.swift · 256 lines</span>
+        <p>Owns the league registry manifest. <code>registryURL</code> (line 116) is hardcoded to the <strong>workers.dev</strong> host — see finding 08.1. <code>refreshFromRegistry()</code> fetches, decodes, runs <code>VersionGateCheck</code>, and caches to disk. <code>authorities</code>/<code>storefrontMap</code> drive attest-authority resolution.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">AppAttest.swift</span><span class="floc">Cloud/AppAttest.swift · 296 lines</span>
+        <p>The App Attest / JWT client. <code>authorityURL()</code> resolves once per install from StoreKit storefront, persisted to <code>UserDefaults</code>, correctly falling back to the <strong>custom domain</strong> <code>api.&lt;region&gt;.sportsmanager.site</code>. Drives <code>fetchChallenge</code> → <code>register</code> → <code>mintJWT</code>, with one retry on a stale-registration 403. Key lives in Keychain.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">SnapshotClient.swift</span><span class="floc">Cloud/SnapshotClient.swift · 102 lines</span>
+        <p>Backup and publish. <code>backup(_:id:)</code> → <code>PUT /backup/:id</code>; <code>restore(id:)</code> → <code>GET /backup/:id</code>; <code>publish(...)</code> → <code>POST /publish</code>. All routed through <code>authorityRequest(path:method:)</code>.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">SubmissionsClient.swift</span><span class="floc">Cloud/SubmissionsClient.swift · 251 lines</span>
+        <p>Manager-facing half of the PWA submission queue. <code>playerBase</code> is hardcoded to <code>submit.sportsmanager.site</code> — the PWA's own domain, separate from the authority API.</p>
+        <ul>
+          <li><code>mintLink</code>, <code>revokeLink</code>, <code>revokeLinkByName</code> → <code>/links*</code></li>
+          <li><code>pushRound</code> → <code>POST /games/:gameToken/push</code>, mode-agnostic payload (covers Killer)</li>
+          <li><code>listSubmissions</code>, <code>approve</code>, <code>reject</code>, <code>deleteGame</code> → <code>/games/:gameToken/submissions[...]</code></li>
+        </ul>
+      </div>
+      <div class="filecard">
+        <span class="fname">ManagerLifecycleClient.swift</span><span class="floc">Cloud/ManagerLifecycleClient.swift · 108 lines</span>
+        <p><code>status()</code> on Cloud Settings open; <code>reportEntitlements(maxPWALinks:)</code> once per launch and on purchase/restore; <code>unsubscribe()</code> when the cloud entitlement lapses; <code>resubscribe()</code> on renewal. Auth is <code>X-Manager-Token</code> only — deliberately no JWT, to keep the token out of URLs and logs.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">ManagerToken.swift</span><span class="floc">Cloud/ManagerToken.swift · 96 lines</span>
+        <p>No network. Keychain-backed anonymous UUID sent as <code>X-Manager-Token</code> by every client above. Migrates forward from a prior wrong-bundle-id Keychain service name.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">MaintenanceState.swift</span><span class="floc">Cloud/MaintenanceState.swift · 63 lines</span>
+        <p>No direct network. <code>MaintenanceCheck.check</code> runs after every client's non-2xx response, detects the shared <code>{error:"maintenance"}</code> 503 shape, drives the app-wide banner.</p>
+      </div>
+      <div class="filecard">
+        <span class="fname">VersionGate.swift</span><span class="floc">Cloud/VersionGate.swift · 73 lines</span>
+        <p>No direct network. Called only from <code>Leagues.refreshFromRegistry()</code>; compares the running build against the manifest's <code>minVersion</code> and hard-blocks the UI if stale.</p>
+      </div>
+      <div class="filecard inert">
+        <span class="fname">GameCloudClient.swift</span><span class="floc">Cloud/GameCloudClient.swift · 49 lines</span>
+        <p>Inert skeleton — every function throws <code>CloudError.notImplemented</code>. Pre-pivot sketch of a Layer-2 cloud-backed game state, not wired to any live route.</p>
+      </div>
+
+      <div class="note-box">Outside <code>Cloud/</code>: <code>PurchaseService.swift</code> and <code>Entitlements.swift</code> talk to RevenueCat/StoreKit directly, never through a Worker. The only bridge is <code>reportEntitlements</code> forwarding the resolved tier to lsm-api. No APNs registration, no server-side receipt validation, no App Store Server Notifications webhook exist anywhere in the repo.</div>
+    </section>
+
+    <!-- 04 STORAGE -->
+    <section id="storage">
+      <h2>04 · Storage layer</h2>
+      <p class="section-sub">One R2 bucket shared by two Workers, two D1 schemas across four (planned) databases, and per-region KV namespaces that are quietly the same namespace under three different binding names.</p>
+      <div class="storage-grid">
+        <div class="storage-card">
+          <h4><span class="icon icon-r2">R2</span>lsm-cloud-bundle</h4>
+          <p>One bucket, bound identically into both lsm-worker and lsm-api, uk and eu — a backup/publish blob is self-contained and not league-scoped, so any shard can serve it.</p>
+          <ul>
+            <li><code>backups/&lt;restoreCode&gt;.json</code> — keep last 2 per manager</li>
+            <li><code>publish/&lt;id&gt;.json</code> — deleted 100 days after last publish</li>
+            <li>lsm-worker's own <code>backup.ts</code>/<code>publish.ts</code> are dead — live logic is entirely in worker-api</li>
+          </ul>
+        </div>
+        <div class="storage-card">
+          <h4><span class="icon icon-d1">D1</span>Sports-shard schema</h4>
+          <p><code>worker/schema.sql</code> — <code>leagues</code>, <code>teams</code>, <code>fixtures</code>, <code>standings</code>, <code>sync_meta</code>, legacy <code>attest_devices</code>, plus a dormant Layer-2 sketch (<code>games</code>, <code>players</code>, <code>picks</code>...).</p>
+          <ul>
+            <li>lsm-uk-db — provisioned</li>
+            <li>lsm-eu-db — provisioned</li>
+          </ul>
+        </div>
+        <div class="storage-card">
+          <h4><span class="icon icon-d1">D1</span>Authority schema</h4>
+          <p><code>worker-api/schema.sql</code> — <code>attest_devices</code>, <code>player_tokens</code>, <code>game_enrollments</code>, <code>round_pushes</code>, <code>round_results</code>, <code>submissions</code>, <code>manager_lifecycle</code>, <code>manager_backups</code>, <code>publish_links</code>.</p>
+          <ul>
+            <li>lsm-api-uk-db — provisioned</li>
+            <li>lsm-api-eu-db — never existed; the eu env was torn down 2026-08-02</li>
+            <li>5 hand-applied migrations in <code>worker-api/migrations/</code></li>
+          </ul>
+        </div>
+        <div class="storage-card">
+          <h4><span class="icon icon-kv">KV</span>Region-scoped namespaces</h4>
+          <p>lsm-worker's <code>SCORES</code>, lsm-api's <code>FLAGS</code>, and worker-dash's <code>UK_KV</code>/<code>EU_KV</code> all resolve to the <strong>same namespace ID per region</strong> — one write reaches all three workers.</p>
+          <ul>
+            <li><code>{leagueId}:scores</code>, <code>:scores:call</code>, <code>:refresh</code>, <code>:ts</code></li>
+            <li><code>{leagueId}:season:phase</code></li>
+            <li><code>outage:flag</code> — the global kill switch</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 CRON -->
+    <section id="cron">
+      <h2>05 · Cron jobs</h2>
+      <p class="section-sub">Both scheduled jobs are fully built and reachable via admin dry-run endpoints, but neither runs on a schedule yet.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Worker</th><th>Function</th><th>Does</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="mono">lsm-worker</td>
+              <td class="mono">runDailySync</td>
+              <td>Per-league football-data.org refresh via <code>runMaintenance</code></td>
+              <td><span class="status s-parked">not activated</span> — <code>triggers.crons: []</code></td>
+            </tr>
+            <tr>
+              <td class="mono">lsm-api</td>
+              <td class="mono">runDailyCleanup</td>
+              <td>9-phase retention sweep: submissions, revoked tokens, abandoned games, manager deletes, R2 backup pruning, stale publish links, stale attest devices, PWA-link over-cap cascade</td>
+              <td><span class="status s-parked">parked</span> — explicitly held until current test cycle finishes</td>
+            </tr>
+            <tr>
+              <td class="mono">worker-dash</td>
+              <td class="mono">—</td>
+              <td>no scheduled handler exported</td>
+              <td><span class="status s-off">n/a</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note-box">Until these are turned on, everything depends on manual <code>/admin/sync</code> / <code>/admin/sync-if-due</code> calls or the worker-dash console.</div>
+    </section>
+
+    <!-- 06 AUTH -->
+    <section id="auth">
+      <h2>06 · Auth mechanisms</h2>
+      <p class="section-sub">Five schemes, layered by how sensitive the route is — from full device attestation down to a rate-limited PIN.</p>
+      <ol class="auth-list">
+        <li class="auth-item">
+          <div>
+            <h4>App Attest → 15-minute ES256 JWT <span class="pill pill-jwt">primary</span></h4>
+            <p>Enrolment once per device per authority: <code>/attest/challenge</code> → <code>/attest/register</code>, verified via CBOR-decoded attestation pinned against Apple's root CA. Per-session: <code>/attest/assert</code> mints a short-lived JWT, <code>Bearer</code>-attached to every protected call.</p>
+            <p>Verified independently by both Workers — lsm-worker trusts JWTs from <em>any</em> known authority via a shared <code>JWT_PUBLIC_KEYS</code> kid→key map, so adding a region is a config change, not a code change. A dev bypass exists but is designed to be impossible in a release build.</p>
+          </div>
+        </li>
+        <li class="auth-item">
+          <div>
+            <h4>Anonymous device / manager tokens <span class="pill pill-mgr">no login, no PII</span></h4>
+            <p><code>ManagerToken.current</code> — client-generated UUID, Keychain-persisted, sent as <code>X-Manager-Token</code>. Scopes ownership of games, publish links, backups, lifecycle rows, and is the <em>sole</em> credential on <code>/manager/*</code> — deliberately kept out of JWT claims and URLs to avoid leaking into logs.</p>
+            <p>Player tokens are a second, unrelated tier: one unguessable UUID per player, the only credential in the public <code>/s/&lt;token&gt;</code> PWA link, deliberately outside GDPR personal-data scope.</p>
+          </div>
+        </li>
+        <li class="auth-item">
+          <div>
+            <h4>Admin bearer tokens <span class="pill pill-admin">ops</span></h4>
+            <p><code>Authorization: Bearer &lt;ADMIN_TOKEN&gt;</code>, region-prefixed secrets, timing-safe compared. Gate all <code>/admin/*</code> routes on both Workers; worker-dash holds its own copies (<code>WRK_*</code> prefix) to proxy actions.</p>
+          </div>
+        </li>
+        <li class="auth-item">
+          <div>
+            <h4>Cloudflare Access JWT <span class="pill pill-access">edge + code</span></h4>
+            <p>Gates worker-dash at the edge (policy lives in the Zero Trust dashboard, not the repo) and is independently re-verified against the team's JWKS, RS256, audience-scoped. Fails closed on any verification failure, including an unreachable JWKS endpoint.</p>
+          </div>
+        </li>
+        <li class="auth-item">
+          <div>
+            <h4>PIN-based unlock <span class="pill pill-public">access control, not identity</span></h4>
+            <p><code>publish_links.pin_hash</code>/<code>pin_salt</code> (salted SHA-256), checked in <code>POST /publish/:id/unlock</code>. Brute-force protected: 10 attempts, 30-minute lockout, reset on republish.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 07 EXTERNAL -->
+    <section id="external">
+      <h2>07 · External integrations proxied through Cloudflare</h2>
+      <div class="storage-grid">
+        <div class="storage-card">
+          <h4>football-data.org</h4>
+          <p>The only upstream sports-data provider, called from <code>worker/src/football.ts</code>. Token stored as a region-prefixed secret, never exposed client-side. Consumed via a <code>Provider</code> interface designed for future multi-provider support. Licence obligation is attribution-only, shipped in Settings → About.</p>
+        </div>
+        <div class="storage-card">
+          <h4>Cloudflare Access</h4>
+          <p>JWKS fetched from <code>audleyhome.cloudflareaccess.com</code> to verify the ops dashboard's edge auth. Not called by the app or PWA.</p>
+        </div>
+      </div>
+      <div class="note-box">No Apple App Store Server Notifications webhook, no APNs, no RevenueCat webhook are proxied through any Worker. RevenueCat/StoreKit purchases resolve entirely client-side; only the resolved <code>maxPWALinks</code> entitlement is reported to lsm-api.</div>
+    </section>
+
+    <!-- 08 FINDINGS -->
+    <section id="findings">
+      <h2>08 · Known issues</h2>
+      <p class="section-sub">Surfaced while tracing the touchpoints above — ordered by how directly they affect a live user or the security boundary.</p>
+      <div class="findings-wrap">
+        <div class="finding">
+          <div class="sev"><span class="status s-off">critical</span></div>
+          <div>
+            <h4>Leagues.swift still points at workers.dev, and a fresh install can get stuck there</h4>
+            <p><code>worker/src/manifest.ts</code>'s move of <code>SHARD_BASE</code> to the custom domains is now committed (main, 2026-08-02) <em>and</em> deployed — confirmed live at <code>GET uk-api.sportsmanager.site/leagues.json</code>. But <code>ios/LSM/LSM/Config/Leagues.swift:116</code>'s <code>registryURL</code>, and the bundled <code>Resources/leagues.json</code>, still hardcode <code>lsm-uk-worker.sportsmanager.workers.dev</code>. The registry refresh itself uses the stale URL, so if workers.dev is ever locked down before an app rebuild ships, existing installs have no path to discover the corrected domain. Still needs an app rebuild — sequence: rebuild first, let it propagate, only then disable workers.dev.</p>
+            <p class="cite">Config/Leagues.swift:116 · worker/src/manifest.ts (main @ 8018d8a)</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-off">critical</span></div>
+          <div>
+            <h4>workers.dev is still live on both app-facing Workers</h4>
+            <p><code>workers_dev: true</code> remains set on both uk/eu envs of lsm-worker, and on lsm-api's uk env, leaving the unprotected subdomains reachable outside the zone's WAF, rate limiting, and Bot Fight Mode — directly undermining the custom-domain migration. Only worker-dash has this disabled. Deliberately left on until the Leagues.swift fix above ships (see that finding's sequencing note).</p>
+            <p class="cite">worker/wrangler.jsonc:34,84 · worker-api/wrangler.jsonc:37</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-parked">warning</span></div>
+          <div>
+            <h4>lsm-publish's WORKER_BASE_URL is still the old workers.dev host</h4>
+            <p>The Cloud Publish viewer's live env var still points at <code>https://lsm-uk-worker.sportsmanager.workers.dev</code> instead of the <code>uk-api.sportsmanager.site</code> custom domain — same underlying issue as the two findings above, in a Pages project instead of the app binary. Lower urgency: it's a Pages env var, fixable with a redeploy, no app rebuild required.</p>
+            <p class="cite">pages/README.md</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-live">resolved 2026-08-02</span></div>
+          <div>
+            <h4>EU authority env — torn down, not just unprovisioned</h4>
+            <p>Previously flagged as "not fully provisioned" (<code>lsm-api-eu-db</code> was <code>database_id: "PLACEHOLDER"</code>, <code>JWT_PUBLIC_KEYS</code> was <code>"{}"</code>). Andrew's call: launch is UK-only, so rather than finish provisioning it, the whole <code>eu</code> env was removed from <code>worker-api/wrangler.jsonc</code>, along with worker-dash's proxy references to it (<code>WRK_API_EU_ADMIN_TOKEN</code>, the <code>/action/cleanup-preview</code> EU branch) and the dead <code>deploy:eu</code>/<code>db:migrate:eu</code> scripts. Since it was never deployed, there was nothing to delete on Cloudflare's side for this specific piece — see §09 for the separate, larger legacy-resource cleanup that <em>did</em> delete real deployed resources. The sports-data <code>eu</code> shard (5 European leagues) is unaffected.</p>
+            <p class="cite">worker-api/wrangler.jsonc · worker-dash/src/index.ts (main @ 6ae641b)</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-parked">warning</span></div>
+          <div>
+            <h4>PWA has no region routing</h4>
+            <p><code>player-app/src/api.ts:6</code> hardcodes <code>API_BASE = 'https://api.uk.sportsmanager.site'</code>. Every player link resolves to the UK authority regardless of where the manager or players actually are — unlike the iOS app's storefront-based resolution or the Pages publish-viewer, which does take region from the URL path.</p>
+            <p class="cite">player-app/src/api.ts:6</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-parked">warning</span></div>
+          <div>
+            <h4>No version-controlled HSTS / security-header config</h4>
+            <p>No HSTS or security-headers config exists in any of the three Worker projects or two Pages sites (only cache-control in <code>player-app/public/_headers</code>). Presumably relies on a zone-level dashboard setting for sportsmanager.site — consistent with the Access policy, which is also dashboard-only and not version-controlled.</p>
+            <p class="cite">worker-dash/wrangler.jsonc (comments)</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-live">by design</span></div>
+          <div>
+            <h4>PWA submission endpoints are intentionally public</h4>
+            <p><code>/s/:token</code> and <code>POST /s/:token/games/:gameToken</code> are unauthenticated by token-possession only — documented as deliberate (anonymous player, no login), compensated with server-side payload whitelisting, fixture cross-checks against the trusted <code>round_pushes</code> row, deadline enforcement, and a <code>409 round_moved_on</code> staleness check.</p>
+            <p class="cite">worker-api/src/routes/submissions.ts</p>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="sev"><span class="status s-parked">watch</span></div>
+          <div>
+            <h4>worker-dash's proxy secrets are a manual sync point</h4>
+            <p>worker-dash holds three separate secrets (<code>WRK_UK_ADMIN_TOKEN</code>, <code>WRK_EU_ADMIN_TOKEN</code>, <code>WRK_API_UK_ADMIN_TOKEN</code> — the fourth, <code>WRK_API_EU_ADMIN_TOKEN</code>, was removed with the EU authority teardown) that must be hand-kept in sync with the underlying Worker secrets of the same logical value but different names — no shared source of truth, so they can silently drift.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 CLEANUP -->
+    <section id="cleanup">
+      <h2>09 · Legacy cleanup log — 2026-08-02</h2>
+      <p class="section-sub">Not a repo change — an account-wide Cloudflare tidy-up, done directly against the <code>sportsmanager.site</code> zone via <code>wrangler</code>/API ahead of launch. Andrew flagged the account had "a lot of legacy things"; this is the full delete log, kept for the record. Two things on the same account were explicitly out of scope: the <code>pigandpixel.com</code> zone entirely, and Clubroom2's <code>clubroom-submissions</code> Worker + its <code>SUBMISSIONS</code> KV namespace (verified against Clubroom2's own <code>wrangler.jsonc</code> before leaving it alone).</p>
+
+      <h3>Workers deleted (14)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it was</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">lms-pl-worker</td><td>v1 per-league Worker (Premier League) — superseded by lsm-uk-worker</td></tr>
+            <tr><td class="mono">lms-elc-worker</td><td>v1 per-league Worker (Championship) — superseded by lsm-uk-worker</td></tr>
+            <tr><td class="mono">lms-pd-worker</td><td>v1 per-league Worker (La Liga) — superseded by lsm-eu-worker</td></tr>
+            <tr><td class="mono">lms-bl1-worker</td><td>v1 per-league Worker (Bundesliga) — superseded by lsm-eu-worker</td></tr>
+            <tr><td class="mono">lms-sa-worker</td><td>v1 per-league Worker (Serie A) — superseded by lsm-eu-worker</td></tr>
+            <tr><td class="mono">lms-fl1-worker</td><td>v1 per-league Worker (Ligue 1) — superseded by lsm-eu-worker</td></tr>
+            <tr><td class="mono">lms-ded-worker</td><td>v1 per-league Worker (Eredivisie) — superseded by lsm-eu-worker</td></tr>
+            <tr><td class="mono">lms-registry-worker</td><td>v1 cross-league registry — superseded by lsm-worker's <code>/leagues.json</code></td></tr>
+            <tr><td class="mono">lms-demo-worker</td><td>v1 demo/sandbox league Worker, unused</td></tr>
+            <tr><td class="mono">lms-dash-worker</td><td>v1 ops dashboard — superseded by lsm-v2-dash-worker</td></tr>
+            <tr><td class="mono">lsm-worker</td><td>stray bare deploy of worker/'s top-level (no-env) name, not one of the real uk/eu shards</td></tr>
+            <tr><td class="mono">cfapphandler</td><td>unrelated proof-of-concept, confirmed disposable by Andrew</td></tr>
+            <tr><td class="mono">darts</td><td>unrelated old project, superseded by Clubroom2</td></tr>
+            <tr><td class="mono">kitchzing-worker</td><td>unrelated old project, superseded by Pig &amp; Pixel</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Custom domains detached (9)</h3>
+      <p style="font-size:13.5px;color:var(--slate);margin:0 0 12px;">All on <code>sportsmanager.site</code>, auto-detached by <code>wrangler delete</code> as part of removing the Worker above that served them: <code>registry.</code>, <code>pl.</code>, <code>elc.</code>, <code>pd.</code>, <code>bl1.</code>, <code>sa.</code>, <code>fl1.</code>, <code>ded.</code>, <code>admin.</code></p>
+
+      <h3>KV namespaces deleted (12)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it was</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">lms-bl1-scores</td><td rowspan="7">v1 per-league KV cache, one per v1 league Worker above</td></tr>
+            <tr><td class="mono">lms-ded-scores</td></tr>
+            <tr><td class="mono">lms-demo-scores</td></tr>
+            <tr><td class="mono">lms-elc-scores</td></tr>
+            <tr><td class="mono">lms-fl1-scores</td></tr>
+            <tr><td class="mono">lms-pd-scores</td></tr>
+            <tr><td class="mono">lms-sa-scores</td></tr>
+            <tr><td class="mono">lms-worker-lms-pl-scores</td><td>v1 Premier League KV cache (odd double-prefixed name)</td></tr>
+            <tr><td class="mono">lms-registry-manifest</td><td>v1 registry cache — superseded by lsm-worker's manifest logic</td></tr>
+            <tr><td class="mono">STANDINGS_KV</td><td rowspan="2">unbound in any current wrangler.jsonc — orphaned, pre-shard-era leftover</td></tr>
+            <tr><td class="mono">STANDINGS_KV_preview</td></tr>
+            <tr><td class="mono">kitchzing-kv</td><td>unrelated old project, superseded by Pig &amp; Pixel</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>D1 deleted (1) &amp; Pages projects deleted (2)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it was</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">cfapphandler-db</td><td>D1 backing the disposable cfapphandler POC above</td></tr>
+            <tr><td class="mono">lms-pwa-v1</td><td>Pages project, GitHub-connected — v1 player PWA, superseded by lsm-player-app</td></tr>
+            <tr><td class="mono">sweep-pwa-v1</td><td>Pages project, GitHub-connected — unrecognized, no matching directory anywhere in this repo, confirmed no longer used</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note-box">Post-cleanup verification: account now holds exactly 5 Workers (<code>clubroom-submissions</code>, <code>lsm-api-uk</code>, <code>lsm-eu-worker</code>, <code>lsm-uk-worker</code>, <code>lsm-v2-dash-worker</code>), 3 KV namespaces (<code>eu-SCORES</code>, <code>uk-SCORES</code>, <code>SUBMISSIONS</code>), 3 D1 databases, 1 R2 bucket, 3 Pages projects, and 5 custom domains on sportsmanager.site — matching §01–§04 above exactly, nothing extra and nothing missing.</div>
+    </section>
+
+    <footer class="doc-foot">
+      Generated from a full-repo trace of <code>worker/</code>, <code>worker-api/</code>, <code>worker-dash/</code>, and <code>ios/LSM/LSM/Cloud/</code>, plus a live Cloudflare account inventory as of 2026-08-02.
+    </footer>
+  </main>
+</div>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.idx-link'));
+    var sections = links.map(function (l) { return document.querySelector(l.getAttribute('href')); }).filter(Boolean);
+    if (!('IntersectionObserver' in window) || sections.length === 0) return;
+    var byId = {};
+    links.forEach(function (l) { byId[l.getAttribute('href').slice(1)] = l; });
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var link = byId[entry.target.id];
+        if (!link) return;
+        if (entry.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove('active'); });
+          link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    sections.forEach(function (s) { observer.observe(s); });
+  })();
+</script>
