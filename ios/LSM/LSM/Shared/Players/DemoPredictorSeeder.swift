@@ -4,8 +4,8 @@ import SwiftData
 #if DEBUG
 /// DEBUG-only convenience: seeds one Predictor game with several CLOSED
 /// matchdays already scored, so there's something to look at immediately —
-/// a multi-week standings table, recent results, a Publish/Backup test
-/// subject — without manually running rounds for weeks first. Never
+/// a multi-week standings table and recent results to look at — without
+/// manually running rounds for weeks first. Never
 /// compiled into a Release/TestFlight/App Store build.
 ///
 /// One-time via a UserDefaults flag, same pattern as `DemoRosterSeeder` (and

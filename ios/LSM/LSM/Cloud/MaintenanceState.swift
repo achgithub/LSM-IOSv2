@@ -21,7 +21,7 @@ enum MaintenanceError: LocalizedError {
 }
 
 /// App-wide "the backend is in maintenance mode" flag, set from any cloud
-/// call site (sports data, backup, publish, manager, submissions, attest) so
+/// call site (sports data, manager, submissions, attest) so
 /// a single banner near the app root can cover every screen, not just the
 /// one that happened to notice.
 @MainActor

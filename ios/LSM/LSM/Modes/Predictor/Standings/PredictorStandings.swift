@@ -10,8 +10,8 @@ struct PredictorStandingRow: Identifiable {
 }
 
 /// Local aggregation of a Predictor game's standings — no cloud involved.
-/// Three render targets (on-device table, share-card, published page) all
-/// derive from this same shape per §0; Phase 1 only builds the on-device one.
+/// Two render targets (on-device table, share-card) derive from this same
+/// shape per §0.
 enum PredictorStandings {
     /// Total points per player across every closed round's predictions,
     /// ranked by points only (no secondary tiebreakers), ties alphabetical.

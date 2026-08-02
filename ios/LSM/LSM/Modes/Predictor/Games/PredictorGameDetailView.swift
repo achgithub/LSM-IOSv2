@@ -52,7 +52,7 @@ struct PredictorGameDetailView: View {
     /// reachable — players keep submitting into it via the tier-blind `/s/:token`
     /// routes regardless of the manager's tier, so hiding the queue only makes
     /// the manager blind to it, it doesn't stop anything (issue #18). Same
-    /// grace-window rule as `CloudBackupSection`'s Restore.
+    /// grace-window rule used elsewhere for reaching existing cloud-backed data.
     private var canReachExistingCloudData: Bool {
         entitlements.canUseCloud || lifecycleStatus?.isPendingDelete == true
     }

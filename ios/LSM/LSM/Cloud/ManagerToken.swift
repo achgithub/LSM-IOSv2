@@ -3,8 +3,8 @@ import Security
 
 /// Stable anonymous device identifier for cloud lifecycle management.
 /// Generated once on first cloud use and stored in the Keychain — it acts as
-/// an ownership credential for cloud backup/lifecycle, so UserDefaults (readable
-/// by backup tools) is not an appropriate store.
+/// an ownership credential for cloud lifecycle/PWA state, so UserDefaults
+/// (readable by device backup tools) is not an appropriate store.
 ///
 /// Migration: if a value exists in UserDefaults under the old key, it is moved
 /// to the Keychain on first access and deleted from UserDefaults.
@@ -20,8 +20,8 @@ nonisolated enum ManagerToken {
     // bundle id, com.sportsmanager.LMS, or the worker's APP_ATTEST_BUNDLE_ID).
     // Fixed for consistency; `legacyKeychainService` below migrates any token
     // already stored under the old name so existing testers aren't silently
-    // handed a new token (which would orphan their submission links and
-    // manager_lifecycle row — see `restore()`'s doc comment).
+    // handed a new token, which would orphan their submission links and
+    // manager_lifecycle row.
     private static let keychainService = "com.sportsmanager.LMS"
     private static let legacyKeychainService = "com.sportsmanager.LSM"
     private static let keychainAccount = "managerCloudToken"
@@ -44,17 +44,6 @@ nonisolated enum ManagerToken {
         let new = UUID().uuidString.lowercased()
         save(new)
         return new
-    }
-
-    /// Overwrites the Keychain value with a token recovered from a Cloud
-    /// Backup restore. Without this, a restored phone always mints a brand
-    /// new random token (Keychain data is device-local and isn't part of the
-    /// backup bundle by default), which silently orphans every existing
-    /// submission link, the manager_lifecycle row, and anything else scoped
-    /// server-side to the original device's token. Restoring the same value
-    /// makes the new device indistinguishable from the original to the server.
-    static func restore(_ token: String) {
-        save(token.lowercased())
     }
 
     private static func keychainValue(service: String) -> String? {

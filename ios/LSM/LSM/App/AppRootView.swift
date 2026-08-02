@@ -60,7 +60,7 @@ struct AppRootView: View {
 }
 
 /// Global "the backend is in maintenance mode" banner — set by MaintenanceState
-/// whenever any cloud call (sports data, backup, publish, manager, submissions,
+/// whenever any cloud call (sports data, manager, submissions,
 /// attest) detects the shared 503 maintenance shape. Sits above every tab so it
 /// covers reads served from cache as well as write-path failures.
 private struct MaintenanceBanner: View {
