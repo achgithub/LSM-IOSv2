@@ -16,11 +16,11 @@ interface Env {
   // go direct to KV and don't require these.
   WRK_UK_ADMIN_TOKEN?: string;
   WRK_EU_ADMIN_TOKEN?: string;
-  // Separate pair for worker-api (the authority Worker, not the sports shard)
-  // — its own UK_ADMIN_TOKEN/EU_ADMIN_TOKEN secrets are distinct values.
+  // For worker-api (the authority Worker, not the sports shard) — its own
+  // UK_ADMIN_TOKEN is a distinct secret value from the sports shard's.
   // Used only to proxy GET /admin/cleanup-preview (read-only dry run).
+  // UK-only: the EU authority env was torn down 2026-08-02, never deployed.
   WRK_API_UK_ADMIN_TOKEN?: string;
-  WRK_API_EU_ADMIN_TOKEN?: string;
   // This Access application's team domain + Audience (AUD) tag — both from
   // the Zero Trust dashboard (Access > Applications > this app > Overview).
   // Team domain isn't secret (it's in the login redirect URL); AUD is set
@@ -46,13 +46,13 @@ const SHARD_URLS: Record<Shard, string> = {
 
 // The authority Worker (worker-api/) — distinct deployment from the sports
 // shards above, holds player_tokens/round_pushes/publish_links/attest_devices/etc.
-const API_URLS: Record<Shard, string> = {
+// UK-only for now — the EU authority env was torn down 2026-08-02 (never deployed).
+const API_URLS: Record<"uk", string> = {
   uk: "https://api.uk.sportsmanager.site",
-  eu: "https://api.eu.sportsmanager.site",
 };
 
-function apiToken(env: Env, shard: Shard): string | undefined {
-  return shard === "uk" ? env.WRK_API_UK_ADMIN_TOKEN : env.WRK_API_EU_ADMIN_TOKEN;
+function apiToken(env: Env, shard: "uk"): string | undefined {
+  return shard === "uk" ? env.WRK_API_UK_ADMIN_TOKEN : undefined;
 }
 
 const LEAGUES = [
@@ -567,7 +567,7 @@ function shellHtml(): Response {
       out.textContent = 'Running…';
       try {
         const d = await fetch('/action/cleanup-preview?days=' + encodeURIComponent(days)).then(r => r.json());
-        out.innerHTML = renderCleanupRegion('UK', d.uk) + renderCleanupRegion('EU', d.eu);
+        out.innerHTML = renderCleanupRegion('UK', d.uk);
       } catch (e) {
         out.textContent = 'Error: ' + e.message;
       }
@@ -643,7 +643,7 @@ type CleanupPreview = {
 // GET /admin/cleanup-preview?days=N on the authority Worker — read-only, runs
 // the same WHERE clauses as the real cleanup cron without deleting anything.
 async function proxyCleanupPreview(
-  shard: Shard, env: Env, days: number,
+  shard: "uk", env: Env, days: number,
 ): Promise<{ ok: true; preview: CleanupPreview } | { ok: false; error: string }> {
   const token = apiToken(env, shard);
   if (!token) return { ok: false, error: `WRK_API_${shard.toUpperCase()}_ADMIN_TOKEN not configured` };
@@ -674,18 +674,16 @@ export default {
 
     if (pathname === "/outage") return Response.json(await fetchOutage(env));
 
-    // Read-only dry run against both authority regions — deletes nothing.
+    // Read-only dry run against the authority — deletes nothing.
+    // UK-only: the EU authority env was torn down 2026-08-02 (never deployed).
     if (pathname === "/action/cleanup-preview") {
       const daysParam = searchParams.get("days");
       const days = daysParam ? parseInt(daysParam, 10) : 100;
       if (!Number.isFinite(days) || days < 0) {
         return Response.json({ ok: false, error: "days must be a non-negative number" }, { status: 400 });
       }
-      const [uk, eu] = await Promise.all([
-        proxyCleanupPreview("uk", env, days),
-        proxyCleanupPreview("eu", env, days),
-      ]);
-      return Response.json({ uk, eu });
+      const uk = await proxyCleanupPreview("uk", env, days);
+      return Response.json({ uk });
     }
 
     if (pathname === "/action/outage" && req.method === "POST") {

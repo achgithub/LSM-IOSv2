@@ -16,9 +16,6 @@ interface __BaseEnv_Env {
 	UK_ATTEST_CHALLENGE_KEY: string;
 	UK_JWT_PRIVATE_KEY: string;
 	UK_ADMIN_TOKEN: string;
-	EU_ATTEST_CHALLENGE_KEY: string;
-	EU_JWT_PRIVATE_KEY: string;
-	EU_ADMIN_TOKEN: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

@@ -22,13 +22,6 @@ export function regionSecret(env: Env, name: SecretName): string {
         case "ADMIN_TOKEN":          return env.UK_ADMIN_TOKEN ?? "";
       }
       break;
-    case "EU":
-      switch (name) {
-        case "ATTEST_CHALLENGE_KEY": return env.EU_ATTEST_CHALLENGE_KEY ?? "";
-        case "JWT_PRIVATE_KEY":      return env.EU_JWT_PRIVATE_KEY ?? "";
-        case "ADMIN_TOKEN":          return env.EU_ADMIN_TOKEN ?? "";
-      }
-      break;
   }
   return "";
 }
