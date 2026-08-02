@@ -868,7 +868,7 @@ final class LMSSmokeUITests: XCTestCase {
     }
 
     private func request(path: String, method: String, body: [String: Any]? = nil) throws -> Data {
-        guard let url = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev\(path)") else {
+        guard let url = URL(string: "https://uk-api.sportsmanager.site\(path)") else {
             throw UITestAPIError.badURL(path)
         }
         var request = URLRequest(url: url)

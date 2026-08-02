@@ -113,7 +113,7 @@ enum Leagues {
     // v2: the league manifest is served by the shard workers themselves
     // (GET /leagues.json), not v1's separate registry worker. Either shard
     // returns the full cross-shard list; the UK shard is used here.
-    private static let registryURL = URL(string: "https://lsm-uk-worker.sportsmanager.workers.dev/leagues.json")!
+    private static let registryURL = URL(string: "https://uk-api.sportsmanager.site/leagues.json")!
 
     private static let manifest: Manifest = load()
 
