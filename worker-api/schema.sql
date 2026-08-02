@@ -4,8 +4,11 @@
 -- This database owns everything that is NOT sports data:
 --   • App Attest device registry (one row per enrolled device)
 --   • PWA submission queue (player_tokens, game_enrollments, round_pushes, submissions)
---   • Cloud backup metadata (manager_lifecycle, manager_backups)
---   • Publish links
+--   • Manager lifecycle (manager_lifecycle)
+--
+-- Cloud Backup (manager_backups) and Cloud Publish (publish_links) tables
+-- were dropped 2026-08-02 along with the features — see
+-- migrations/0006_drop_backup_publish_tables.sql.
 --
 -- Sports data (leagues, teams, fixtures, standings) stays in the sports shard DBs.
 --
@@ -127,27 +130,3 @@ CREATE TABLE IF NOT EXISTS manager_lifecycle (
   link_cap_warned_at   TEXT              -- when the over-cap grace clock started (separate from scheduled_delete_at)
 );
 
--- ── Manager backups ───────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS manager_backups (
-  manager_token  TEXT NOT NULL,
-  restore_code   TEXT NOT NULL,
-  backed_up_at   TEXT NOT NULL,
-  PRIMARY KEY (manager_token, restore_code)
-);
-
-CREATE INDEX IF NOT EXISTS idx_manager_backups_token ON manager_backups (manager_token, backed_up_at DESC);
-
--- ── Publish links ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS publish_links (
-  id                   TEXT PRIMARY KEY,
-  pin_salt             TEXT NOT NULL,
-  pin_hash             TEXT NOT NULL,
-  r2_key               TEXT NOT NULL,
-  owner_key_id         TEXT NOT NULL,
-  owner_token          TEXT,
-  manager_token        TEXT,                -- links this link to its owning manager, for cascade delete
-  unlock_attempts      INTEGER NOT NULL DEFAULT 0,
-  unlock_locked_until  TEXT,
-  created_at           TEXT NOT NULL,
-  updated_at           TEXT NOT NULL
-);

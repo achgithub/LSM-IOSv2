@@ -18,7 +18,6 @@ export interface StalePreview {
   revokedPlayerTokens: { count: number; sample: string[] };
   roundPushesToWarn: { count: number; sample: string[] };
   abandonedGames: { count: number; sample: string[] };
-  stalePublishLinks: { count: number; sample: string[] };
   staleAttestDevices: { count: number; sample: string[] };
   // Not day-parameterized — these are always "what's due right now" regardless
   // of the `days` argument, included so the preview gives the full picture.
@@ -51,7 +50,6 @@ export async function previewStaleData(env: Env, days: number = DEFAULT_RETENTIO
     revokedPlayerTokens,
     roundPushesToWarn,
     abandonedGames,
-    stalePublishLinks,
     staleAttestDevices,
     managerDeletesDue,
     managersOverCap,
@@ -71,11 +69,6 @@ export async function previewStaleData(env: Env, days: number = DEFAULT_RETENTIO
       env.DB,
       `SELECT game_token FROM round_pushes WHERE updated_at < datetime('now', ?)`,
       [`-${days} days`], "game_token",
-    ),
-    countAndSample(
-      env.DB,
-      `SELECT id FROM publish_links WHERE updated_at < datetime('now', ?)`,
-      [`-${days} days`], "id",
     ),
     countAndSample(
       env.DB,
@@ -105,7 +98,6 @@ export async function previewStaleData(env: Env, days: number = DEFAULT_RETENTIO
     revokedPlayerTokens,
     roundPushesToWarn,
     abandonedGames,
-    stalePublishLinks,
     staleAttestDevices,
     managerDeletesDue,
     managersOverCap,

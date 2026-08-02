@@ -45,7 +45,7 @@ const SHARD_URLS: Record<Shard, string> = {
 };
 
 // The authority Worker (worker-api/) — distinct deployment from the sports
-// shards above, holds player_tokens/round_pushes/publish_links/attest_devices/etc.
+// shards above, holds player_tokens/round_pushes/attest_devices/etc.
 // UK-only for now — the EU authority env was torn down 2026-08-02 (never deployed).
 const API_URLS: Record<"uk", string> = {
   uk: "https://api.uk.sportsmanager.site",
@@ -539,7 +539,6 @@ function shellHtml(): Response {
       ['revokedPlayerTokens', 'Revoked player tokens'],
       ['roundPushesToWarn',   'Games newly warned (abandonment)'],
       ['abandonedGames',      'Games deleted (abandonment)'],
-      ['stalePublishLinks',   'Stale publish links'],
       ['staleAttestDevices',  'Stale attest devices'],
       ['managerDeletesDue',   'Managers due for delete (unsubscribed, grace expired)'],
       ['managersOverCap',     'Managers currently over their PWA link cap'],
@@ -633,7 +632,6 @@ type CleanupPreview = {
   revokedPlayerTokens: CleanupCategory;
   roundPushesToWarn: CleanupCategory;
   abandonedGames: CleanupCategory;
-  stalePublishLinks: CleanupCategory;
   staleAttestDevices: CleanupCategory;
   managerDeletesDue: CleanupCategory;
   managersOverCap: CleanupCategory;

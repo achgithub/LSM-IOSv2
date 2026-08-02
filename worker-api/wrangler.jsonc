@@ -59,9 +59,8 @@
         }
       ],
 
-      "r2_buckets": [
-        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
-      ],
+      // R2 binding removed 2026-08-02 along with Cloud Backup/Publish — see
+      // index.ts. lsm-cloud-bundle itself is being decommissioned too.
 
       // Same namespace as worker/wrangler.jsonc's uk-shard SCORES binding —
       // the global outage flag (src/outage.ts) is one KV key shared across
