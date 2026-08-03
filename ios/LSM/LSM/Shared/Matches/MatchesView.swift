@@ -123,6 +123,19 @@ struct MatchesView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
                     .background(.bar)
+                } else if let errorMessage, !items.isEmpty {
+                    // A failed refresh with valid stale data on screen used to be
+                    // completely silent — no ad, no error, no throttle countdown
+                    // (a failed fetch never makes the cache fresh enough to arm
+                    // one) — indistinguishable from the button not working at all.
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                        Text("Refresh failed: \(errorMessage)").font(.caption).lineLimit(1)
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.bar)
                 }
             }
             .appBackground()
