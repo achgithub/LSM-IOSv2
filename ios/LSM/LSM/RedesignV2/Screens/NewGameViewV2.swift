@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// Card restyle of `NewGameView`'s mode picker + Predictor form — the mode
 /// this branch is building end-to-end first (see `GamesPortalViewV2`'s doc
@@ -19,6 +20,16 @@ struct NewGameViewV2: View {
 
     @State private var mode: GameMode?
     @State private var showingLegacyForm = false
+
+    // Import Game (transfer from another manager's device) — see GameTransfer.swift.
+    @Query(sort: \RosterMember.name) private var rosterMembers: [RosterMember]
+    @State private var showingImport = false
+    @State private var importError: String?
+    @State private var pendingSnapshot: GameTransferSnapshot?
+    @State private var conflictQueue: [GameTransferSnapshot.PlayerSnapshot] = []
+    @State private var nameOverrides: [UUID: String] = [:]
+    @State private var showingConflictAlert = false
+    @State private var currentConflictName = ""
 
     @State private var name = ""
     @State private var selectedLeagueIds: Set<String> = []
@@ -61,6 +72,28 @@ struct NewGameViewV2: View {
             .background(V2Theme.background.ignoresSafeArea())
         }
         .sheet(isPresented: $showingLegacyForm) { NewGameView() }
+        .fileImporter(
+            isPresented: $showingImport,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result)
+        }
+        .alert("Couldn't Import", isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importError ?? "")
+        }
+        .alert("Name already in your roster", isPresented: $showingConflictAlert) {
+            TextField("Player name", text: $currentConflictName)
+            Button("Use this name") { resolveConflict() }
+            Button("Cancel Import", role: .cancel) { cancelImport() }
+        } message: {
+            Text("\"\(conflictQueue.first?.name ?? "")\" matches a player already in your roster. Enter a different name for this import so they aren't mixed up.")
+        }
     }
 
     private var modePicker: some View {
@@ -81,6 +114,12 @@ struct NewGameViewV2: View {
                     }
                     .buttonStyle(.plain)
                 }
+                Button {
+                    showingImport = true
+                } label: {
+                    MenuRow(systemImage: "square.and.arrow.down", title: "Import Game", tint: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
@@ -226,6 +265,76 @@ struct NewGameViewV2: View {
         let completeRaw = GameStatus.complete.rawValue
         let descriptor = FetchDescriptor<Game>(predicate: #Predicate { $0.statusRaw != completeRaw })
         return (try? context.fetchCount(descriptor)) ?? 0
+    }
+
+    // MARK: - Import Game
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure:
+            importError = AppString("Couldn't read that file — it may not be a valid game transfer file.")
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let snapshot = try GameTransferFile.read(from: url)
+                beginConflictResolution(for: snapshot)
+            } catch {
+                importError = AppString("Couldn't read that file — it may not be a valid game transfer file.")
+            }
+        }
+    }
+
+    /// Case-insensitive exact match — the same duplicate-name rule used
+    /// everywhere else in the app (`PlayersView.isDuplicateMember`, etc.).
+    private func beginConflictResolution(for snapshot: GameTransferSnapshot) {
+        let existingNames = Set(rosterMembers.map { $0.name.lowercased() })
+        pendingSnapshot = snapshot
+        nameOverrides = [:]
+        conflictQueue = snapshot.players.filter { existingNames.contains($0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) }
+        presentNextConflict()
+    }
+
+    private func presentNextConflict() {
+        guard let next = conflictQueue.first else {
+            finishImport()
+            return
+        }
+        currentConflictName = suggestedName(for: next.name)
+        showingConflictAlert = true
+    }
+
+    private func suggestedName(for name: String) -> String {
+        let existingNames = Set(rosterMembers.map { $0.name.lowercased() })
+        var suffix = 2
+        var candidate = "\(name) (\(suffix))"
+        while existingNames.contains(candidate.lowercased())
+            || nameOverrides.values.contains(where: { $0.localizedCaseInsensitiveCompare(candidate) == .orderedSame }) {
+            suffix += 1
+            candidate = "\(name) (\(suffix))"
+        }
+        return candidate
+    }
+
+    private func resolveConflict() {
+        guard let current = conflictQueue.first else { return }
+        let trimmed = currentConflictName.trimmingCharacters(in: .whitespacesAndNewlines)
+        nameOverrides[current.id] = trimmed.isEmpty ? current.name : trimmed
+        conflictQueue.removeFirst()
+        presentNextConflict()
+    }
+
+    private func cancelImport() {
+        conflictQueue = []
+        pendingSnapshot = nil
+    }
+
+    private func finishImport() {
+        guard let snapshot = pendingSnapshot else { return }
+        GameTransferBuilder.restore(snapshot, nameOverrides: nameOverrides, into: context)
+        pendingSnapshot = nil
+        dismiss()
     }
 }
 

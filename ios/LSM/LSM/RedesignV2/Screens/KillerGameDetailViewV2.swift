@@ -96,15 +96,21 @@ struct KillerGameDetailViewV2: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { Task { await exportGame() } } label: {
-                    if isPreparingExport {
-                        ProgressView()
-                    } else {
+                if isPreparingExport {
+                    ProgressView()
+                } else {
+                    Menu {
+                        Button { Task { await exportGame() } } label: {
+                            Label("Export as CSV (backup)", systemImage: "doc.text")
+                        }
+                        Button { Task { await exportForTransfer() } } label: {
+                            Label("Export for Transfer", systemImage: "square.and.arrow.up.on.square")
+                        }
+                    } label: {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundStyle(V2Theme.textPrimary)
                     }
                 }
-                .disabled(isPreparingExport)
             }
         }
         .task {
@@ -377,6 +383,19 @@ struct KillerGameDetailViewV2: View {
         do {
             let data = try await LeagueData.load(for: game.leagues)
             exportFiles = try KillerExportFiles.write(for: game, data: data)
+        } catch {
+            exportError = AppString("Couldn't prepare the export. Please try again.")
+        }
+    }
+
+    /// Full-fidelity JSON hand-off to another manager — not the CSV backup
+    /// above. PWA links never transfer; the receiving manager mints fresh
+    /// ones if they use PWA submissions.
+    private func exportForTransfer() async {
+        isPreparingExport = true
+        defer { isPreparingExport = false }
+        do {
+            exportFiles = try [GameTransferFile.write(snapshot: GameTransferBuilder.snapshot(of: game), gameName: game.name)]
         } catch {
             exportError = AppString("Couldn't prepare the export. Please try again.")
         }
