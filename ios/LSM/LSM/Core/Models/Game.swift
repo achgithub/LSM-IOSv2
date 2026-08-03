@@ -24,6 +24,11 @@ final class Game {
     /// tutorial game so its content can be identified and cleared without touching
     /// the manager's real games. Defaults to false → existing games migrate as non-tutorial.
     var isDemoData: Bool = false
+    /// Manager-side shortcut flag — surfaces the game in the V2 portal's
+    /// Favourites section (a shortcut, not a move: it still also appears in
+    /// its normal per-mode section). Defaults to false, so existing games
+    /// migrate unchanged (lightweight migration, same pattern as `isDemoData`).
+    var isFavourite: Bool = false
     /// The league(s) this game runs in (chosen at creation from the enabled
     /// leagues). Usually one, but a game can blend several. Rounds draw fixtures
     /// from these. Empty on legacy games → `leagues` resolves to the home league.

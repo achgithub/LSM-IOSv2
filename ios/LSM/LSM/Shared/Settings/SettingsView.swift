@@ -56,8 +56,15 @@ struct SettingsView: View {
                     Toggle(isOn: $v2PreviewEnabled) {
                         SettingsRow(systemName: "sparkles", title: "Try the new design")
                     }
+                    if v2PreviewEnabled {
+                        NavigationLink {
+                            V2PreviewMenuView()
+                        } label: {
+                            SettingsRow(systemName: "wand.and.stars", title: "V2 Preview")
+                        }
+                    }
                 } footer: {
-                    Text("Adds a V2 tab with an early look at the redesigned Games screen. Everything else stays the same.")
+                    Text("An early look at the redesigned Games screen. Everything else stays the same.")
                 }
             }
             .listSectionSpacing(.compact)

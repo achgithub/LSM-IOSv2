@@ -14,6 +14,17 @@ struct StandingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if enabled.leagues.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(enabled.leagues) { option in
+                                SelectablePill(title: option.displayName, isSelected: option.id == league.id) {
+                                    selectedLeague = option
+                                }
+                            }
+                        }
+                    }
+                }
                 if store.isLoading && store.standings.isEmpty {
                     ProgressView("Loading standings…")
                         .padding(.top, 60)
@@ -42,6 +53,15 @@ struct StandingsViewV2: View {
         }
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Standings")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { store.refresh(league: league) } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .accessibilityLabel("Refresh")
+                .disabled(store.isLoading || store.isThrottled)
+            }
+        }
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
     }

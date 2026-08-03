@@ -3,7 +3,7 @@ import SwiftUI
 /// The five tabs. Tagged so the selection survives the language re-key (see
 /// `AppRootView`): changing language recreates this view, so the selection lives
 /// in the parent and is restored via the binding rather than resetting to Games.
-enum RootTab: Hashable { case games, players, matches, standings, settings, v2Preview }
+enum RootTab: Hashable { case games, players, matches, standings, settings }
 
 /// The five-tab navigation: Games, Players, Matches, Standings, Settings.
 /// (Picks are entered inside a game — Games → Enter Picks — so the second tab
@@ -17,7 +17,6 @@ struct RootTabView: View {
     /// Owned by `AppRootView` so it persists across the language re-key.
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-    @AppStorage(V2PreviewFlag.key) private var v2PreviewEnabled = false
     @State private var entitlements = Entitlements.shared
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
@@ -64,11 +63,6 @@ struct RootTabView: View {
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                     .tag(RootTab.settings)
-                if v2PreviewEnabled {
-                    V2PreviewMenuView()
-                        .tabItem { Label("V2", systemImage: "sparkles") }
-                        .tag(RootTab.v2Preview)
-                }
             }
             // App-wide banner at the very bottom; only for ad-supported tiers.
             // Kept OUTSIDE the TabView (not a safeAreaInset on it) so it renders

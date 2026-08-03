@@ -23,6 +23,11 @@ struct GamesPortalViewV2: View {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
     }
 
+    /// Shortcut, not a move: a favourited game also stays in its normal
+    /// per-mode section below, so a manager never loses track of "where did
+    /// my game go" — this section is purely a faster way to reach it.
+    private var favouriteGames: [Game] { games.filter(\.isFavourite) }
+
     /// Mirrors `GamesListView.atGameLimit` — checked *before* presenting the
     /// create form, not just at Create-tap, so hitting the cap surfaces an
     /// explanatory alert instead of a silent no-op inside `NewGameViewV2`.
@@ -41,6 +46,18 @@ struct GamesPortalViewV2: View {
                     }
                     .padding(.top, 40)
                 } else {
+                    if !favouriteGames.isEmpty {
+                        Card {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionHeader(title: "Favourites")
+                                VStack(spacing: 10) {
+                                    ForEach(favouriteGames) { game in
+                                        GameSummaryRow(game: game)
+                                    }
+                                }
+                            }
+                        }
+                    }
                     ForEach(modesInPlay, id: \.self) { mode in
                         ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode })
                     }
@@ -223,6 +240,14 @@ private struct GameSummaryRow: View {
                     .foregroundStyle(V2Theme.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
+                Button {
+                    game.isFavourite.toggle()
+                } label: {
+                    Image(systemName: game.isFavourite ? "star.fill" : "star")
+                        .font(.body)
+                        .foregroundStyle(game.isFavourite ? V2Theme.warning : V2Theme.textTertiary)
+                }
+                .buttonStyle(.plain)
                 NavigationLink {
                     destination
                 } label: {
