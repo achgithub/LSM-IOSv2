@@ -24,6 +24,10 @@ struct PredictorGameDetailView: View {
     @State private var isResending = false
     @State private var resendMessage: String?
     @State private var lifecycleStatus: ManagerLifecycleStatus?
+    /// CSV export (manual backup) — mirrors LMS's `GameDetailView`.
+    @State private var isPreparingExport = false
+    @State private var exportFiles: [URL]?
+    @State private var exportError: String?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
@@ -80,11 +84,35 @@ struct PredictorGameDetailView: View {
                     Label("Rename Game", systemImage: "pencil")
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { await exportGame() } } label: {
+                    if isPreparingExport {
+                        ProgressView()
+                    } else {
+                        Label("Export Game", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isPreparingExport)
+            }
         }
         .alert("Rename game", isPresented: $renaming) {
             TextField("Game name", text: $renameText)
             Button("Rename") { commitRename() }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: Binding(
+            get: { exportFiles.map(ExportShareItem.init) },
+            set: { if $0 == nil { exportFiles = nil } }
+        )) { item in
+            ActivityShareView(items: item.urls)
+        }
+        .alert("Export Failed", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
         }
         .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
         .sheet(item: $sheet) { which in
@@ -286,4 +314,16 @@ struct PredictorGameDetailView: View {
         context.delete(round)
     }
 
+    /// Manual backup: export the game's settings + full prediction history
+    /// as two CSV files via the share sheet. Mirrors LMS's `exportGame()`.
+    private func exportGame() async {
+        isPreparingExport = true
+        defer { isPreparingExport = false }
+        do {
+            let data = try await LeagueData.load(for: game.leagues)
+            exportFiles = try PredictorExportFiles.write(for: game, data: data)
+        } catch {
+            exportError = AppString("Couldn't prepare the export. Please try again.")
+        }
+    }
 }
