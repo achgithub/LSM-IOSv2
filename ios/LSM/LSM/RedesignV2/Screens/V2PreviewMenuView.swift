@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Debug-only entry point into the V2 redesign — a portal-style menu of
-/// links to each restyled screen, built as they're added. Not part of the
-/// shipping app; wired into `RootTabView` behind `#if DEBUG` only.
+/// Entry point into the V2 redesign — a portal-style menu of links to each
+/// restyled screen, built as they're added. Reached via the "V2" tab, which
+/// `RootTabView` only shows when the user opts in from Settings (see
+/// `V2PreviewFlag`) — off by default, works in every build, not `#if DEBUG`.
 struct V2PreviewMenuView: View {
     var body: some View {
         NavigationStack {
