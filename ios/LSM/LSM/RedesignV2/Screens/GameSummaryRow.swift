@@ -95,7 +95,7 @@ struct GameSummaryRow: View {
     @ViewBuilder
     private var destination: some View {
         switch game.mode {
-        case .lms: GameDetailView(game: game)
+        case .lms: GameDetailViewV2(game: game)
         case .predictor: PredictorGameDetailViewV2(game: game)
         case .killer: KillerGameDetailViewV2(game: game)
         }

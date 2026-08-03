@@ -1,20 +1,22 @@
 import SwiftUI
 import SwiftData
 
-/// Card restyle of `OpenRoundView`, scoped to Predictor's "Open Matchday"
-/// step (the only V2 caller). All the same logic — league blending, unplayed/
+/// Card restyle of `OpenRoundView`, shared by Predictor's "Open Matchday" and
+/// LMS's "Open Round" steps. All the same logic — league blending, unplayed/
 /// date filters, manual fixtures, deadline, LMS's `strandedPlayers` check
-/// (kept for parity even though it's always empty for Predictor, which has
-/// no "used teams" concept) — copied rather than shared, since the original
-/// is a large mode-agnostic view also used live by LMS; touching it wasn't
-/// part of this pass. `AddManualFixtureSheet` is reused as-is (unstyled,
-/// out of scope).
+/// (empty for Predictor, which has no "used teams" concept) — copied rather
+/// than shared with the original, since that's a large mode-agnostic view
+/// also used live by LMS itself; touching it wasn't part of this pass.
+/// `AddManualFixtureSheet` is reused as-is (unstyled, out of scope).
 struct OpenRoundViewV2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
     let game: Game
     var roundType: RoundType = .normal
+    /// Mode identity color — defaults to Predictor's (the original caller);
+    /// LMS's `GameDetailViewV2` passes `V2Theme.Mode.lms`.
+    var tint: Color = V2Theme.Mode.predictor
     var onOpened: () -> Void = {}
 
     @State private var data: LeagueData?
@@ -117,7 +119,7 @@ struct OpenRoundViewV2: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Open") { create() }
                         .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty)
-                        .foregroundStyle(V2Theme.Mode.predictor)
+                        .foregroundStyle(tint)
                 }
             }
             .task { await load() }
@@ -168,7 +170,7 @@ struct OpenRoundViewV2: View {
                             Spacer()
                             Button("Refresh") { refreshMatches() }
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(V2Theme.Mode.predictor)
+                                .foregroundStyle(tint)
                         }
                     }
                 }
@@ -225,14 +227,14 @@ struct OpenRoundViewV2: View {
                                 SelectablePill(
                                     title: league.name,
                                     isSelected: selectedLeagueIds.contains(league.id),
-                                    tint: V2Theme.Mode.predictor
+                                    tint: tint
                                 ) { toggleLeague(league.id) }
                             }
                         }
                     }
                 }
-                Toggle("Unplayed only", isOn: $unplayedOnly).tint(V2Theme.Mode.predictor)
-                Toggle("Filter by date", isOn: $dateFilterOn.animation()).tint(V2Theme.Mode.predictor)
+                Toggle("Unplayed only", isOn: $unplayedOnly).tint(tint)
+                Toggle("Filter by date", isOn: $dateFilterOn.animation()).tint(tint)
                 if dateFilterOn {
                     DatePicker("From", selection: $dateFrom, displayedComponents: .date)
                     DatePicker(
@@ -259,7 +261,7 @@ struct OpenRoundViewV2: View {
                     if !visibleFixtures.isEmpty {
                         Button(allVisibleSelected ? "Deselect all" : "Select all") { toggleSelectAllVisible() }
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(V2Theme.Mode.predictor)
+                            .foregroundStyle(tint)
                     }
                 }
                 if visibleFixtures.isEmpty {
@@ -270,7 +272,7 @@ struct OpenRoundViewV2: View {
                             Button { toggle(fixture.id) } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: selectedFixtureIds.contains(fixture.id) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(selectedFixtureIds.contains(fixture.id) ? V2Theme.Mode.predictor : V2Theme.textTertiary)
+                                        .foregroundStyle(selectedFixtureIds.contains(fixture.id) ? tint : V2Theme.textTertiary)
                                     FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
                                         .foregroundStyle(V2Theme.textPrimary)
                                     if isBlended, let lid = fixture.leagueId, let l = Leagues.lookup(lid) {
@@ -295,7 +297,7 @@ struct OpenRoundViewV2: View {
                     Label("Add Manual Fixture", systemImage: "plus.circle")
                 }
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(V2Theme.Mode.predictor)
+                .foregroundStyle(tint)
             }
         }
     }
