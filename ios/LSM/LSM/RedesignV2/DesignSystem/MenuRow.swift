@@ -8,13 +8,18 @@ struct MenuRow: View {
     let systemImage: String
     let title: String
     var value: String?
+    /// Icon color — defaults to the shared accent, but pass a mode's own
+    /// color (`V2Theme.Mode.color(for:)`) when the row represents that mode,
+    /// so it reads consistently with how the mode is colored elsewhere
+    /// (e.g. the games portal's section headers).
+    var tint: Color = V2Theme.accent
 
     var body: some View {
         Card(padding: 16) {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(V2Theme.accent)
+                    .foregroundStyle(tint)
                     .frame(width: 22)
                 Text(title)
                     .font(V2Theme.Typography.rowTitle)

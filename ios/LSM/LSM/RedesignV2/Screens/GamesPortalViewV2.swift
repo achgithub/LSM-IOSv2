@@ -14,10 +14,20 @@ import SwiftData
 /// Tapping the chevron pushes the *existing* per-mode detail view — those
 /// haven't been restyled yet; that's the next phase of the V2 build.
 struct GamesPortalViewV2: View {
+    @Environment(Entitlements.self) private var entitlements
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
+    @State private var showingNewGame = false
+    @State private var showingGameLimit = false
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
+    }
+
+    /// Mirrors `GamesListView.atGameLimit` — checked *before* presenting the
+    /// create form, not just at Create-tap, so hitting the cap surfaces an
+    /// explanatory alert instead of a silent no-op inside `NewGameViewV2`.
+    private var atGameLimit: Bool {
+        games.filter { $0.status != .complete }.count >= entitlements.maxActiveGames
     }
 
     var body: some View {
@@ -27,7 +37,7 @@ struct GamesPortalViewV2: View {
                     ContentUnavailableView {
                         Label("No games yet", systemImage: "trophy")
                     } description: {
-                        Text("Create a game from the main Games tab.")
+                        Text("Tap + to create your first game.")
                     }
                     .padding(.top, 40)
                 } else {
@@ -43,6 +53,24 @@ struct GamesPortalViewV2: View {
         // Mocked — no live submission queue is wired up yet (no test data to
         // aggregate against); see AppHeader.trailingBadgeCount's doc comment.
         .v2Header("Games", trailingBadgeCount: 3)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if atGameLimit { showingGameLimit = true } else { showingNewGame = true }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(V2Theme.accent)
+                }
+                .accessibilityLabel("New Game")
+            }
+        }
+        .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
+        .alert("Game limit reached", isPresented: $showingGameLimit) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            let limit = entitlements.maxActiveGames
+            Text("Your \(entitlements.tier.label) plan includes \(limit) active games. Complete an existing game or upgrade to run more.")
+        }
     }
 }
 
@@ -128,11 +156,17 @@ private struct ManagerRoundStatus {
             eligible = game.activePlayers.count
             submitted = round.picks.count
         case .predictor:
+            // Not `round.predictions.count` — that's one row per fixture
+            // per player, not per player, so it overcounts by roughly the
+            // fixture count (e.g. 14 players × 5 fixtures showed as
+            // "70/14"). Count players with a complete slate instead.
             eligible = game.players.count
-            submitted = round.predictions.count
+            submitted = game.players.filter { PredictorScoringService.slateComplete(for: $0, round: round) }.count
         case .killer:
+            // Same overcounting risk as Predictor when a round has more than
+            // one Manager Picked Game — count players, not prediction rows.
             eligible = game.activePlayers.count
-            submitted = round.killerPredictions.count
+            submitted = game.activePlayers.filter { KillerScoringService.slateComplete(for: $0, round: round, game: game) }.count
         }
 
         let due = "Due " + Self.dateFormatter.string(from: round.deadline)
@@ -257,7 +291,7 @@ private struct GameSummaryRow: View {
     private var destination: some View {
         switch game.mode {
         case .lms: GameDetailView(game: game)
-        case .predictor: PredictorGameDetailView(game: game)
+        case .predictor: PredictorGameDetailViewV2(game: game)
         case .killer: KillerGameDetailView(game: game)
         }
     }
@@ -287,7 +321,6 @@ private struct GameSummaryRow: View {
             }
         case .predictor:
             let round = game.currentRound
-            let submittedIds = Set((round?.predictions ?? []).compactMap { $0.player?.id })
             let rows = PredictorStandings.rows(for: game)
             return rows.map { row in
                 StandingEntry(
@@ -297,22 +330,28 @@ private struct GameSummaryRow: View {
                     text: "\(row.position). \(row.player.name)",
                     trailing: "\(row.points)pts",
                     isMuted: false,
-                    hasSubmitted: round == nil ? nil : submittedIds.contains(row.player.id)
+                    // A full slate, not just "has any prediction row" — a
+                    // player with 1 of 10 fixtures done isn't submitted yet.
+                    hasSubmitted: round.map { PredictorScoringService.slateComplete(for: row.player, round: $0) }
                 )
             }
         case .killer:
             let round = game.currentRound
-            let submittedIds = Set((round?.killerPredictions ?? []).compactMap { $0.player?.id })
             let standings = KillerCardData.makeStandings(game: game)
             return standings.map { entry in
-                StandingEntry(
+                let hasSubmitted: Bool? = (entry.isEliminated || round == nil) ? nil : round.flatMap { r in
+                    game.players.first(where: { $0.id == entry.id }).map {
+                        KillerScoringService.slateComplete(for: $0, round: r, game: game)
+                    }
+                }
+                return StandingEntry(
                     id: entry.id.uuidString,
                     icon: entry.isEliminated ? "xmark" : "heart.fill",
                     iconTint: entry.isEliminated ? V2Theme.danger : V2Theme.accent,
                     text: entry.playerName,
                     trailing: entry.isEliminated ? "OUT" : "\(entry.lives)",
                     isMuted: entry.isEliminated,
-                    hasSubmitted: (entry.isEliminated || round == nil) ? nil : submittedIds.contains(entry.id)
+                    hasSubmitted: hasSubmitted
                 )
             }
         }

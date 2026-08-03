@@ -64,6 +64,10 @@ extension View {
     func v2Header(_ title: String, trailingBadgeCount: Int? = nil) -> some View {
         self
             .navigationBarBackButtonHidden(true)
+            // Without this, the nav bar reserves large-title height even
+            // though AppHeader supplies its own title text — left the gap
+            // between the header and the first card oversized.
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { AppHeader(title: title, trailingBadgeCount: trailingBadgeCount) }
             .toolbarBackground(V2Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)

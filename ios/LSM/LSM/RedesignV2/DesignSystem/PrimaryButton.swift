@@ -5,6 +5,10 @@ import SwiftUI
 struct PrimaryButton: View {
     let title: String
     var isEnabled = true
+    /// Fill color — defaults to the shared accent; pass a mode's own color
+    /// (`V2Theme.Mode.color(for:)`) on a mode-specific screen (e.g. a
+    /// mode's "Create Game") so it matches that mode's identity elsewhere.
+    var tint: Color = V2Theme.accent
     let action: () -> Void
 
     var body: some View {
@@ -15,7 +19,7 @@ struct PrimaryButton: View {
                 .padding(.vertical, 14)
         }
         .foregroundStyle(V2Theme.accentOnAccent)
-        .background(V2Theme.accent, in: RoundedRectangle(cornerRadius: V2Theme.Radius.button, style: .continuous))
+        .background(tint, in: RoundedRectangle(cornerRadius: V2Theme.Radius.button, style: .continuous))
         .opacity(isEnabled ? 1 : 0.4)
         .disabled(!isEnabled)
     }
@@ -26,6 +30,10 @@ struct PrimaryButton: View {
 struct SelectablePill: View {
     let title: String
     let isSelected: Bool
+    /// Fill color when selected — defaults to the shared accent; pass a
+    /// mode's own color on a mode-specific screen to match that mode's
+    /// identity elsewhere.
+    var tint: Color = V2Theme.accent
     let action: () -> Void
 
     var body: some View {
@@ -38,7 +46,7 @@ struct SelectablePill: View {
         .foregroundStyle(isSelected ? V2Theme.accentOnAccent : V2Theme.textPrimary)
         .background(
             RoundedRectangle(cornerRadius: V2Theme.Radius.pill, style: .continuous)
-                .fill(isSelected ? V2Theme.accent : V2Theme.pillBackground)
+                .fill(isSelected ? tint : V2Theme.pillBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: V2Theme.Radius.pill, style: .continuous)

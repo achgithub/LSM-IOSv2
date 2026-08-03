@@ -70,6 +70,16 @@ enum PredictorScoringService {
         }
     }
 
+    /// Clears the joker entirely — no fixture doubled this round. `setJoker`
+    /// only ever *moves* the joker to a fixture, with no way back to "none";
+    /// this is the counterpart a toggle-style joker control needs to actually
+    /// undo an accidental tap rather than just relocate it.
+    static func clearJoker(player: Player, round: Round) {
+        for p in predictions(for: player, in: round) {
+            p.isJoker = false
+        }
+    }
+
     /// Points for one prediction against the real final score. The cascade
     /// falls through disabled rungs rather than special-casing draws: a
     /// correct non-exact draw has goal difference 0 either way, so it lands on
