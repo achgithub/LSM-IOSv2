@@ -30,6 +30,25 @@ struct StandingsView: View {
                     }
                 }
             }
+            // The branch above only surfaces `errorMessage` when the screen has
+            // nothing else to show. A refresh that fails with valid stale data
+            // still on screen used to fail completely silently — no ad, no
+            // error, no throttle countdown (a failed fetch never makes the
+            // cache fresh enough to arm one) — indistinguishable from the
+            // button just not working. Surface it without replacing the
+            // still-valid content.
+            .safeAreaInset(edge: .top) {
+                if let errorMessage, !standings.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                        Text("Refresh failed: \(errorMessage)").font(.caption).lineLimit(1)
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.bar)
+                }
+            }
             .appBackground()
             .navigationTitle("Standings")
             .toolbar {

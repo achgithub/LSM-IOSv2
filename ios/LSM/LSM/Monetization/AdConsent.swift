@@ -70,10 +70,20 @@ enum AdConsent {
         // thread. Called from @MainActor as-is, that's exactly the ~1s+
         // fresh-install hang a tester hit mid-wizard (issue #13). Google's
         // start() is documented safe to call off the main thread, so hop to
-        // a background queue for just this call; there's no completion
-        // handler here to dispatch back to main.
+        // a background queue for just this call.
+        //
+        // RootTabView's launch-time `RewardedAdManager.preload()` fires
+        // immediately after `AdsBootstrap.start()`, racing this whole
+        // UMP → ATT → SDK-init chain — a rewarded ad request made before the
+        // SDK has actually started can silently no-fill, and nothing ever
+        // retried it (no scenePhase hook, no other preload call site), so
+        // `isReady` stayed false for the rest of the session and every
+        // "free" refresh fell through to a real, silently-failing network
+        // fetch. Re-run preload here once start() genuinely completes.
         DispatchQueue.global(qos: .utility).async {
-            MobileAds.shared.start(completionHandler: nil)
+            MobileAds.shared.start { _ in
+                Task { @MainActor in RewardedAdManager.shared.preload() }
+            }
         }
         #endif
     }
