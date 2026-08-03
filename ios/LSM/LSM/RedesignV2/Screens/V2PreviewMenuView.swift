@@ -1,9 +1,13 @@
 import SwiftUI
+import SwiftData
 
-/// Entry point into the V2 redesign — a portal-style menu of links to each
-/// restyled screen, built as they're added. Reached via a row at the bottom
+/// Home — entry point into the V2 redesign. Reached via a row at the bottom
 /// of Settings (see `SettingsView`), shown only when the user opts in via
 /// `V2PreviewFlag` — off by default, works in every build, not `#if DEBUG`.
+/// Leads with a Favourites shortcut (a game's star toggle lives on
+/// `GameSummaryRow`, shared with the Games screen's per-mode sections —
+/// favouriting here doesn't remove it from its normal section there, it's a
+/// shortcut, not a move), then a menu of links to each restyled screen.
 ///
 /// Pushed into Settings' own `NavigationStack` rather than owning one itself
 /// — an embedded `NavigationStack` here, combined with `.v2Header`'s custom
@@ -11,13 +15,29 @@ import SwiftUI
 /// its own root in `.v2Header`, which draws a back button even with nothing
 /// to dismiss) on top of the real one Settings already provides.
 struct V2PreviewMenuView: View {
+    @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
+
+    private var favouriteGames: [Game] { games.filter(\.isFavourite) }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if !favouriteGames.isEmpty {
+                    Card {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SectionHeader(title: "Favourites")
+                            VStack(spacing: 10) {
+                                ForEach(favouriteGames) { game in
+                                    GameSummaryRow(game: game)
+                                }
+                            }
+                        }
+                    }
+                }
                 NavigationLink {
                     GamesPortalViewV2()
                 } label: {
-                    MenuRow(systemImage: "trophy", title: "Portal")
+                    MenuRow(systemImage: "trophy", title: "Games")
                 }
                 .buttonStyle(.plain)
                 NavigationLink {
@@ -43,6 +63,6 @@ struct V2PreviewMenuView: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("V2 Preview")
+        .v2Header("Home")
     }
 }
