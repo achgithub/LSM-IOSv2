@@ -317,7 +317,7 @@ private struct GameSummaryRow: View {
         switch game.mode {
         case .lms: GameDetailView(game: game)
         case .predictor: PredictorGameDetailViewV2(game: game)
-        case .killer: KillerGameDetailView(game: game)
+        case .killer: KillerGameDetailViewV2(game: game)
         }
     }
 
