@@ -173,6 +173,18 @@ final class Entitlements {
         // for the over-cap cascade cron. See ManagerLifecycleClient.
         let maxPWALinks = tier.maxPWALinks
         let canUseCloud = tier.cloudLevel == .full
+        // "pwaSubmissionsEnabled" is a separate manual toggle (Settings ->
+        // Player Management) from the tier entitlement, and both live in
+        // UserDefaults — so a delete+reinstall (or a fresh device) wipes it
+        // right alongside the tier, and a cloud-entitled manager silently
+        // loses the PWA link option with no indication why until they
+        // rediscover the toggle. Default it on the first time a manager
+        // becomes cloud-entitled and the flag has never been explicitly set
+        // (as opposed to explicitly turned off), so upgrading/restoring
+        // doesn't strand the feature. Never overrides a real user choice.
+        if canUseCloud, UserDefaults.standard.object(forKey: "pwaSubmissionsEnabled") == nil {
+            UserDefaults.standard.set(true, forKey: "pwaSubmissionsEnabled")
+        }
         Task {
             await ManagerLifecycleClient.shared.reportEntitlements(maxPWALinks: maxPWALinks)
             // Keep manager_lifecycle in sync with the resolved tier: a
