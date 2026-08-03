@@ -64,7 +64,7 @@ export async function requireAttestation(
 
   // The verified per-device key id — the closest thing to a "principal" this
   // app has (no accounts). Routes that need to scope a write to "whoever
-  // created this" (e.g. Cloud Publish ownership) read it back via this key.
+  // created this" read it back via this key.
   c.set("attestKeyId", keyId);
 
   return next();

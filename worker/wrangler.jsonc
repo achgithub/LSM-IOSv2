@@ -58,13 +58,8 @@
         }
       ],
 
-      // Cloud bundle (Phase 2) — backup/publish blobs. ONE bucket, bound into
-      // both shards: a backup/publish blob is self-contained (it isn't scoped
-      // to a league), so either shard can serve it regardless of which
-      // league(s) the game uses.
-      "r2_buckets": [
-        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
-      ],
+      // R2 binding (backup/publish blobs) removed 2026-08-02 — Cloud
+      // Backup/Publish are gone and lsm-cloud-bundle is being decommissioned.
 
       // Shared KV cache for all leagues in this shard. Keys are league-scoped:
       // "{leagueId}:scores" (payload), "{leagueId}:scores:call" (gate), etc.
@@ -106,10 +101,7 @@
         }
       ],
 
-      // Same shared cloud-bundle bucket as the uk shard — see that block's note.
-      "r2_buckets": [
-        { "binding": "BACKUPS", "bucket_name": "lsm-cloud-bundle" }
-      ],
+      // R2 binding removed 2026-08-02 — see the uk env's note above.
 
       // Shared KV cache for all leagues in this shard — same pattern as uk.
       "kv_namespaces": [

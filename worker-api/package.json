@@ -12,11 +12,9 @@
   "scripts": {
     "dev": "wrangler dev --env uk",
     "deploy:uk": "wrangler deploy --env uk",
-    "deploy:eu": "wrangler deploy --env eu",
     "types": "wrangler types --env uk",
     "typecheck": "tsc --noEmit",
-    "db:migrate:uk": "wrangler d1 execute lsm-api-uk-db --remote --env uk --file=./schema.sql",
-    "db:migrate:eu": "wrangler d1 execute lsm-api-eu-db --remote --env eu --file=./schema.sql"
+    "db:migrate:uk": "wrangler d1 execute lsm-api-uk-db --remote --env uk --file=./schema.sql"
   },
   "dependencies": {
     "@levischuck/tiny-cbor": "^0.3.4",

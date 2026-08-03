@@ -10107,41 +10107,6 @@
         }
       }
     },
-    "One name per row. Add a group with `Name, Group`. Rows without one go to the selected import group above. `Name, Email` still works (email ignored).": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ein Name pro Zeile. Gruppe mit „Name, Gruppe“ angeben. Zeilen ohne Gruppe kommen in die oben gewählte Import-Gruppe. „Name, E-Mail“ funktioniert weiterhin (E-Mail wird ignoriert)."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un nombre por fila. Añade un grupo con «Nombre, Grupo». Las filas sin grupo van al grupo de importación seleccionado arriba. «Nombre, Email» también funciona (el email se ignora)."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un nom par ligne. Ajoute un groupe avec « Nom, Groupe ». Les lignes sans groupe vont dans le groupe d’import sélectionné ci-dessus. « Nom, E-mail » fonctionne aussi (e-mail ignoré)."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un nome per riga. Aggiungi un gruppo con «Nome, Gruppo». Le righe senza gruppo vanno nel gruppo di importazione selezionato sopra. «Nome, Email» funziona ancora (email ignorata)."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eén naam per regel. Voeg een groep toe met ‘Naam, Groep’. Regels zonder groep gaan naar de hierboven gekozen importgroep. ‘Naam, E-mail’ werkt nog steeds (e-mail genegeerd)."
-          }
-        }
-      }
-    },
     "Open": {
       "extractionState": "manual",
       "localizations": {
@@ -24734,6 +24699,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "Deze versie van %@ wordt niet meer ondersteund. Update naar de nieuwste versie om te blijven spelen."
+          }
+        }
+      }
+    },
+    "One name per row. Add a group with `Name, Group`. Rows without one go to the selected import group above.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Name pro Zeile. Gruppe mit „Name, Gruppe“ angeben. Zeilen ohne Gruppe kommen in die oben gewählte Import-Gruppe."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un nombre por fila. Añade un grupo con «Nombre, Grupo». Las filas sin grupo van al grupo de importación seleccionado arriba."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un nom par ligne. Ajoute un groupe avec « Nom, Groupe ». Les lignes sans groupe vont dans le groupe d’import sélectionné ci-dessus."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un nome per riga. Aggiungi un gruppo con «Nome, Gruppo». Le righe senza gruppo vanno nel gruppo di importazione selezionato sopra."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eén naam per regel. Voeg een groep toe met ‘Naam, Groep’. Regels zonder groep gaan naar de hierboven gekozen importgroep."
           }
         }
       }

@@ -33,11 +33,6 @@ struct SettingsView: View {
                         SettingsRow(systemName: "trophy.fill", title: "Leagues", value: "\(enabled.ids.count)/\(entitlements.leagueAllowance)")
                     }
                     NavigationLink {
-                        BackupSettingsView()
-                    } label: {
-                        SettingsRow(systemName: "icloud.fill", title: "Backup & Cloud")
-                    }
-                    NavigationLink {
                         RosterSettingsView()
                     } label: {
                         SettingsRow(systemName: "person.2.fill", title: "Roster")

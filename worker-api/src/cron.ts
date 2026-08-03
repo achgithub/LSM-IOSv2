@@ -1,7 +1,7 @@
 // ── LSM API Cron handler ──────────────────────────────────────────────────────
 // Moved here from worker/src/cron.ts (#6) — this cleanup operates on
-// player_tokens, round_pushes, game_enrollments, submissions, manager_backups,
-// manager_lifecycle, publish_links and attest_devices, which only exist in the
+// player_tokens, round_pushes, game_enrollments, submissions,
+// manager_lifecycle and attest_devices, which only exist in the
 // authority (worker-api) schema, not the sports-shard (worker) one. Called
 // from index.ts scheduled.
 
@@ -20,10 +20,12 @@ import { DEFAULT_RETENTION_DAYS, LINK_CAP_GRACE_DAYS, WARN_LEAD_DAYS } from "./r
 //                     AND here as a safety net)
 //   Revoked tokens:   hard-delete 100 days after revocation (cascade cleans enrollments)
 //   Abandoned games:  warn at 86 days, delete at 100 (measured by round_pushes.updated_at)
-//   Publish links:    delete 100 days after last (re)publish, + its R2 blob
 //   Attest devices:   delete 100 days after last assertion
 //   Unsubscribe:      iOS sets scheduled_delete_at = now + 14d; cron executes deletion
-//   R2 backups:       keep last 2 per manager; delete older blobs
+//
+// R2 backup pruning and stale-publish-link phases removed 2026-08-02 along
+// with Cloud Backup/Publish (manager_backups and publish_links tables dropped
+// — see migrations/0006_drop_backup_publish_tables.sql).
 
 export async function runDailyCleanup(env: Env): Promise<void> {
   const log = (msg: string) => console.log(JSON.stringify({ cron: "daily-cleanup", msg }));
@@ -91,46 +93,13 @@ export async function runDailyCleanup(env: Env): Promise<void> {
     await deleteManagerData(env, manager_token, log);
   }
 
-  // ── 6. R2 backup pruning (keep last 2 per manager) ────────────────────────
-  const managers = await env.DB.prepare(
-    `SELECT DISTINCT manager_token FROM manager_backups`
-  ).all<{ manager_token: string }>();
-
-  for (const { manager_token } of managers.results ?? []) {
-    const backups = await env.DB.prepare(
-      `SELECT restore_code FROM manager_backups
-       WHERE manager_token = ?
-       ORDER BY backed_up_at DESC`
-    ).bind(manager_token).all<{ restore_code: string }>();
-
-    const toDelete = (backups.results ?? []).slice(2);
-    for (const { restore_code } of toDelete) {
-      await env.BACKUPS.delete(`backups/${restore_code}.json`);
-      await env.DB.prepare(
-        `DELETE FROM manager_backups WHERE manager_token = ? AND restore_code = ?`
-      ).bind(manager_token, restore_code).run();
-      log(`deleted old backup ${restore_code} for manager ${manager_token}`);
-    }
-  }
-
-  // ── 7. Stale publish links (100 days since last (re)publish) ──────────────
-  const stalePublishLinks = await env.DB.prepare(
-    `SELECT id, r2_key FROM publish_links WHERE updated_at < datetime('now', ?)`
-  ).bind(`-${DEFAULT_RETENTION_DAYS} days`).all<{ id: string; r2_key: string }>();
-
-  for (const { id, r2_key } of stalePublishLinks.results ?? []) {
-    await env.BACKUPS.delete(r2_key);
-    await env.DB.prepare(`DELETE FROM publish_links WHERE id = ?`).bind(id).run();
-    log(`deleted stale publish link ${id}`);
-  }
-
-  // ── 8. Stale attest devices (100 days since last assertion) ───────────────
+  // ── 6. Stale attest devices (100 days since last assertion) ───────────────
   const staleDevices = await env.DB.prepare(
     `DELETE FROM attest_devices WHERE updated_at < datetime('now', ?)`
   ).bind(`-${DEFAULT_RETENTION_DAYS} days`).run();
   if (staleDevices.meta.changes > 0) log(`deleted ${staleDevices.meta.changes} stale attest devices`);
 
-  // ── 9. Player-token over-cap cascade ───────────────────────────────────────
+  // ── 7. Player-token over-cap cascade ───────────────────────────────────────
   // A tier downgrade (e.g. league_7 → league_5) can drop a manager below their
   // new maxPWALinks without them ever reopening the app to notice. The client
   // reports its cap via POST /manager/entitlements; this is the only place
@@ -216,34 +185,11 @@ export async function deleteManagerData(env: Env, managerToken: string, log: (m:
     `DELETE FROM player_tokens WHERE manager_token = ?`
   ).bind(managerToken).run();
 
-  // R2 backups.
-  const backups = await env.DB.prepare(
-    `SELECT restore_code FROM manager_backups WHERE manager_token = ?`
-  ).bind(managerToken).all<{ restore_code: string }>();
-
-  for (const { restore_code } of backups.results ?? []) {
-    await env.BACKUPS.delete(`backups/${restore_code}.json`);
-  }
-
-  // Publish links (+ their R2 blobs) — only findable via manager_token now
-  // that publish.ts stamps it (see #12 discussion on manager linkage).
-  const publishLinks = await env.DB.prepare(
-    `SELECT id, r2_key FROM publish_links WHERE manager_token = ?`
-  ).bind(managerToken).all<{ id: string; r2_key: string }>();
-
-  for (const { id, r2_key } of publishLinks.results ?? []) {
-    await env.BACKUPS.delete(r2_key);
-    await env.DB.prepare(`DELETE FROM publish_links WHERE id = ?`).bind(id).run();
-  }
-
   // Attest devices — same manager_token linkage.
   await env.DB.prepare(`DELETE FROM attest_devices WHERE manager_token = ?`).bind(managerToken).run();
 
-  // Lifecycle and backup audit rows.
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM manager_backups  WHERE manager_token = ?`).bind(managerToken),
-    env.DB.prepare(`DELETE FROM manager_lifecycle WHERE manager_token = ?`).bind(managerToken),
-  ]);
+  // Lifecycle row.
+  await env.DB.prepare(`DELETE FROM manager_lifecycle WHERE manager_token = ?`).bind(managerToken).run();
 
   log(`deleted all data for manager ${managerToken}`);
 }

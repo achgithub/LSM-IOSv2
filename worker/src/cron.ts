@@ -1,8 +1,8 @@
 // ── LSM Cron handler ──────────────────────────────────────────────────────────
 // runDailySync (per-league football-data.org refresh), called from index.ts
-// scheduled. The daily D1/R2 cleanup job moved to worker-api/src/cron.ts (#6)
-// — it operates on authority-only tables (player_tokens, manager_backups,
-// manager_lifecycle, …) that don't exist in this shard's schema.
+// scheduled. The daily D1 cleanup job moved to worker-api/src/cron.ts (#6)
+// — it operates on authority-only tables (player_tokens, manager_lifecycle,
+// …) that don't exist in this shard's schema.
 
 import { regionSecret } from "./auth";
 import { getAllLeagues } from "./db";

@@ -61,26 +61,6 @@ final class Game {
     /// `KillerScoringService.requiredMPGCount`.
     var killerMaxMPG: Int = 5
 
-    // Cloud Publish (Phase 2, Predictor only) — set at GAME level, not typed in
-    // on every publish: a 6-digit PIN, generated once on first Publish and
-    // reused on every republish until the manager explicitly resets it. The
-    // manager shares it however they like (it's going on share cards
-    // alongside the link, per Andrew 2026-06-25 — not meant to be retyped).
-    /// nil until the game has been published for the first time.
-    var predictorPublishPin: String?
-    /// The stable `/l/<id>` link id, nil until first published.
-    var predictorPublishLinkIdRaw: String?
-    /// High-entropy republish credential, minted server-side on first publish
-    /// and required on every later one — the PIN above is viewer-only and
-    /// deliberately NOT accepted as proof of ownership (a security review
-    /// flagged the earlier draft that did: brute-forcing a 6-digit PIN would
-    /// have let anyone steal/relock someone else's link, not just view it).
-    /// See worker/src/routes/publish.ts.
-    var predictorPublishOwnerToken: String?
-    /// Authority region that owns this game's publish link (e.g. "uk").
-    /// Stored so the share URL /l/{region}/{id} survives without a server round-trip.
-    var predictorPublishLinkRegion: String?
-
     // Cloud Submissions (Phase 3) — the client-generated game identity token
     // used to group all player links and round pushes for this game on the
     // Worker. Nil until the first round push fires (lazy mint: if the manager
@@ -173,18 +153,6 @@ final class Game {
         get { GameMode(rawValue: modeRaw) ?? .lms }
         set { modeRaw = newValue.rawValue }
     }
-    var predictorPublishLinkId: UUID? {
-        get { predictorPublishLinkIdRaw.flatMap(UUID.init(uuidString:)) }
-        set { predictorPublishLinkIdRaw = newValue?.uuidString }
-    }
-
-    /// Generates a fresh 6-digit publish PIN (e.g. for "Reset PIN") — not
-    /// auto-applied; the caller decides when to overwrite
-    /// `predictorPublishPin` (first publish, or an explicit reset).
-    static func generatePublishPin() -> String {
-        String(format: "%06d", Int.random(in: 0...999_999))
-    }
-
     var activePlayers: [Player] { players.filter { $0.status == .active } }
     var currentRound: Round? { rounds.max(by: { $0.roundNumber < $1.roundNumber }) }
 

@@ -274,32 +274,10 @@ CREATE TABLE IF NOT EXISTS submissions (
 CREATE INDEX IF NOT EXISTS idx_submissions_game   ON submissions (token);
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions (status);
 
--- ════════════════════════════════════════════════════════════════════════════
---  CLOUD BUNDLE (Phase 2; NOT the Layer 2 sync above — see §0) ────────────────
--- ════════════════════════════════════════════════════════════════════════════
--- The cloud bundle (backup + publish, one pay-gated entitlement) does NOT use
--- games/players/picks/predictions above — game state stays on-device per §0.
--- Backup needs no D1 row at all (R2 key = the client-generated restore code).
--- Publish needs exactly one lookup row per link: the published blob itself
--- lives in R2 (r2_key); this row exists only so the Pages Function can
--- validate a PIN SERVER-SIDE before ever serving that blob.
-CREATE TABLE IF NOT EXISTS publish_links (
-  id            TEXT PRIMARY KEY,          -- uuid in the public /l/<id> URL
-  pin_salt      TEXT NOT NULL,             -- random per-link, mixed into pin_hash
-  pin_hash      TEXT NOT NULL,             -- sha256(salt + pin) — never the raw PIN
-  r2_key        TEXT NOT NULL,             -- e.g. publish/<id>.json
-  owner_key_id  TEXT NOT NULL,             -- creator's App Attest key id, or '' while
-                                           -- attestation is off (current state, 2026-06)
-  owner_token   TEXT,                      -- high-entropy uuid, minted on first publish,
-                                           -- returned to the app once and stored on Game —
-                                           -- the actual republish credential while
-                                           -- attestation is off. NULL only on rows minted
-                                           -- before this column existed (none real yet).
-                                           -- The viewer PIN is intentionally NOT this
-                                           -- token's equivalent: it's short, brute-
-                                           -- forceable in seconds, and was briefly (and
-                                           -- wrongly) accepted as republish proof too —
-                                           -- see worker/src/routes/publish.ts.
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL              -- bumped on republish (link id stays stable)
-);
+-- The Cloud Bundle (backup + publish) briefly had tables here (a manager_backups
+-- CREATE TABLE in migrate-phase6.sql, and a publish_links CREATE TABLE that used
+-- to live in this file) before the feature moved wholesale to worker-api — this
+-- shard's own backup.ts/publish.ts were dead, unmounted duplicates. Both tables
+-- dropped 2026-08-02 via migrate-phase9.sql, along with Cloud Backup/Publish
+-- entirely (worker-api's copies of the same tables, and the R2 bucket, also
+-- removed the same day — see docs/cf-integration-map.html §10).

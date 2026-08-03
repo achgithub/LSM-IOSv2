@@ -1,9 +1,9 @@
 import Foundation
 import Observation
 
-/// Cloud feature level derived from tier. Backup and PWA both unlock
-/// together at `leagues_3` — quantity caps (`maxActiveGames`, `maxPWALinks`)
-/// do the differentiation above that point, not a feature split.
+/// Cloud feature level derived from tier. PWA unlocks at `leagues_3` —
+/// quantity caps (`maxActiveGames`, `maxPWALinks`) do the differentiation
+/// above that point, not a feature split.
 enum CloudLevel {
     case none
     case full
@@ -44,11 +44,11 @@ enum Tier: String, CaseIterable, Identifiable {
         case .noAds:
             return AppString("No ads · 1 league · 3 games")
         case .leagues3:
-            return AppString("No ads · 3 leagues · 9 games · Cloud backup & PWA (60 links)")
+            return AppString("No ads · 3 leagues · 9 games · PWA player links (60)")
         case .leagues5:
-            return AppString("No ads · 5 leagues · 15 games · Cloud backup & PWA (100 links)")
+            return AppString("No ads · 5 leagues · 15 games · PWA player links (100)")
         case .leagues7:
-            return AppString("No ads · 7 leagues · 21 games · Cloud backup & PWA (140 links)")
+            return AppString("No ads · 7 leagues · 21 games · PWA player links (140)")
         }
     }
 
@@ -75,7 +75,7 @@ enum Tier: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Cloud features (Backup, PWA) bundled into every league tier.
+    /// Cloud features (PWA) bundled into every league tier.
     var cloudLevel: CloudLevel {
         switch self {
         case .free, .noAds:               return .none
@@ -149,7 +149,7 @@ final class Entitlements {
     /// `nil` means PWA is unavailable at the current tier.
     var maxPWALinks: Int? { tier.maxPWALinks }
 
-    /// Gates all cloud features (Backup, PWA). True when the tier
+    /// Gates cloud features (PWA). True when the tier
     /// includes cloud — `leagues_3` and above.
     var canUseCloud: Bool { tier.cloudLevel == .full }
 
@@ -172,7 +172,22 @@ final class Entitlements {
         // PWA link cap (tier is a client-side/StoreKit concept), and needs it
         // for the over-cap cascade cron. See ManagerLifecycleClient.
         let maxPWALinks = tier.maxPWALinks
-        Task { await ManagerLifecycleClient.shared.reportEntitlements(maxPWALinks: maxPWALinks) }
+        let canUseCloud = tier.cloudLevel == .full
+        Task {
+            await ManagerLifecycleClient.shared.reportEntitlements(maxPWALinks: maxPWALinks)
+            // Keep manager_lifecycle in sync with the resolved tier: a
+            // downgrade starts the 14-day deletion grace, a renewal cancels
+            // it. Runs every launch/purchase/restore (moved here from the
+            // old Cloud Backup settings screen, removed along with Cloud
+            // Backup — this no longer depends on that screen being open).
+            if canUseCloud {
+                if let status = await ManagerLifecycleClient.shared.status(), status.isPendingDelete {
+                    await ManagerLifecycleClient.shared.resubscribe()
+                }
+            } else {
+                await ManagerLifecycleClient.shared.unsubscribe()
+            }
+        }
     }
 
     func refresh() async {

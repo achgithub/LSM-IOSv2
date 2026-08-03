@@ -7,7 +7,7 @@ import { Hono } from "hono";
 //
 // The manager_token is a client-generated UUID (stored in iOS @AppStorage),
 // never tied to PII. It's the anonymous key that links round_pushes,
-// player_tokens, and manager_backups to one subscriber.
+// player_tokens to one subscriber.
 //
 // Token is passed via X-Manager-Token header (not the URL path) so it stays
 // out of server logs and Cloudflare access logs.

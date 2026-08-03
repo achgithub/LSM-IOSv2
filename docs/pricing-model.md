@@ -5,22 +5,28 @@ Key changes: cloud features bundled into league tiers (no standalone Cloud Bundl
 SKU), 1:3:20 ratio introduced, ladder extended to 20 leagues, full P&L model
 including Apple commission, office, equipment, electricity, staff, and tax.
 
+**2026-08-02:** Cloud Backup and Cloud Publish removed (shed R2 as an
+operational dependency ahead of launch; Publish was already unreachable from
+any app UI). The "Cloud" bundle at 3 Leagues+ is now PWA player links only —
+doesn't change any price point, ratio, or P&L number below, since R2 cost was
+already negligible (see "Cloudflare cost stack"). Per-game export/import is
+planned as Backup's replacement, not yet built/priced.
+
 ---
 
 ## The ladder
 
 ### Ratio: 1 league : 3 active games : 20 PWA links
 
-Every league tier is derived mechanically from this ratio. Cloud features
-(Backup, Publish, PWA) unlock in full at 3 Leagues and stay on for every
-tier above — the quantity caps do the differentiation work, not a feature
-split.
+Every league tier is derived mechanically from this ratio. Cloud (PWA player
+links) unlocks in full at 3 Leagues and stays on for every tier above — the
+quantity caps do the differentiation work, not a feature split.
 
 | Tier | UK £/mo | EUR €/mo | USD $/mo | Leagues | Active games | PWA links | Cloud |
 |---|---|---|---|---|---|---|---|
 | Free | £0 | €0 | $0 | 1 | 2 | — | ✗ (ads) |
 | No Ads | £2.49 | €2.99 | $3.49 | 1 | 3 | — | ✗ |
-| 3 Leagues | £3.49 | €3.99 | $4.49 | 3 | 9 | 60 | ✓ Backup + Publish + PWA |
+| 3 Leagues | £3.49 | €3.99 | $4.49 | 3 | 9 | 60 | ✓ PWA |
 | 5 Leagues | £4.49 | €4.99 | $5.49 | 5 | 15 | 100 | ✓ |
 | 7 Leagues | £5.49 | €5.99 | $6.49 | 7 | 21 | 140 | ✓ |
 | 10 Leagues | £6.99 | €7.49 | $7.99 | 10 | 30 | 200 | ✓ |
@@ -48,15 +54,8 @@ tiers are priced and structured; they become meaningful as new leagues are added
 - **No mid-season price hikes on existing subscribers** — Apple grandfathers
   existing subscribers on any price rise, so this is the real launch price
 
-### Cloud features — what each unlocks at 3 Leagues+
+### Cloud features — what unlocks at 3 Leagues+
 
-- **Backup**: R2 blob snapshot of game data. User-triggered. Restore code for
-  device migration. Paid/durability feature, not a storage play (worst case
-  ~20–30 MB/season even with 3 leagues).
-- **Publish**: PIN-gated standings snapshot page hosted on Cloudflare Pages.
-  Manager selects fixtures and scores; app uploads a self-contained blob.
-  Access URL is unguessable UUID; PIN validated server-side; names never in the
-  openly-served payload.
 - **PWA**: Per-player web submission links (pick/prediction via browser).
   PWA links are minted per-player per-game; each active link counts against the
   tier's link cap. Link can be revoked and re-minted (token rotates; old link
@@ -119,7 +118,7 @@ artificial cap.
   RevenueCat when catalogue grows to those counts
 - Gate game creation on `maxActiveGames` — prompt to upgrade when limit hit
 - Gate PWA link minting on `maxPWALinks` with count check across all active games
-- Gate backup/publish/PWA on `cloudFeatureLevel == .full`
+- Gate PWA on `cloudFeatureLevel == .full`
 
 **RevenueCat package identifiers (current — no change to existing):**
 
@@ -176,16 +175,16 @@ One "pull live data" tap (`LeagueData.pullLiveScores`, hits `/scores`
 Client-side cooldown: 120s, shared across the Scores tab and Results entry's
 "Pull results from server".
 
-Cloud feature overhead (backup writes + publish page views + PWA submissions):
-approximately 200 additional Workers requests/month per active cloud subscriber.
+Cloud feature overhead (PWA submissions): approximately 200 additional
+Workers requests/month per active cloud subscriber.
 
 ### Cloudflare cost stack
 
 - Workers Paid: $5/mo base, 10M requests included, $0.30/M beyond
 - KV: 10M reads/month included, $0.50/M beyond
 - D1: 25B rows/month included, $0.001/M beyond (never material)
-- R2 (backup/publish blobs): $0.015/GB storage, $4.50/M write ops, $0.36/M
-  read ops — negligible at any realistic scale (~£2-8/month at 10K cloud users)
+- R2: removed 2026-08-02 along with Cloud Backup/Publish (was negligible
+  anyway — ~£2-8/month at 10K cloud users)
 
 **Cloudflare variable cost by user count** (worst case: heavy engagement,
 optimistic uptake — 15 taps/day, 20 active days/month, 1.9 avg leagues):
