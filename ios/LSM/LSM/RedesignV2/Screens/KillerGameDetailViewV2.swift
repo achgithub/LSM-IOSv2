@@ -141,11 +141,11 @@ struct KillerGameDetailViewV2: View {
         .sheet(item: $sheet) { which in
             switch which {
             case .open:
-                KillerOpenRoundView(game: game)
+                KillerOpenRoundViewV2(game: game)
             case .predictions:
-                if let round = openRound { KillerPredictionsEntryView(game: game, round: round) }
+                if let round = openRound { KillerPredictionsEntryViewV2(game: game, round: round) }
             case .results:
-                if let round = openRound { KillerResultsEntryView(game: game, round: round) }
+                if let round = openRound { KillerResultsEntryViewV2(game: game, round: round) }
             case .scratchpad:
                 if let round = openRound { KillerScratchpadEntryView(game: game, round: round) }
             case .submissions:
