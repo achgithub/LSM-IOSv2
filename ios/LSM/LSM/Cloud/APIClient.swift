@@ -4,12 +4,26 @@ enum APIError: LocalizedError {
     case badURL
     case badStatus(Int, body: String?)
 
+    /// User-facing copy only — never the raw status/body (that's logged to
+    /// `DiagnosticLog` at the throw site instead, for a Report a Bug
+    /// attachment, not shown on screen). Every display site across the app
+    /// reads this one property, so bucketing it here is a single fix for
+    /// all of them rather than touching each site individually.
     var errorDescription: String? {
+        let hint = AppString("Try again, and if this keeps happening, send a report from Settings → Report a Bug.")
         switch self {
-        case .badURL: return AppString("Invalid request URL.")
-        case .badStatus(let code, let body):
-            guard let body, !body.isEmpty else { return AppString("Server returned status \(code).") }
-            return AppString("Server returned status \(code): \(body)")
+        case .badURL:
+            return AppString("Something went wrong. \(hint)")
+        case .badStatus(let code, _):
+            let reason: String
+            switch code {
+            case 401, 403: reason = AppString("Couldn't verify this device with the server (\(code)).")
+            case 404: reason = AppString("Couldn't find that (\(code)).")
+            case 429: reason = AppString("Too many requests — please wait a moment (\(code)).")
+            case 500...599: reason = AppString("The server had a problem (\(code)).")
+            default: reason = AppString("Something went wrong reaching the server (\(code)).")
+            }
+            return "\(reason) \(hint)"
         }
     }
 }
@@ -51,11 +65,15 @@ actor APIClient {
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw APIError.badStatus(-1, body: String(data: data, encoding: .utf8))
+            let body = String(data: data, encoding: .utf8)
+            await DiagnosticLog.shared.log("non-HTTP response for \(url.absoluteString): \(body ?? "")", category: "network")
+            throw APIError.badStatus(-1, body: body)
         }
         guard (200..<300).contains(http.statusCode) else {
             try await MaintenanceCheck.check(status: http.statusCode, data: data)
-            throw APIError.badStatus(http.statusCode, body: String(data: data, encoding: .utf8))
+            let body = String(data: data, encoding: .utf8)
+            await DiagnosticLog.shared.log("\(http.statusCode) for \(url.absoluteString): \(body ?? "")", category: "network")
+            throw APIError.badStatus(http.statusCode, body: body)
         }
         await MaintenanceState.shared.clear()
         return try decoder.decode(T.self, from: data)

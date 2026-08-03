@@ -50,6 +50,11 @@ struct SettingsView: View {
                     } label: {
                         SettingsRow(systemName: "info.circle.fill", title: "About")
                     }
+                    NavigationLink {
+                        ReportBugView()
+                    } label: {
+                        SettingsRow(systemName: "ladybug.fill", title: "Report a Bug")
+                    }
                 }
 
                 Section {

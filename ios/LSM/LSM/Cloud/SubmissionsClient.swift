@@ -239,11 +239,15 @@ actor SubmissionsClient {
     private func send(_ request: URLRequest) async throws -> Data {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw APIError.badStatus(-1, body: String(data: data, encoding: .utf8))
+            let body = String(data: data, encoding: .utf8)
+            await DiagnosticLog.shared.log("non-HTTP response for \(request.url?.absoluteString ?? ""): \(body ?? "")", category: "submissions")
+            throw APIError.badStatus(-1, body: body)
         }
         guard (200..<300).contains(http.statusCode) else {
             try await MaintenanceCheck.check(status: http.statusCode, data: data)
-            throw APIError.badStatus(http.statusCode, body: String(data: data, encoding: .utf8))
+            let body = String(data: data, encoding: .utf8)
+            await DiagnosticLog.shared.log("\(http.statusCode) for \(request.url?.absoluteString ?? ""): \(body ?? "")", category: "submissions")
+            throw APIError.badStatus(http.statusCode, body: body)
         }
         await MaintenanceState.shared.clear()
         return data

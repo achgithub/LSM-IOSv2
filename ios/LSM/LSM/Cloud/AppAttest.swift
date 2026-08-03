@@ -231,7 +231,9 @@ actor AppAttestService {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             try await MaintenanceCheck.check(status: status, data: data)
-            throw APIError.badStatus(status, body: String(data: data, encoding: .utf8))
+            let body = String(data: data, encoding: .utf8)
+            await DiagnosticLog.shared.log("attest \(status) for \(response.url?.absoluteString ?? ""): \(body ?? "")", category: "attest")
+            throw APIError.badStatus(status, body: body)
         }
         await MaintenanceState.shared.clear()
     }
