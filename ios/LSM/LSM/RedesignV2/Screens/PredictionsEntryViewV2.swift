@@ -162,6 +162,14 @@ struct PredictionsEntryViewV2: View {
                         .foregroundStyle(V2Theme.accent)
                 }
             }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Enter your prediction",
+                        detail: "Other players are pre-filled. Enter a score for the first fixture (try 2–0), then tap Done ↑."
+                    )
+                }
+            }
             .task { await store.load(game: game, round: round) }
         }
     }

@@ -57,6 +57,9 @@ struct PredictorResultsEntryViewV2: View {
                 ToolbarItem(placement: .primaryAction) {
                     LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.foregroundStyle(V2Theme.Mode.predictor)
+                }
             }
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
                 if refresh.isThrottled { refresh.now = tick }
@@ -173,6 +176,7 @@ struct PredictorResultsEntryViewV2: View {
                 }
                 .foregroundStyle(V2Theme.textPrimary)
                 .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.button, style: .continuous))
+                .opacity(round.status == .closed || scores.isEmpty ? 0.4 : 1)
                 .disabled(round.status == .closed || scores.isEmpty)
 
                 Button { attemptClose() } label: {

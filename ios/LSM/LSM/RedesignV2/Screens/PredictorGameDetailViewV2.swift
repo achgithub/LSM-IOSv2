@@ -191,7 +191,7 @@ struct PredictorGameDetailViewV2: View {
                 HStack {
                     V2StatusBadge(gameStatus: game.status)
                     Spacer()
-                    Text("Matchday \(currentRound?.roundNumber ?? 0)")
+                    Text("Round \(currentRound?.roundNumber ?? 0)")
                         .font(V2Theme.Typography.metadata)
                         .foregroundStyle(V2Theme.textSecondary)
                 }
@@ -201,7 +201,7 @@ struct PredictorGameDetailViewV2: View {
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption)
                     }
-                    .foregroundStyle(V2Theme.accent)
+                    .foregroundStyle(V2Theme.Mode.predictor)
                 }
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
@@ -236,16 +236,16 @@ struct PredictorGameDetailViewV2: View {
         }
     }
 
-    // MARK: - This matchday
+    // MARK: - This round
 
     @ViewBuilder
     private var roundCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "This Matchday")
+                SectionHeader(title: "This Round")
                 if let round = openRound {
                     HStack {
-                        Text("Matchday \(round.roundNumber)")
+                        Text("Round \(round.roundNumber)")
                             .font(V2Theme.Typography.rowTitle)
                             .foregroundStyle(V2Theme.textPrimary)
                         Spacer()
@@ -253,25 +253,23 @@ struct PredictorGameDetailViewV2: View {
                     }
                     PrimaryButton(title: "Enter Predictions") { sheet = .predictions }
                         .tutorialAnchor(id: "pred.enterPredictions")
-                    actionRow(title: "Enter Results / Close", icon: "flag.checkered") { sheet = .results }
+                    ActionRow(title: "Enter Results / Close", icon: "flag.checkered") { sheet = .results }
                         .tutorialAnchor(id: "pred.enterResults")
-                    actionRow(title: "Edit Fixtures", icon: "pencil", tint: V2Theme.danger) { pendingEditFixtures = true }
+                    ActionRow(title: "Edit Fixtures", icon: "pencil", tint: V2Theme.danger) { pendingEditFixtures = true }
                     if !incompletePlayers(for: round).isEmpty {
                         let names = incompletePlayers(for: round).map(\.name).joined(separator: ", ")
                         Text("Waiting on predictions: \(names)")
                             .font(.caption).foregroundStyle(V2Theme.textTertiary)
                     }
                     if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        actionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
+                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
                     }
-                    actionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
-                    if round.deadline < Date() {
-                        actionRow(title: "Share Entry Closed Card", icon: "square.and.arrow.up") {
-                            AdGate.run { sheet = .shareEntryClosed }
-                        }
+                    ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
+                    ActionRow(title: "Share Entry Closed Card", icon: "square.and.arrow.up", isEnabled: round.deadline < Date()) {
+                        AdGate.run { sheet = .shareEntryClosed }
                     }
                 } else {
-                    PrimaryButton(title: "Open Matchday", isEnabled: game.players.count >= 2) { sheet = .open }
+                    PrimaryButton(title: "Open Round", isEnabled: game.players.count >= 2) { sheet = .open }
                         .tutorialAnchor(id: "pred.openRound")
                 }
             }
@@ -284,10 +282,10 @@ struct PredictorGameDetailViewV2: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Share")
-                actionRow(title: "Share Weekly Results", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWeeklyResults } }
+                ActionRow(title: "Share Weekly Results", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWeeklyResults } }
                     .tutorialAnchor(id: "pred.shareResults")
-                actionRow(title: "Share League Table", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareLeague } }
-                actionRow(title: "Share Final Standings", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWinner } }
+                ActionRow(title: "Share League Table", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareLeague } }
+                ActionRow(title: "Share Final Standings", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWinner } }
             }
         }
     }
@@ -314,7 +312,7 @@ struct PredictorGameDetailViewV2: View {
                             }
                             .padding(10)
                             .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            .contextMenu {
                                 Button(role: .destructive) { pendingRemovePlayer = player } label: {
                                     Label("Remove", systemImage: "person.fill.xmark")
                                 }
@@ -322,22 +320,12 @@ struct PredictorGameDetailViewV2: View {
                         }
                     }
                 }
-                actionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
+                ActionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
                     .tutorialAnchor(id: "pred.addPlayers")
             }
         }
     }
 
-    private func actionRow(title: String, icon: String, tint: Color = V2Theme.accent, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label(title, systemImage: icon)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-        }
-        .foregroundStyle(tint)
-    }
 
     private func removePlayer(_ player: Player) {
         game.players.removeAll { $0.id == player.id }

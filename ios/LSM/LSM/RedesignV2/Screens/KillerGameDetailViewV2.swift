@@ -2,17 +2,17 @@ import SwiftUI
 import SwiftData
 
 private enum KillerSheetV2: String, Identifiable {
-    case open, predictions, results, scratchpad, submissions
+    case open, predictions, results, submissions, lives
     case shareFixtures, sharePlayerKey, shareWeeklyResults, shareStandings, shareWinner
     var id: String { rawValue }
 }
 
 /// Card restyle of `KillerGameDetailView`. Same actions/scope as the
 /// original (rename, remove player, PWA resend, submission queue, share
-/// cards, scratchpad) — every sheet still opens the existing unstyled v1
-/// screen (no restyled Killer entry/results screen exists yet), matching the
-/// portal's "outer shell first, inner sheets next phase" pattern already
-/// used for `PredictorGameDetailViewV2`. The original view is untouched.
+/// cards) minus Scratchpad — that was a v1 proof-of-concept, intentionally
+/// dropped from V2. Predictions/Results/Lives route to their own restyled
+/// V2 screens; the rest still open the original view. The original view
+/// is untouched.
 struct KillerGameDetailViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
@@ -33,18 +33,6 @@ struct KillerGameDetailViewV2: View {
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-
-    private var sortedByLives: [Player] {
-        game.players.sorted { a, b in
-            let livesA = a.killerState?.lives ?? 0
-            let livesB = b.killerState?.lives ?? 0
-            if livesA != livesB { return livesA > livesB }
-            let accA = a.killerState?.correctPredictions ?? 0
-            let accB = b.killerState?.correctPredictions ?? 0
-            if accA != accB { return accA > accB }
-            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
-        }
-    }
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -77,7 +65,6 @@ struct KillerGameDetailViewV2: View {
                 infoCard
                 roundCard
                 if latestClosedRound != nil { shareCard }
-                livesCard
                 playersCard
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
@@ -146,8 +133,8 @@ struct KillerGameDetailViewV2: View {
                 if let round = openRound { KillerPredictionsEntryViewV2(game: game, round: round) }
             case .results:
                 if let round = openRound { KillerResultsEntryViewV2(game: game, round: round) }
-            case .scratchpad:
-                if let round = openRound { KillerScratchpadEntryView(game: game, round: round) }
+            case .lives:
+                KillerLivesViewV2(game: game)
             case .submissions:
                 if let round = openRound, let gameToken = game.cloudGameToken {
                     NavigationStack {
@@ -190,11 +177,19 @@ struct KillerGameDetailViewV2: View {
                     V2StatusBadge(gameStatus: game.status)
                     Spacer()
                     if let currentPhase {
-                        Text(currentPhase == .build ? "Build Phase" : "Kill Phase")
+                        Text("Round \(currentRound?.roundNumber ?? 0) · \(currentPhase == .build ? "Build Phase" : "Kill Phase")")
                             .font(V2Theme.Typography.metadata)
                             .foregroundStyle(V2Theme.textSecondary)
                     }
                 }
+                Button { sheet = .lives } label: {
+                    HStack {
+                        Label("Lives", systemImage: "heart.fill")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption)
+                    }
+                }
+                .foregroundStyle(V2Theme.Mode.killer)
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
                         Task { await resend() }
@@ -243,19 +238,18 @@ struct KillerGameDetailViewV2: View {
                         Spacer()
                         V2StatusBadge(label: round.status.label, tint: V2Theme.Mode.killer)
                     }
-                    actionRow(title: "Enter Predictions", icon: "checklist") { sheet = .predictions }
-                    actionRow(title: "Scratchpad (Paste Picks)", icon: "text.badge.plus") { sheet = .scratchpad }
-                    actionRow(title: "Enter Results / Close", icon: "flag.checkered") { sheet = .results }
+                    PrimaryButton(title: "Enter Predictions", tint: V2Theme.Mode.killer) { sheet = .predictions }
+                    ActionRow(title: "Enter Results / Close", icon: "flag.checkered") { sheet = .results }
                     if !openRoundComplete {
                         Text("Waiting on predictions before this round can close.")
                             .font(.caption).foregroundStyle(V2Theme.textTertiary)
                     }
-                    actionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
+                    ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
                     if currentPhase == .kill {
-                        actionRow(title: "Share Player Key Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .sharePlayerKey } }
+                        ActionRow(title: "Share Player Key Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .sharePlayerKey } }
                     }
                     if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        actionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
+                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
                     }
                 } else if game.status == .complete {
                     Text("Game complete.").font(.footnote).foregroundStyle(V2Theme.textSecondary)
@@ -274,43 +268,10 @@ struct KillerGameDetailViewV2: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Share")
-                actionRow(title: "Share Weekly Results", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWeeklyResults } }
-                actionRow(title: "Share Accuracy Table", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareStandings } }
+                ActionRow(title: "Share Weekly Results", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWeeklyResults } }
+                ActionRow(title: "Share Accuracy Table", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareStandings } }
                 if game.status == .complete {
-                    actionRow(title: "Share Final Result", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWinner } }
-                }
-            }
-        }
-    }
-
-    // MARK: - Lives
-
-    private var livesCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Lives")
-                if game.players.isEmpty {
-                    Text("No players yet.").font(.footnote).foregroundStyle(V2Theme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(sortedByLives) { player in
-                            HStack {
-                                Text(player.name)
-                                    .font(V2Theme.Typography.rowTitle)
-                                    .foregroundStyle(V2Theme.textPrimary)
-                                if player.status == .eliminated {
-                                    Text("eliminated")
-                                        .font(.caption2)
-                                        .foregroundStyle(V2Theme.textTertiary)
-                                }
-                                Spacer()
-                                Text(String(repeating: "❤️", count: max(0, player.killerState?.lives ?? 0)))
-                                    .font(.caption)
-                            }
-                            .padding(10)
-                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                        }
-                    }
+                    ActionRow(title: "Share Final Result", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWinner } }
                 }
             }
         }
@@ -346,20 +307,9 @@ struct KillerGameDetailViewV2: View {
                         }
                     }
                 }
-                actionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
+                ActionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
             }
         }
-    }
-
-    private func actionRow(title: String, icon: String, tint: Color = V2Theme.accent, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label(title, systemImage: icon)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-        }
-        .foregroundStyle(tint)
     }
 
     private func removePlayer(_ player: Player) {

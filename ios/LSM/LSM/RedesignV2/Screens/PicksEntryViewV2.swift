@@ -48,75 +48,77 @@ struct PicksEntryViewV2: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: V2Theme.Spacing.section) {
-                if activePlayers.isEmpty {
-                    ContentUnavailableView("No active players", systemImage: "person.slash")
-                        .padding(.top, 40)
-                } else {
-                    filterCard
-                    TextField("Search players", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                    playersCard
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: V2Theme.Spacing.section) {
+                    if activePlayers.isEmpty {
+                        ContentUnavailableView("No active players", systemImage: "person.slash")
+                            .padding(.top, 40)
+                    } else {
+                        filterCard
+                        TextField("Search players", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                        playersCard
+                    }
+                }
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.vertical, V2Theme.Spacing.section)
+            }
+            .background(V2Theme.background.ignoresSafeArea())
+            .v2Header("Picks · Round \(round.roundNumber)")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Auto-Assign") { showAutoAssignConfirm = true }
+                        .disabled(teamRefs.isEmpty || unpickedCount == 0)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { AdGate.run { showShare = true } } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(V2Theme.textPrimary)
+                    }
+                    .accessibilityLabel("Share")
+                    .disabled(round.picks.isEmpty)
                 }
             }
-            .padding(.horizontal, V2Theme.Spacing.horizontal)
-            .padding(.vertical, V2Theme.Spacing.section)
-        }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Picks · Round \(round.roundNumber)")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Auto-Assign") { showAutoAssignConfirm = true }
-                    .disabled(teamRefs.isEmpty || unpickedCount == 0)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button { AdGate.run { showShare = true } } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(V2Theme.textPrimary)
+            .task { await load() }
+            .safeAreaInset(edge: .top) {
+                if game.isDemoData && TutorialManager.shared.isActive {
+                    TutorialSheetBanner(
+                        title: "Tutorial picks pre-assigned",
+                        detail: "Each player's pick is set for the tutorial. Tap Done ↑ to save and continue."
+                    )
                 }
-                .accessibilityLabel("Share")
-                .disabled(round.picks.isEmpty)
             }
-        }
-        .task { await load() }
-        .safeAreaInset(edge: .top) {
-            if game.isDemoData && TutorialManager.shared.isActive {
-                TutorialSheetBanner(
-                    title: "Tutorial picks pre-assigned",
-                    detail: "Each player's pick is set for the tutorial. Tap Done ↑ to save and continue."
-                )
+            .sheet(isPresented: $showShare) {
+                SummaryShareView(game: game, round: round, type: .picks)
             }
-        }
-        .sheet(isPresented: $showShare) {
-            SummaryShareView(game: game, round: round, type: .picks)
-        }
-        .confirmationDialog(
-            unpickedCount == 1
-                ? AppString("Auto-assign 1 player?")
-                : AppString("Auto-assign \(unpickedCount) players?"),
-            isPresented: $showAutoAssignConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Auto-Assign") { runAutoAssign() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Each unassigned player gets the bottom-of-table team still available to them.")
-        }
-        .confirmationDialog(
-            AppString("The league table is over an hour old"),
-            isPresented: $showStaleTablePrompt,
-            titleVisibility: .visible
-        ) {
-            Button("Fetch latest table") {
-                AdGate.run { Task { await refreshTableThenAssign() } }
+            .confirmationDialog(
+                unpickedCount == 1
+                    ? AppString("Auto-assign 1 player?")
+                    : AppString("Auto-assign \(unpickedCount) players?"),
+                isPresented: $showAutoAssignConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Auto-Assign") { runAutoAssign() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Each unassigned player gets the bottom-of-table team still available to them.")
             }
-            Button("Use current table") { commitAutoAssign() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Auto-assign uses the bottom-of-table team. Fetch the latest table first, or assign on the one you have?")
+            .confirmationDialog(
+                AppString("The league table is over an hour old"),
+                isPresented: $showStaleTablePrompt,
+                titleVisibility: .visible
+            ) {
+                Button("Fetch latest table") {
+                    AdGate.run { Task { await refreshTableThenAssign() } }
+                }
+                Button("Use current table") { commitAutoAssign() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Auto-assign uses the bottom-of-table team. Fetch the latest table first, or assign on the one you have?")
+            }
         }
     }
 

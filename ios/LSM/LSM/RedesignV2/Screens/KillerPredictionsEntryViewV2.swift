@@ -33,8 +33,7 @@ struct KillerPredictionsEntryViewV2: View {
     }
 
     private var selectedPlayer: Player? {
-        if let id = selectedPlayerId, let match = activePlayers.first(where: { $0.id == id }) { return match }
-        return activePlayers.first { !slateComplete($0) } ?? activePlayers.first
+        activePlayers.first { $0.id == selectedPlayerId } ?? activePlayers.first
     }
 
     private func slateComplete(_ player: Player) -> Bool {
@@ -76,7 +75,7 @@ struct KillerPredictionsEntryViewV2: View {
             .background(V2Theme.background.ignoresSafeArea())
             .v2Header("Round \(round.roundNumber)")
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }.foregroundStyle(V2Theme.Mode.killer)
                 }
             }

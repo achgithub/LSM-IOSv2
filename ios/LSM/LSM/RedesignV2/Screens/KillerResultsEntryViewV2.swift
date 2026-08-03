@@ -60,6 +60,9 @@ struct KillerResultsEntryViewV2: View {
                 ToolbarItem(placement: .primaryAction) {
                     LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.foregroundStyle(V2Theme.Mode.killer)
+                }
             }
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
                 if refresh.isThrottled { refresh.now = tick }

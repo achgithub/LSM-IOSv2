@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Card restyle of `OpenRoundView`, shared by Predictor's "Open Matchday" and
-/// LMS's "Open Round" steps. All the same logic — league blending, unplayed/
+/// Card restyle of `OpenRoundView`, shared by Predictor's and LMS's "Open
+/// Round" steps. All the same logic — league blending, unplayed/
 /// date filters, manual fixtures, deadline, LMS's `strandedPlayers` check
 /// (empty for Predictor, which has no "used teams" concept) — copied rather
 /// than shared with the original, since that's a large mode-agnostic view

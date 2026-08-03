@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 private enum LMSSheetV2: String, Identifiable {
-    case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome, submissions
+    case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome, submissions, standings
     var id: String { rawValue }
 }
 
@@ -176,6 +176,8 @@ struct GameDetailViewV2: View {
                         SubmissionQueueView(game: game, round: round, gameToken: gameToken)
                     }
                 }
+            case .standings:
+                LMSStandingsViewV2(game: game)
             }
         }
         // Tie resolution at the top level — presented only after the Results
@@ -225,6 +227,14 @@ struct GameDetailViewV2: View {
                         .font(V2Theme.Typography.metadata)
                         .foregroundStyle(V2Theme.textSecondary)
                 }
+                Button { sheet = .standings } label: {
+                    HStack {
+                        Label("Standings", systemImage: "list.number")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption)
+                    }
+                }
+                .foregroundStyle(V2Theme.Mode.lms)
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
                         Task { await resend() }
@@ -275,9 +285,9 @@ struct GameDetailViewV2: View {
                         Text(winners.map(\.name).joined(separator: ", "))
                             .font(.footnote).foregroundStyle(V2Theme.textSecondary)
                     }
-                    shareRow("Share Results Card", enabled: latestClosedRound != nil) { sheet = .summaryResults }
+                    ActionRow(title: "Share Results Card", icon: "square.and.arrow.up", isEnabled: latestClosedRound != nil) { AdGate.run { sheet = .summaryResults } }
                     if let ending = game.lastOutcome {
-                        shareRow("Share \(ending.headline) Card", enabled: latestClosedRound != nil) { sheet = .summaryOutcome }
+                        ActionRow(title: "Share \(ending.headline) Card", icon: "square.and.arrow.up", isEnabled: latestClosedRound != nil) { AdGate.run { sheet = .summaryOutcome } }
                     }
 
                 } else if let round = openRound {
@@ -288,18 +298,26 @@ struct GameDetailViewV2: View {
                         V2StatusBadge(label: round.status.label, tint: V2Theme.Mode.lms)
                     }
                     if round.roundType != .normal, let ending = game.lastOutcome {
-                        shareRow("Share \(ending.headline) Card", enabled: true) { sheet = .summaryOutcome }
+                        ActionRow(title: "Share \(ending.headline) Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .summaryOutcome } }
                     }
-                    actionRow(title: "Edit Fixtures", icon: "pencil", tint: V2Theme.danger) { pendingEditFixtures = true }
-                    shareRow("Share Fixtures Card", enabled: true) { sheet = .summaryFixtures }
-                    actionRow(title: "Enter Picks", icon: "checklist") { sheet = .picks }
-                    shareRow("Share Picks Card", enabled: openRoundPicksComplete) { sheet = .summaryPicks }
-                    actionRow(title: "Enter Results / Close", icon: "flag.checkered", tint: openRoundPicksComplete ? V2Theme.accent : V2Theme.textTertiary) {
+                    PrimaryButton(title: "Enter Picks", tint: V2Theme.Mode.lms) { sheet = .picks }
+                    ActionRow(title: "Enter Results / Close", icon: "flag.checkered", tint: V2Theme.accent, isEnabled: openRoundPicksComplete) {
                         sheet = .results
                     }
-                    .disabled(!openRoundPicksComplete)
+                    if !openRoundPicksComplete, !round.picks.isEmpty || !game.activePlayers.isEmpty {
+                        let missing = game.activePlayers.filter { player in
+                            !round.picks.contains { $0.player?.id == player.id }
+                        }
+                        if !missing.isEmpty {
+                            Text("Waiting on: \(missing.map(\.name).joined(separator: ", "))")
+                                .font(.caption).foregroundStyle(V2Theme.textTertiary)
+                        }
+                    }
+                    ActionRow(title: "Edit Fixtures", icon: "pencil", tint: V2Theme.danger) { pendingEditFixtures = true }
+                    ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .summaryFixtures } }
+                    ActionRow(title: "Share Picks Card", icon: "square.and.arrow.up", isEnabled: openRoundPicksComplete) { AdGate.run { sheet = .summaryPicks } }
                     if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        actionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
+                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
                     }
 
                 } else if unresolvedTie {
@@ -309,12 +327,12 @@ struct GameDetailViewV2: View {
                         Spacer()
                         V2StatusBadge(label: "No clear winner", tint: V2Theme.warning)
                     }
-                    actionRow(title: "Resolve Round", icon: "exclamationmark.triangle", tint: V2Theme.warning) { showResolve = true }
-                    shareRow("Share Results Card", enabled: latestClosedRound != nil) { sheet = .summaryResults }
+                    ActionRow(title: "Resolve Round", icon: "exclamationmark.triangle", tint: V2Theme.warning) { showResolve = true }
+                    ActionRow(title: "Share Results Card", icon: "square.and.arrow.up", isEnabled: latestClosedRound != nil) { AdGate.run { sheet = .summaryResults } }
 
                 } else {
                     if latestClosedRound != nil {
-                        shareRow("Share Results Card", enabled: true) { sheet = .summaryResults }
+                        ActionRow(title: "Share Results Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .summaryResults } }
                     }
                     PrimaryButton(title: "Open Round", isEnabled: game.activePlayers.count >= 2, tint: V2Theme.Mode.lms) {
                         sheet = .open
@@ -322,18 +340,6 @@ struct GameDetailViewV2: View {
                 }
             }
         }
-    }
-
-    private func shareRow(_ title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button { AdGate.run(action) } label: {
-            HStack {
-                Label(title, systemImage: "square.and.arrow.up")
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-        }
-        .foregroundStyle(enabled ? V2Theme.textSecondary : V2Theme.textTertiary)
-        .disabled(!enabled)
     }
 
     // MARK: - Declare winners
@@ -344,8 +350,7 @@ struct GameDetailViewV2: View {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(title: "Manually declare winner(s)")
-                    actionRow(title: "Declare Winner(s)…", icon: "trophy") { sheet = .declare }
-                        .disabled(latestClosedRound == nil || game.activePlayers.isEmpty)
+                    ActionRow(title: "Declare Winner(s)…", icon: "trophy", isEnabled: latestClosedRound != nil && !game.activePlayers.isEmpty) { sheet = .declare }
                 }
             }
         }
@@ -386,20 +391,9 @@ struct GameDetailViewV2: View {
                         }
                     }
                 }
-                actionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
+                ActionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
             }
         }
-    }
-
-    private func actionRow(title: String, icon: String, tint: Color = V2Theme.accent, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label(title, systemImage: icon)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-        }
-        .foregroundStyle(tint)
     }
 
     // MARK: - Actions

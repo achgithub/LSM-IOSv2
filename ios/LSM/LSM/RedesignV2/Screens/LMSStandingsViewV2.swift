@@ -1,0 +1,100 @@
+import SwiftUI
+
+/// Card restyle survivors list — reached via a "Standings" link in
+/// `GameDetailViewV2`'s info card, mirroring exactly how
+/// `PredictorGameDetailViewV2`/`KillerGameDetailViewV2` link out to their own
+/// standalone summary screens rather than showing an inline list. LMS has no
+/// points/lives to rank by, so the equivalent summary is survival: active
+/// players first, then eliminated players below a divider with the round
+/// they went out.
+struct LMSStandingsViewV2: View {
+    let game: Game
+
+    private var activePlayers: [Player] {
+        let notEliminated = game.players.filter { $0.status != .eliminated }
+        return notEliminated.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var eliminatedPlayers: [(player: Player, roundOut: Int?)] {
+        let eliminated: [Player] = game.players.filter { $0.status == .eliminated }
+        let entries: [(player: Player, roundOut: Int?)] = eliminated.map { player in
+            (player: player, roundOut: roundEliminated(player))
+        }
+        return entries.sorted { lhs, rhs in
+            (lhs.roundOut ?? 0) > (rhs.roundOut ?? 0)
+        }
+    }
+
+    private func roundEliminated(_ player: Player) -> Int? {
+        game.rounds
+            .filter { $0.status == .closed }
+            .first { round in
+                round.picks.contains { $0.player?.id == player.id && $0.result == .loss }
+            }?.roundNumber
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if game.players.isEmpty {
+                    ContentUnavailableView("No players yet", systemImage: "person.3")
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            ForEach(activePlayers) { player in
+                                LMSStandingsRowV2(player: player, roundOut: nil)
+                            }
+                            if !eliminatedPlayers.isEmpty {
+                                Divider().padding(.vertical, 4)
+                                ForEach(eliminatedPlayers, id: \.player.id) { entry in
+                                    LMSStandingsRowV2(player: entry.player, roundOut: entry.roundOut)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, V2Theme.Spacing.horizontal)
+                        .padding(.vertical, V2Theme.Spacing.section)
+                    }
+                }
+            }
+            .background(V2Theme.background.ignoresSafeArea())
+            .v2Header("Standings")
+        }
+    }
+}
+
+private struct LMSStandingsRowV2: View {
+    let player: Player
+    let roundOut: Int?
+
+    var body: some View {
+        Card(padding: 16) {
+            HStack(spacing: 14) {
+                Text(player.name)
+                    .font(V2Theme.Typography.rowTitle)
+                    .foregroundStyle(V2Theme.textPrimary)
+                    .lineLimit(1)
+                if player.isManager {
+                    V2StatusBadge(label: "you", tint: V2Theme.Mode.lms)
+                }
+                Spacer(minLength: 8)
+                if player.status == .winner {
+                    Text("winner")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(V2Theme.accent)
+                } else if let roundOut {
+                    Text("out · Rd \(roundOut)")
+                        .font(.caption)
+                        .foregroundStyle(V2Theme.textTertiary)
+                } else if player.status == .eliminated {
+                    Text("out")
+                        .font(.caption)
+                        .foregroundStyle(V2Theme.textTertiary)
+                } else {
+                    Text("active")
+                        .font(.caption)
+                        .foregroundStyle(V2Theme.textSecondary)
+                }
+            }
+        }
+    }
+}
