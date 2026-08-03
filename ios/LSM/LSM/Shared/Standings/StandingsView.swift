@@ -38,7 +38,7 @@ struct StandingsView: View {
             // button just not working. Surface it without replacing the
             // still-valid content.
             .safeAreaInset(edge: .top) {
-                if let errorMessage, !standings.isEmpty {
+                if let errorMessage = store.errorMessage, !store.standings.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: "wifi.slash")
                         Text("Refresh failed: \(errorMessage)").font(.caption).lineLimit(1)
