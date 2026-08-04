@@ -92,7 +92,14 @@ struct LeagueData {
                 teamsById[team.externalId] = team
                 teamsCountByTeam[team.externalId] = league.teamsCount
             }
-            for standing in result.standings { standingsByTeam[standing.teamId] = standing }
+            // Pre-season (all 0-0-0) rows need the same alphabetical correction
+            // the Standings screen applies (`StandingDTO.displayOrder`) — every
+            // other consumer of `standingsByTeam` (chiefly Auto-Assign's
+            // bottom-of-table sort) must see the same ordering the manager
+            // sees on screen, not the Worker's raw preseason row order.
+            for standing in StandingDTO.displayOrder(rows: result.standings, teamsById: teamsById) {
+                standingsByTeam[standing.teamId] = standing
+            }
             if let date = result.standingsDate { oldestStandings = min(oldestStandings ?? date, date) }
             if let matchDate = result.matchesDate { oldestMatches = min(oldestMatches ?? matchDate, matchDate) }
         }
