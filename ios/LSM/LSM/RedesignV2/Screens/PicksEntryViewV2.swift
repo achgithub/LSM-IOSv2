@@ -17,7 +17,6 @@ struct PicksEntryViewV2: View {
     @State private var errorMessage: String?
     @State private var showAutoAssignConfirm = false
     @State private var showStaleTablePrompt = false
-    @State private var showShare = false
     @State private var searchText = ""
     @State private var unassignedOnly = false
 
@@ -73,14 +72,6 @@ struct PicksEntryViewV2: View {
                     Button("Auto-Assign") { showAutoAssignConfirm = true }
                         .disabled(teamRefs.isEmpty || unpickedCount == 0)
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { AdGate.run { showShare = true } } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .foregroundStyle(V2Theme.textPrimary)
-                    }
-                    .accessibilityLabel("Share")
-                    .disabled(round.picks.isEmpty)
-                }
             }
             .task { await load() }
             .safeAreaInset(edge: .top) {
@@ -90,9 +81,6 @@ struct PicksEntryViewV2: View {
                         detail: "Each player's pick is set for the tutorial. Tap Done ↑ to save and continue."
                     )
                 }
-            }
-            .sheet(isPresented: $showShare) {
-                SummaryShareView(game: game, round: round, type: .picks)
             }
             .confirmationDialog(
                 unpickedCount == 1
