@@ -59,6 +59,12 @@ struct V2PreviewMenuView: View {
                     MenuRow(systemImage: "list.number", title: "Leagues")
                 }
                 .buttonStyle(.plain)
+                NavigationLink {
+                    SettingsViewV2()
+                } label: {
+                    MenuRow(systemImage: "gearshape", title: "Settings")
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)

@@ -2,16 +2,11 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-/// Card restyle of `NewGameView`'s mode picker + Predictor form — the mode
-/// this branch is building end-to-end first (see `GamesPortalViewV2`'s doc
-/// comment). Reuses `NewGameView`'s own `Game(...)` construction and
-/// `PredictorSettings` "remember last settings" logic verbatim (copied, not
-/// shared, since the original's helpers are private to that view) — no
-/// backend/Cloudflare surface changes, this is view-only.
-///
-/// LMS and Killer aren't restyled yet: picking either hands off to the
-/// existing `NewGameView` sheet (its own mode picker included), matching the
-/// "outer shell first" boundary the rest of this branch uses.
+/// Card restyle of `NewGameView`'s mode picker + all three mode forms.
+/// Reuses `NewGameView`'s own `Game(...)` construction and the
+/// `PredictorSettings`/`KillerSettings` "remember last settings" logic
+/// verbatim (copied, not shared, since the original's helpers are private to
+/// that view) — no backend/Cloudflare surface changes, this is view-only.
 struct NewGameViewV2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -19,7 +14,6 @@ struct NewGameViewV2: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     @State private var mode: GameMode?
-    @State private var showingLegacyForm = false
 
     // Import Game (transfer from another manager's device) — see GameTransfer.swift.
     @Query(sort: \RosterMember.name) private var rosterMembers: [RosterMember]
@@ -35,12 +29,22 @@ struct NewGameViewV2: View {
     @State private var selectedLeagueIds: Set<String> = []
     @State private var managerPlaying = true
 
+    // LMS-only settings.
+    @State private var anonymity: AnonymityMode = .anonymous
+    @State private var drawEliminates = true
+    @State private var postponedEliminates = false
+
     @State private var predictorExactPoints = PredictorSettings.lastExactPoints
     @State private var predictorGDEnabled = PredictorSettings.lastGDEnabled
     @State private var predictorGDPoints = PredictorSettings.lastGDPoints
     @State private var predictorResultEnabled = PredictorSettings.lastResultEnabled
     @State private var predictorResultPoints = PredictorSettings.lastResultPoints
     @State private var predictorJokerEnabled = PredictorSettings.lastJokerEnabled
+
+    // Killer-only settings.
+    @State private var killerBuildPhaseRounds = KillerSettings.lastBuildPhaseRounds
+    @State private var killerMaxAdditionalLives = KillerSettings.lastMaxAdditionalLives
+    @State private var killerMaxMPG = KillerSettings.lastMaxMPG
 
     private var managerTrimmed: String { managerName.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -63,15 +67,15 @@ struct NewGameViewV2: View {
     var body: some View {
         NavigationStack {
             Group {
-                if mode == .predictor {
-                    predictorForm
-                } else {
-                    modePicker
+                switch mode {
+                case .lms: lmsForm
+                case .predictor: predictorForm
+                case .killer: killerForm
+                case nil: modePicker
                 }
             }
             .background(V2Theme.background.ignoresSafeArea())
         }
-        .sheet(isPresented: $showingLegacyForm) { NewGameView() }
         .fileImporter(
             isPresented: $showingImport,
             allowedContentTypes: [.json],
@@ -101,13 +105,9 @@ struct NewGameViewV2: View {
             LazyVStack(spacing: 12) {
                 ForEach(GameMode.allCases) { candidate in
                     Button {
-                        if candidate == .predictor {
-                            mode = candidate
-                            if selectedLeagueIds.isEmpty, enabled.leagues.count == 1 {
-                                selectedLeagueIds = Set(enabled.leagues.map(\.id))
-                            }
-                        } else {
-                            showingLegacyForm = true
+                        mode = candidate
+                        if selectedLeagueIds.isEmpty, enabled.leagues.count == 1 {
+                            selectedLeagueIds = Set(enabled.leagues.map(\.id))
                         }
                     } label: {
                         MenuRow(systemImage: modeIcon(candidate), title: candidate.displayName, tint: V2Theme.Mode.color(for: candidate))
@@ -334,6 +334,243 @@ struct NewGameViewV2: View {
         guard let snapshot = pendingSnapshot else { return }
         GameTransferBuilder.restore(snapshot, nameOverrides: nameOverrides, into: context)
         pendingSnapshot = nil
+        dismiss()
+    }
+}
+
+/// LMS + Killer forms, split into their own extension purely to keep
+/// `NewGameViewV2`'s primary declaration under SwiftLint's type_body_length
+/// limit — no functional boundary, just file organization.
+extension NewGameViewV2 {
+    var lmsForm: some View {
+        ScrollView {
+            LazyVStack(spacing: V2Theme.Spacing.section) {
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MicroLabel(text: "Game name")
+                        TextField("e.g. Friday LMS", text: $name)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                    }
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MicroLabel(text: "Leagues")
+                        FlowPills {
+                            ForEach(enabled.leagues) { league in
+                                SelectablePill(
+                                    title: league.name,
+                                    isSelected: selectedLeagueIds.contains(league.id),
+                                    tint: V2Theme.Mode.lms
+                                ) {
+                                    if enabled.leagues.count > 1 { toggleLeague(league.id) }
+                                }
+                            }
+                        }
+                        if wouldExceedLeagueAllowance {
+                            Text("Your plan doesn't cover an extra league right now.")
+                                .font(.caption).foregroundStyle(V2Theme.danger)
+                        }
+                    }
+                }
+
+                if !managerTrimmed.isEmpty {
+                    Card {
+                        Toggle(isOn: $managerPlaying) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(managerTrimmed) (you)")
+                                    .font(V2Theme.Typography.rowTitle)
+                                    .foregroundStyle(V2Theme.textPrimary)
+                                Text(managerPlaying ? "Playing in this game" : "Running only, not playing")
+                                    .font(.caption).foregroundStyle(V2Theme.textSecondary)
+                            }
+                        }
+                        .tint(V2Theme.Mode.lms)
+                    }
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: 14) {
+                        MicroLabel(text: "Result rules")
+                        Toggle(isOn: $postponedEliminates) {
+                            resultRuleLabel("Postponed", eliminates: postponedEliminates)
+                        }
+                        .tint(V2Theme.Mode.lms)
+                        Divider().background(V2Theme.cardBorder)
+                        Toggle(isOn: $drawEliminates) {
+                            resultRuleLabel("Draw", eliminates: drawEliminates)
+                        }
+                        .tint(V2Theme.Mode.lms)
+                        // swiftlint:disable:next line_length
+                        Text("A win always survives and a loss always eliminates. Toggle on for Postponed/Draw to treat them as a loss too — off keeps them as a survive.")
+                            .font(.caption).foregroundStyle(V2Theme.textTertiary)
+                    }
+                    .foregroundStyle(V2Theme.textPrimary)
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MicroLabel(text: "Summaries")
+                        HStack(spacing: 8) {
+                            ForEach(AnonymityMode.allCases) { option in
+                                SelectablePill(title: option.label, isSelected: anonymity == option, tint: V2Theme.Mode.lms) {
+                                    anonymity = option
+                                }
+                            }
+                        }
+                    }
+                }
+
+                PrimaryButton(title: "Create Game", isEnabled: canCreate, tint: V2Theme.Mode.lms) { createLMS() }
+            }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
+        }
+        .v2Header("New LMS Game")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Back") { mode = nil }
+            }
+        }
+    }
+
+    func resultRuleLabel(_ title: LocalizedStringKey, eliminates: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).foregroundStyle(V2Theme.textPrimary)
+            Text(eliminates ? "Counts as a loss" : "Counts as a win")
+                .font(.caption).foregroundStyle(V2Theme.textSecondary)
+        }
+    }
+
+    var killerForm: some View {
+        ScrollView {
+            LazyVStack(spacing: V2Theme.Spacing.section) {
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MicroLabel(text: "Game name")
+                        TextField("e.g. Friday Killer", text: $name)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                    }
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MicroLabel(text: "Leagues")
+                        FlowPills {
+                            ForEach(enabled.leagues) { league in
+                                SelectablePill(
+                                    title: league.name,
+                                    isSelected: selectedLeagueIds.contains(league.id),
+                                    tint: V2Theme.Mode.killer
+                                ) {
+                                    if enabled.leagues.count > 1 { toggleLeague(league.id) }
+                                }
+                            }
+                        }
+                        if wouldExceedLeagueAllowance {
+                            Text("Your plan doesn't cover an extra league right now.")
+                                .font(.caption).foregroundStyle(V2Theme.danger)
+                        }
+                    }
+                }
+
+                if !managerTrimmed.isEmpty {
+                    Card {
+                        Toggle(isOn: $managerPlaying) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(managerTrimmed) (you)")
+                                    .font(V2Theme.Typography.rowTitle)
+                                    .foregroundStyle(V2Theme.textPrimary)
+                                Text(managerPlaying ? "Playing in this game" : "Running only, not playing")
+                                    .font(.caption).foregroundStyle(V2Theme.textSecondary)
+                            }
+                        }
+                        .tint(V2Theme.Mode.killer)
+                    }
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: 14) {
+                        MicroLabel(text: "Killer settings")
+                        Stepper(killerBuildPhaseRounds == 1
+                                ? AppString("Build Phase: \(killerBuildPhaseRounds) round")
+                                : AppString("Build Phase: \(killerBuildPhaseRounds) rounds"),
+                                value: $killerBuildPhaseRounds, in: 1...10)
+                        Divider().background(V2Theme.cardBorder)
+                        Stepper("Max additional lives: \(killerMaxAdditionalLives)",
+                                value: $killerMaxAdditionalLives, in: 0...20)
+                        Divider().background(V2Theme.cardBorder)
+                        Stepper("Max Manager Picked Games: \(killerMaxMPG)",
+                                value: $killerMaxMPG, in: 1...10)
+                        // swiftlint:disable:next line_length
+                        Text("Everyone starts with 1 life. During the Build Phase, a correct prediction earns +1 life (up to the cap). After that, the Kill Phase begins: predictions also fire a Hit at a chosen opponent.")
+                            .font(.caption).foregroundStyle(V2Theme.textTertiary)
+                    }
+                    .foregroundStyle(V2Theme.textPrimary)
+                }
+
+                PrimaryButton(title: "Create Game", isEnabled: canCreate, tint: V2Theme.Mode.killer) { createKiller() }
+            }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
+        }
+        .v2Header("New Killer Game")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Back") { mode = nil }
+            }
+        }
+    }
+
+    func createLMS() {
+        guard activeGameCount() < Entitlements.shared.maxActiveGames, !wouldExceedLeagueAllowance else { return }
+        let game = Game(
+            name: trimmedName,
+            season: Leagues.app.season,
+            allowRepeats: Leagues.app.allowRepeatDefault,
+            anonymityMode: anonymity,
+            leagueIds: Array(selectedLeagueIds),
+            drawEliminates: drawEliminates,
+            postponedEliminates: postponedEliminates,
+            mode: .lms
+        )
+        context.insert(game)
+        if managerPlaying && !managerTrimmed.isEmpty {
+            let player = Player(name: managerTrimmed, game: game, isManager: true, entryNumber: game.nextEntryNumber)
+            context.insert(player)
+            game.players.append(player)
+        }
+        dismiss()
+    }
+
+    func createKiller() {
+        guard activeGameCount() < Entitlements.shared.maxActiveGames, !wouldExceedLeagueAllowance else { return }
+        let game = Game(
+            name: trimmedName,
+            season: Leagues.app.season,
+            allowRepeats: Leagues.app.allowRepeatDefault,
+            leagueIds: Array(selectedLeagueIds),
+            mode: .killer,
+            killerBuildPhaseRounds: killerBuildPhaseRounds,
+            killerMaxAdditionalLives: killerMaxAdditionalLives,
+            killerMaxMPG: killerMaxMPG
+        )
+        context.insert(game)
+        if managerPlaying && !managerTrimmed.isEmpty {
+            let player = Player(name: managerTrimmed, game: game, isManager: true, entryNumber: game.nextEntryNumber)
+            context.insert(player)
+            game.players.append(player)
+            KillerScoringService.attachStateIfNeeded(to: player, game: game, context: context)
+        }
+        KillerSettings.saveLastUsed(
+            buildPhaseRounds: killerBuildPhaseRounds,
+            maxAdditionalLives: killerMaxAdditionalLives,
+            maxMPG: killerMaxMPG
+        )
         dismiss()
     }
 }
