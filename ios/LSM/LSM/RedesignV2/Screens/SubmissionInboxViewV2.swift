@@ -14,6 +14,12 @@ private let inboxLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", 
 ///
 /// Always backed by one aggregate network call (`listPendingSubmissions`),
 /// never a per-game fan-out, whichever entry point it's reached from.
+///
+/// Rows are tap-to-open, not swipe-only — a leading-edge swipe action fights
+/// the NavigationStack's interactive-pop gesture (still live even though
+/// `AppHeader` hides the system back *button*), so it isn't a reliable way
+/// to expose Approve/Reject. A tap always works and gives room to show full
+/// submission detail instead of a truncated one-line summary.
 struct SubmissionInboxViewV2: View {
     @Environment(\.modelContext) private var context
     @Query private var games: [Game]
@@ -23,6 +29,7 @@ struct SubmissionInboxViewV2: View {
     @State private var items: [SubmissionItem] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var selection: SelectedSubmission?
 
     private var visibleItems: [SubmissionItem] {
         guard let filterGameToken else { return items }
@@ -85,24 +92,38 @@ struct SubmissionInboxViewV2: View {
         .v2Header(filterGameToken != nil ? "Submission Queue" : "Submissions")
         .refreshable { await load() }
         .task { await load() }
+        .sheet(item: $selection) { selected in
+            SubmissionDetailSheet(
+                item: selected.item,
+                game: selected.game,
+                onApprove: selected.game.map { game in { Task { await approve(selected.item, game: game) } } },
+                onDelete: { Task { await reject(selected.item) } }
+            )
+        }
     }
 
     @ViewBuilder
     private func row(for item: SubmissionItem) -> some View {
-        // A pending item whose game token doesn't match anything local can't
-        // be applied (no Game/Round to write picks into) — skip it rather
-        // than show a row that can't act, mirroring the existing stale-round
-        // guard in `SubmissionApplyService`.
-        if let token = item.gameToken, let game = localGame(forTokenString: token) {
-            SubmissionRow(item: item, game: game)
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    Button("Approve") { Task { await approve(item, game: game) } }
-                        .tint(.green)
+        let game = item.gameToken.flatMap(localGame(forTokenString:))
+        Button {
+            selection = SelectedSubmission(item: item, game: game)
+        } label: {
+            if item.gameToken != nil, game == nil {
+                // The submission's gameToken doesn't match anything on this
+                // device (e.g. the game was deleted locally, or reinstalled
+                // without this cloud link). Nothing to apply an approval to,
+                // so this row exists purely to be deleted.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.playerName).fontWeight(.medium)
+                    Text("This looks like a submission for a game you no longer have.")
+                        .font(.caption)
+                        .foregroundStyle(V2Theme.danger)
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button("Reject", role: .destructive) { Task { await reject(item) } }
-                }
+            } else {
+                SubmissionRow(item: item, game: game)
+            }
         }
+        .buttonStyle(.plain)
     }
 
     private func load() async {
@@ -132,6 +153,9 @@ struct SubmissionInboxViewV2: View {
         }
     }
 
+    /// Also the delete path for an orphaned submission — the server-side
+    /// reject doesn't require a local game to exist, only the gameToken the
+    /// item already carries.
     private func reject(_ item: SubmissionItem) async {
         guard let tokenString = item.gameToken, let gameToken = UUID(uuidString: tokenString) else { return }
         do {
@@ -140,6 +164,78 @@ struct SubmissionInboxViewV2: View {
             await SubmissionBadgeStore.shared.refresh()
         } catch {
             inboxLog.warning("Reject failed: \(error.localizedDescription)")
+        }
+    }
+}
+
+private struct SelectedSubmission: Identifiable {
+    let item: SubmissionItem
+    let game: Game?
+    var id: String { item.id }
+}
+
+/// Full detail for one submission plus explicit Approve/Reject buttons —
+/// the primary way to act on a submission (see `SubmissionInboxViewV2`'s
+/// doc comment for why this replaced swipe-only actions). `onApprove` is
+/// nil for an orphaned submission (no local game to apply it to); Delete
+/// is always available since rejecting only needs the gameToken.
+private struct SubmissionDetailSheet: View {
+    let item: SubmissionItem
+    let game: Game?
+    let onApprove: (() -> Void)?
+    let onDelete: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var mode: GameMode? {
+        game?.mode ?? item.mode.flatMap(GameMode.init(rawValue:))
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Player", value: item.playerName)
+                    LabeledContent("Game", value: game?.name ?? item.gameName ?? AppString("Unknown"))
+                    if let mode {
+                        LabeledContent("Mode", value: mode.displayName)
+                    }
+                    LabeledContent("Round", value: "\(item.roundNumber)")
+                }
+                if onApprove == nil {
+                    Section {
+                        Text("This looks like a submission for a game you no longer have. You can only delete it.")
+                            .foregroundStyle(V2Theme.textSecondary)
+                    }
+                } else {
+                    Section("Submission") {
+                        SubmissionRow(item: item, game: game)
+                    }
+                }
+                Section {
+                    if let onApprove {
+                        Button {
+                            onApprove()
+                            dismiss()
+                        } label: {
+                            Label("Approve", systemImage: "checkmark.circle.fill")
+                        }
+                        .foregroundStyle(.green)
+                    }
+                    Button(role: .destructive) {
+                        onDelete()
+                        dismiss()
+                    } label: {
+                        Label(onApprove == nil ? "Delete" : "Reject", systemImage: "xmark.circle.fill")
+                    }
+                }
+            }
+            .navigationTitle("Submission")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
         }
     }
 }

@@ -141,7 +141,12 @@ struct SubmissionQueueView: View {
 
 struct SubmissionRow: View {
     let item: SubmissionItem
-    let game: Game
+    /// Nil when this item's `gameToken` doesn't resolve to any game on this
+    /// device (see `SubmissionInboxViewV2`'s orphaned-submission handling) —
+    /// falls back to the aggregate endpoint's `item.mode` string for mode-
+    /// specific rendering, and skips Killer target-name lookup (needs
+    /// `game.players`).
+    let game: Game?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -157,9 +162,13 @@ struct SubmissionRow: View {
 
     /// LMS shows the picked team big, its opponent small underneath (no
     /// truncation — the row grows to fit rather than hiding it behind a tap).
+    private var mode: GameMode? {
+        game?.mode ?? item.mode.flatMap(GameMode.init(rawValue:))
+    }
+
     @ViewBuilder
     private var pickDetail: some View {
-        if game.mode == .lms, let teamId = item.payload.teamId {
+        if mode == .lms, let teamId = item.payload.teamId {
             let name = item.payload.teamName ?? "Team \(teamId)"
             VStack(alignment: .leading, spacing: 0) {
                 Text(name).font(.subheadline).fontWeight(.semibold)
@@ -176,7 +185,7 @@ struct SubmissionRow: View {
                 let abbrev = Self.abbreviation(for: entry.outcome)
                 guard let targetIdString = entry.hitTargetId,
                       let targetId = UUID(uuidString: targetIdString),
-                      let target = game.players.first(where: { $0.id == targetId }) else { return abbrev }
+                      let target = game?.players.first(where: { $0.id == targetId }) else { return abbrev }
                 return "\(abbrev)→\(target.name)"
             }.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
         } else {
