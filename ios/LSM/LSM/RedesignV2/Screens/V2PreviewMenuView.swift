@@ -65,7 +65,14 @@ struct V2PreviewMenuView: View {
         }
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Home", trailingBadgeCount: badgeStore.pendingCount)
+        // No .refreshable here — this is a static navigation menu, not a
+        // live list, and the badge already refreshes on every appearance via
+        // .task below. Pairing .refreshable with a .task that fires (and
+        // finishes) on first appearance made the refresh control's reserved
+        // space flash briefly at the top of the screen on load, not just on
+        // an actual pull gesture. Games portal and the inbox itself both
+        // already have their own .refreshable for the screens where it's
+        // actually live data.
         .task { await badgeStore.refresh() }
-        .refreshable { await badgeStore.refresh() }
     }
 }
