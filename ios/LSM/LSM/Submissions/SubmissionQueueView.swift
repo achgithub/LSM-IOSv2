@@ -126,93 +126,13 @@ struct SubmissionQueueView: View {
         await load()
     }
 
-    /// The local manager's suffix — last 8 hex chars of the manager player's UUID.
-    private var localManagerSuffix: String? {
-        guard let manager = game.players.first(where: { $0.isManager }) else { return nil }
-        return String(manager.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
-    }
-
     @MainActor
     private func applyLocally(_ result: ApproveResult, playerName: String) {
-        // Validate that the submission came through an enrollment owned by this manager.
-        if let resultSuffix = result.managerSuffix, let localSuffix = localManagerSuffix,
-           resultSuffix != localSuffix {
-            subQueueLog.warning("Approve skipped: managerSuffix mismatch (\(resultSuffix) ≠ \(localSuffix))")
-            return
-        }
-
-        // Guard against a submission that was filled out against a round that's
-        // since closed (e.g. approved late, after the manager already opened
-        // the next round) — applying it to whatever round is open now would be
-        // silently wrong. This view is always scoped to one specific `round`,
-        // so a mismatch means the submission is stale.
-        guard result.roundNumber == round.roundNumber else {
-            subQueueLog.warning("Approve skipped: stale round (submission for \(result.roundNumber), open round is \(round.roundNumber))")
-            return
-        }
-
-        // Find player by UUID first; fall back to name for pre-Phase-5 enrollments.
-        let player = game.players.first(where: {
-            $0.id.uuidString.lowercased() == result.localPlayerId.lowercased()
-        }) ?? game.players.first(where: {
-            $0.name.localizedCaseInsensitiveCompare(playerName) == .orderedSame
-        })
-        guard let player else { return }
-
-        if game.mode == .lms, let teamId = result.payload.teamId {
-            GameLogicService.setPick(
-                player: player, round: round, teamId: teamId, fixtureId: result.payload.fixtureId, context: context
-            )
-        } else if game.mode == .predictor, let scores = result.payload.scores {
-            for score in scores {
-                PredictorScoringService.setPrediction(
-                    player: player,
-                    round: round,
-                    fixtureId: score.fixtureId,
-                    home: score.home,
-                    away: score.away,
-                    context: context
-                )
-            }
-            // Apply joker if the player designated one.
-            if let jokerScore = scores.first(where: { $0.isJoker == true }) {
-                PredictorScoringService.setJoker(player: player, round: round, fixtureId: jokerScore.fixtureId)
-            }
-        } else if game.mode == .killer, let outcomes = result.payload.outcomes {
-            for entry in outcomes {
-                // A malformed/unknown outcome string skips just that fixture
-                // rather than aborting the whole submission — matches the
-                // "safely rejectable, not corrupting" requirement for
-                // untrusted PWA payloads.
-                guard let outcome = FixtureOutcome(rawValue: entry.outcome) else {
-                    subQueueLog.warning("Skipped Killer outcome with unknown value: \(entry.outcome)")
-                    continue
-                }
-                KillerScoringService.setPrediction(
-                    player: player, round: round, fixtureId: entry.fixtureId, outcome: outcome, context: context
-                )
-
-                // Kill Phase only. A bad/unresolvable target UUID (malformed
-                // string, or a player deactivated between push and
-                // submission) just leaves the target unset for this fixture
-                // rather than dropping the outcome too. `setHitTarget` itself
-                // is the real enforcement gate for self-target/duplicate-
-                // target — it already guards both and no-ops on violation
-                // (see KillerScoringService), so this stays the backstop even
-                // if the PWA's own client-side validation is bypassed.
-                guard let hitTargetIdString = entry.hitTargetId,
-                      let hitTargetId = UUID(uuidString: hitTargetIdString),
-                      let target = game.players.first(where: { $0.id == hitTargetId }) else { continue }
-                _ = KillerScoringService.setHitTarget(
-                    player: player, round: round, fixtureId: entry.fixtureId, targetPlayerId: target.id, context: context
-                )
-            }
-        }
-        try? context.save()
+        SubmissionApplyService.apply(result, playerName: playerName, game: game, round: round, context: context)
     }
 }
 
-private struct SubmissionRow: View {
+struct SubmissionRow: View {
     let item: SubmissionItem
     let game: Game
 

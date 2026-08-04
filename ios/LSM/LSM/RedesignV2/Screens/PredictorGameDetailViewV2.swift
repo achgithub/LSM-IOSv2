@@ -133,9 +133,9 @@ struct PredictorGameDetailViewV2: View {
             case .standings:
                 PredictorStandingsViewV2(game: game)
             case .submissions:
-                if let round = openRound, let gameToken = game.cloudGameToken {
+                if openRound != nil, let gameToken = game.cloudGameToken {
                     NavigationStack {
-                        SubmissionQueueView(game: game, round: round, gameToken: gameToken)
+                        SubmissionInboxViewV2(filterGameToken: gameToken)
                     }
                 }
             case .shareFixtures:

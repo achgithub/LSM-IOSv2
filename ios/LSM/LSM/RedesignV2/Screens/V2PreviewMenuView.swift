@@ -16,6 +16,7 @@ import SwiftData
 /// to dismiss) on top of the real one Settings already provides.
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
+    @Environment(SubmissionBadgeStore.self) private var badgeStore
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
@@ -63,6 +64,8 @@ struct V2PreviewMenuView: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Home")
+        .v2Header("Home", trailingBadgeCount: badgeStore.pendingCount)
+        .task { await badgeStore.refresh() }
+        .refreshable { await badgeStore.refresh() }
     }
 }

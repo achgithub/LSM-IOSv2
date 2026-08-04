@@ -6,10 +6,9 @@ import SwiftUI
 /// restyled, so no custom navigation stack to maintain.
 struct AppHeader: ToolbarContent {
     let title: String
-    /// Submission-queue badge count, shown as a trailing bell icon when > 0.
-    /// Currently always a caller-supplied mock (no live submission count is
-    /// wired up yet) — see `SubmissionsClient`/`SubmissionQueueView` for the
-    /// real per-game/round data this should eventually aggregate.
+    /// Submission-inbox badge count, shown as a trailing bell icon when > 0.
+    /// Backed by `SubmissionBadgeStore` — tapping it pushes the unfiltered
+    /// `SubmissionInboxViewV2` (all games, color-coded).
     var trailingBadgeCount: Int?
     @Environment(\.dismiss) private var dismiss
 
@@ -33,9 +32,8 @@ struct AppHeader: ToolbarContent {
         }
         if let trailingBadgeCount, trailingBadgeCount > 0 {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    // No destination yet — badge is a visual mock until the
-                    // submission queue is aggregated across games.
+                NavigationLink {
+                    SubmissionInboxViewV2()
                 } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bell.fill")

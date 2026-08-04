@@ -68,6 +68,37 @@ enum V2Theme {
         }
     }
 
+    /// Stable per-game color for contexts that mix rows from several games at
+    /// once (the submission inbox) — distinct from `Mode.color`, which is
+    /// shared by every game of the same mode and wouldn't tell two LMS games
+    /// apart. `Game` has no color field of its own, so this hashes the
+    /// game's cloud token into a fixed palette: same game always gets the
+    /// same color, no data model change needed.
+    enum GameIdentity {
+        private static let palette: [Color] = [
+            Color.v2(light: 0x1D6FD1, dark: 0x4C9AFF),
+            Color.v2(light: 0xB8311E, dark: 0xF2542D),
+            Color.v2(light: 0x4338CA, dark: 0x6366F1),
+            Color.v2(light: 0x0F8B8D, dark: 0x2DD4BF),
+            Color.v2(light: 0xB8860B, dark: 0xF2B705),
+            Color.v2(light: 0xA6266E, dark: 0xEC4899),
+            Color.v2(light: 0x5C7A29, dark: 0x84CC16),
+            Color.v2(light: 0x6B4E9C, dark: 0xA78BFA),
+        ]
+
+        static func color(for gameToken: String) -> Color {
+            // `String.hashValue` is randomized per process launch, so it
+            // can't be used here — the same game would repaint a different
+            // color every relaunch. FNV-1a over the UTF8 bytes is stable.
+            var hash: UInt64 = 0xcbf29ce484222325
+            for byte in gameToken.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x100000001b3
+            }
+            return palette[Int(hash % UInt64(palette.count))]
+        }
+    }
+
     enum Radius {
         static let card: CGFloat = 18
         static let row: CGFloat = 14

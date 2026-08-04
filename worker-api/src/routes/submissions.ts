@@ -308,6 +308,45 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
   });
 });
 
+// GET /manager/submissions/pending
+// Aggregates pending submissions across every game owned by this manager, in
+// one query (no per-game fan-out). Additive alongside the per-game route
+// above — that one is untouched and V1 keeps calling it exclusively.
+submissions.get("/manager/submissions/pending", async (c) => {
+  const managerToken = managerTokenHeader(c);
+  if (!managerToken) return c.json({ error: "X-Manager-Token header is required" }, 400);
+
+  const rows = await c.env.DB.prepare(
+    `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
+            s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at,
+            s.game_token, rp.game_name, rp.mode
+     FROM submissions s
+     JOIN round_pushes rp ON rp.game_token = s.game_token
+     JOIN game_enrollments ge ON ge.token = s.token AND ge.game_token = s.game_token
+     JOIN player_tokens pt ON pt.token = s.token
+     WHERE rp.manager_token = ? AND s.status = 'pending'
+     ORDER BY s.submitted_at ASC`
+  ).bind(managerToken).all();
+
+  return c.json({
+    submissions: (rows.results ?? []).map((r: any) => ({
+      id: r.id,
+      token: r.token,
+      playerName: r.player_name,
+      localPlayerId: r.local_player_id,
+      managerSuffix: r.manager_suffix,
+      roundNumber: r.round_number,
+      payload: JSON.parse(r.payload_json as string),
+      status: r.status,
+      submittedAt: r.submitted_at,
+      decidedAt: r.decided_at,
+      gameToken: r.game_token,
+      gameName: r.game_name,
+      mode: r.mode,
+    })),
+  });
+});
+
 // POST /games/:gameToken/submissions/:id/approve
 submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();

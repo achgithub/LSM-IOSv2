@@ -171,9 +171,9 @@ struct GameDetailViewV2: View {
                     SummaryShareView(game: game, round: round, type: .outcome(ending))
                 }
             case .submissions:
-                if let round = openRound, let gameToken = game.cloudGameToken {
+                if openRound != nil, let gameToken = game.cloudGameToken {
                     NavigationStack {
-                        SubmissionQueueView(game: game, round: round, gameToken: gameToken)
+                        SubmissionInboxViewV2(filterGameToken: gameToken)
                     }
                 }
             case .standings:

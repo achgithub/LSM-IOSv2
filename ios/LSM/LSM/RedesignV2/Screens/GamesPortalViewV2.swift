@@ -15,6 +15,7 @@ import SwiftData
 /// haven't been restyled yet; that's the next phase of the V2 build.
 struct GamesPortalViewV2: View {
     @Environment(Entitlements.self) private var entitlements
+    @Environment(SubmissionBadgeStore.self) private var badgeStore
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNewGame = false
     @State private var showingGameLimit = false
@@ -50,9 +51,9 @@ struct GamesPortalViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
-        // Mocked — no live submission queue is wired up yet (no test data to
-        // aggregate against); see AppHeader.trailingBadgeCount's doc comment.
-        .v2Header("Games", trailingBadgeCount: 3)
+        .v2Header("Games", trailingBadgeCount: badgeStore.pendingCount)
+        .task { await badgeStore.refresh() }
+        .refreshable { await badgeStore.refresh() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

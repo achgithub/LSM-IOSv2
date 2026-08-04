@@ -18,6 +18,7 @@ struct RootTabView: View {
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @State private var entitlements = Entitlements.shared
+    @State private var submissionBadgeStore = SubmissionBadgeStore.shared
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
     @State private var showLeagueManager = false
@@ -72,6 +73,7 @@ struct RootTabView: View {
             }
         }
         .environment(entitlements)
+        .environment(submissionBadgeStore)
         .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {
             ManagerOnboardingView(managerName: $managerName)
         }

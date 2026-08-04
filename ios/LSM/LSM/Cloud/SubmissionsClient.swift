@@ -40,6 +40,12 @@ struct SubmissionItem: Decodable, Identifiable {
     let status: String
     let submittedAt: String
     let decidedAt: String?
+    /// Only populated by the aggregate `/manager/submissions/pending` route —
+    /// nil when decoded from the per-game `listSubmissions` response, which
+    /// omits these keys entirely (the caller already knows its own game).
+    let gameToken: String?
+    let gameName: String?
+    let mode: String?
 }
 
 struct SubmissionPayload: Decodable {
@@ -185,6 +191,19 @@ actor SubmissionsClient {
         struct Response: Decodable { let submissions: [SubmissionItem] }
         let req = try await request(
             path: "/games/\(gameToken.uuidString.lowercased())/submissions?round=\(round)", method: "GET",
+            includeManagerToken: true
+        )
+        let data = try await send(req)
+        return try decoder.decode(Response.self, from: data).submissions
+    }
+
+    /// Aggregates pending submissions across every game this manager owns —
+    /// one call, backed by the worker's `/manager/submissions/pending` join,
+    /// not a per-game fan-out.
+    func listPendingSubmissions() async throws -> [SubmissionItem] {
+        struct Response: Decodable { let submissions: [SubmissionItem] }
+        let req = try await request(
+            path: "/manager/submissions/pending", method: "GET",
             includeManagerToken: true
         )
         let data = try await send(req)
