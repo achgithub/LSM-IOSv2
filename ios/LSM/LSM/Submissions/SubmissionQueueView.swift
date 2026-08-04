@@ -87,6 +87,13 @@ struct SubmissionQueueView: View {
                 gameToken: gameToken,
                 round: round.roundNumber
             )
+        } catch APIError.badStatus(404, _) {
+            // The worker 404s "game not found" when no `round_pushes` row
+            // exists yet for this game — i.e. this round was never actually
+            // sent to players (cloudGameToken can be set locally before the
+            // push that creates that row succeeds). Point at the fix rather
+            // than showing a generic network error.
+            errorMessage = AppString("This round hasn't been sent to players yet. Use \"Resend to Player App\" on the game screen, then try again.")
         } catch {
             errorMessage = "Couldn't load submissions: \(error.localizedDescription)"
         }
