@@ -171,7 +171,7 @@ struct GameDetailViewV2: View {
                     SummaryShareView(game: game, round: round, type: .outcome(ending))
                 }
             case .submissions:
-                if openRound != nil, let gameToken = game.cloudGameToken {
+                if let gameToken = game.cloudGameToken {
                     NavigationStack {
                         SubmissionInboxViewV2(filterGameToken: gameToken)
                     }
@@ -235,6 +235,23 @@ struct GameDetailViewV2: View {
                     }
                 }
                 .foregroundStyle(V2Theme.Mode.lms)
+                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                    // Not gated on an open round — the Home/Games bell already
+                    // reaches this game's submissions regardless of round
+                    // state, so hiding this entry point behind "has an open
+                    // round" was just an inconsistent extra gate. Kept as its
+                    // own `if` (looser `canReachExistingCloudData`, not
+                    // `entitlements.canUseCloud`) so a downgraded manager in
+                    // their pending-delete grace period can still reach
+                    // existing submissions even though Resend (a write) is
+                    // gated stricter below.
+                    Button {
+                        sheet = .submissions
+                    } label: {
+                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
+                    }
+                    .foregroundStyle(V2Theme.textSecondary)
+                }
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
                         Task { await resend() }
@@ -316,9 +333,6 @@ struct GameDetailViewV2: View {
                     ActionRow(title: "Edit Fixtures", icon: "pencil", tint: V2Theme.danger) { pendingEditFixtures = true }
                     ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .summaryFixtures } }
                     ActionRow(title: "Share Picks Card", icon: "square.and.arrow.up", isEnabled: openRoundPicksComplete) { AdGate.run { sheet = .summaryPicks } }
-                    if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
-                    }
 
                 } else if unresolvedTie {
                     HStack {

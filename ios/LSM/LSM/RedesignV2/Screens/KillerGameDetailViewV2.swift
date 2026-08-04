@@ -136,7 +136,7 @@ struct KillerGameDetailViewV2: View {
             case .lives:
                 KillerLivesViewV2(game: game)
             case .submissions:
-                if openRound != nil, let gameToken = game.cloudGameToken {
+                if let gameToken = game.cloudGameToken {
                     NavigationStack {
                         SubmissionInboxViewV2(filterGameToken: gameToken)
                     }
@@ -190,6 +190,23 @@ struct KillerGameDetailViewV2: View {
                     }
                 }
                 .foregroundStyle(V2Theme.Mode.killer)
+                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                    // Not gated on an open round — the Home/Games bell already
+                    // reaches this game's submissions regardless of round
+                    // state, so hiding this entry point behind "has an open
+                    // round" was just an inconsistent extra gate. Kept as its
+                    // own `if` (looser `canReachExistingCloudData`, not
+                    // `entitlements.canUseCloud`) so a downgraded manager in
+                    // their pending-delete grace period can still reach
+                    // existing submissions even though Resend (a write) is
+                    // gated stricter below.
+                    Button {
+                        sheet = .submissions
+                    } label: {
+                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
+                    }
+                    .foregroundStyle(V2Theme.textSecondary)
+                }
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
                         Task { await resend() }
@@ -247,9 +264,6 @@ struct KillerGameDetailViewV2: View {
                     ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
                     if currentPhase == .kill {
                         ActionRow(title: "Share Player Key Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .sharePlayerKey } }
-                    }
-                    if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
                     }
                 } else if game.status == .complete {
                     Text("Game complete.").font(.footnote).foregroundStyle(V2Theme.textSecondary)

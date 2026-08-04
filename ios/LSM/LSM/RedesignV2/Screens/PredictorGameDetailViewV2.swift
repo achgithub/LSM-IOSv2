@@ -133,7 +133,7 @@ struct PredictorGameDetailViewV2: View {
             case .standings:
                 PredictorStandingsViewV2(game: game)
             case .submissions:
-                if openRound != nil, let gameToken = game.cloudGameToken {
+                if let gameToken = game.cloudGameToken {
                     NavigationStack {
                         SubmissionInboxViewV2(filterGameToken: gameToken)
                     }
@@ -203,6 +203,23 @@ struct PredictorGameDetailViewV2: View {
                     }
                     .foregroundStyle(V2Theme.Mode.predictor)
                 }
+                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
+                    // Not gated on an open round — the Home/Games bell already
+                    // reaches this game's submissions regardless of round
+                    // state, so hiding this entry point behind "has an open
+                    // round" was just an inconsistent extra gate. Kept as its
+                    // own `if` (looser `canReachExistingCloudData`, not
+                    // `entitlements.canUseCloud`) so a downgraded manager in
+                    // their pending-delete grace period can still reach
+                    // existing submissions even though Resend (a write) is
+                    // gated stricter below.
+                    Button {
+                        sheet = .submissions
+                    } label: {
+                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
+                    }
+                    .foregroundStyle(V2Theme.textSecondary)
+                }
                 if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
                     Button {
                         Task { await resend() }
@@ -260,9 +277,6 @@ struct PredictorGameDetailViewV2: View {
                         let names = incompletePlayers(for: round).map(\.name).joined(separator: ", ")
                         Text("Waiting on predictions: \(names)")
                             .font(.caption).foregroundStyle(V2Theme.textTertiary)
-                    }
-                    if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                        ActionRow(title: "Submission Queue", icon: "tray.and.arrow.down") { sheet = .submissions }
                     }
                     ActionRow(title: "Share Fixtures Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareFixtures } }
                     ActionRow(title: "Share Entry Closed Card", icon: "square.and.arrow.up", isEnabled: round.deadline < Date()) {
