@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clubroom — Sports Manager</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+    background: #0B1220 url(background.png) top center / cover no-repeat;
+    color: #F8FAFC;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 60px 20px 40px;
+    box-sizing: border-box;
+  }
+  img.logo { width: 120px; height: 120px; border-radius: 24px; margin-bottom: 24px; }
+  .wordmark { font-size: 0.85em; font-weight: 800; letter-spacing: 2px; color: #3DA8FF; margin: 0; }
+  h1 { font-size: 2em; font-weight: 800; letter-spacing: 1px; color: #F97316; margin: 6px 0 18px; }
+  .tagline { font-size: 1.1em; color: #F8FAFC; opacity: 0.9; max-width: 420px; margin-bottom: 2.5em; }
+  p.desc { max-width: 480px; color: #94A3B8; line-height: 1.55; }
+  .features { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; max-width: 560px; margin: 2em 0 1em; }
+  .features .feature {
+    display: block;
+    width: 250px;
+    padding: 16px 14px;
+    border: 1px solid #1E2D45;
+    border-radius: 14px;
+    text-align: left;
+  }
+  .features .feature-name { display: block; font-weight: 700; color: #F97316; margin-bottom: 4px; }
+  .features .feature-desc { display: block; font-size: 0.85em; color: #94A3B8; line-height: 1.4; }
+  .builtins { max-width: 480px; color: #94A3B8; line-height: 1.55; margin-top: 1.5em; font-size: 0.92em; }
+  .links { margin-top: 2.5em; }
+  .links a { color: #3DA8FF; text-decoration: none; display: inline-block; margin: 0 14px; font-weight: 600; }
+  .links a:hover { text-decoration: underline; }
+  .footer { margin-top: auto; padding-top: 3em; color: #475569; font-size: 0.8em; }
+  .home { align-self: flex-start; margin-bottom: 1.5em; color: #94A3B8; text-decoration: none; font-weight: 600; }
+  .home:hover { color: #3DA8FF; }
+</style>
+</head>
+<body>
+<a class="home" href="/">← Sports Manager</a>
+<img class="logo" src="logo.png" alt="Clubroom">
+<p class="wordmark">SPORTS MANAGER</p>
+<h1>CLUBROOM</h1>
+<p class="tagline">League and knockout management for your club.</p>
+<p class="desc">Set up leagues and knockouts for any club or pub game —
+venues, teams, players, fixtures, standings and awards, all handled. Define
+the format once with a Sport Pack, then let the app run the season.</p>
+<div class="features">
+  <div class="feature">
+    <span class="feature-name">Leagues</span>
+    <span class="feature-desc">Round-robin, points, standings and awards, scheduled or open.</span>
+  </div>
+  <div class="feature">
+    <span class="feature-name">Knockouts</span>
+    <span class="feature-desc">Single elimination brackets that run alongside your leagues.</span>
+  </div>
+  <div class="feature">
+    <span class="feature-name">Sport Packs</span>
+    <span class="feature-desc">Build the format for any game — your own scoring, your own rules.</span>
+  </div>
+  <div class="feature">
+    <span class="feature-name">Player Submissions</span>
+    <span class="feature-desc">Send players a link to submit their own result — no app install needed.</span>
+  </div>
+</div>
+<p class="builtins">Comes with Darts, Pool and Cribbage built in as ready-made
+examples — everything else is a format you define yourself.</p>
+<div class="links">
+  <a href="/clubroom/privacy">Privacy Policy</a>
+  <a href="/clubroom/terms">Terms of Service</a>
+  <a href="mailto:sportsmanager@zohomail.eu">Support</a>
+</div>
+<p class="footer">Clubroom is an independent app, not affiliated with,
+licensed by or endorsed by any club, pub chain or sporting body.</p>
+</body>
+</html>
