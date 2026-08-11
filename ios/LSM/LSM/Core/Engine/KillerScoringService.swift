@@ -70,6 +70,24 @@ enum KillerScoringService {
         player.killerState = state
     }
 
+    /// Clears any `hitTargetPlayerId` pointing at a player being removed from
+    /// the game. It's a raw `UUID`, not a relationship, so removing a player
+    /// doesn't cascade-clean it — other players' predictions would silently
+    /// keep aiming at a dead target. Left alone, that Hit vanishes at round
+    /// close with no warning (`slateComplete` only checks non-nil, so the
+    /// incomplete-players gate never catches it). Clearing it to nil instead
+    /// re-surfaces the gap as an incomplete slate, and lets
+    /// `autoAssignIfOnlyOpponent` self-heal it once only one opponent is
+    /// left. Called from every player-removal site, mirroring
+    /// `attachStateIfNeeded`'s "every add site" convention.
+    static func clearHitTargets(referencing removedPlayer: Player, in game: Game) {
+        for round in game.rounds {
+            for prediction in round.killerPredictions where prediction.hitTargetPlayerId == removedPlayer.id {
+                prediction.hitTargetPlayerId = nil
+            }
+        }
+    }
+
     // MARK: - Predictions
 
     static func predictions(for player: Player, in round: Round) -> [KillerPrediction] {
@@ -185,6 +203,11 @@ enum KillerScoringService {
         guard round.fixtureIds.allSatisfy({ finalOutcomes[$0] != nil || voidFixtureIds.contains($0) }) else {
             throw KillerScoringError.incompleteOutcomes
         }
+        // Idempotent no-op on a re-entrant close (e.g. a double tap racing the
+        // async PWA-submission check in the view) — without this, a second
+        // pass re-scores every prediction, double-credits Build Phase lives,
+        // and double-applies Kill Phase Hit damage.
+        guard round.status != .closed else { return .notApplicable }
 
         var correctCountByPlayer: [UUID: Int] = [:]
         for prediction in round.killerPredictions {

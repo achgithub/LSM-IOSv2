@@ -327,6 +327,7 @@ struct KillerGameDetailViewV2: View {
     }
 
     private func removePlayer(_ player: Player) {
+        KillerScoringService.clearHitTargets(referencing: player, in: game)
         game.players.removeAll { $0.id == player.id }
         context.delete(player)
         pendingRemovePlayer = nil

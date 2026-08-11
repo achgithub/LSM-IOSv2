@@ -4,6 +4,14 @@ import os
 
 private let gameLifecycleLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "game-lifecycle")
 
+enum GameLogicError: LocalizedError {
+    case incompletePicks
+
+    var errorDescription: String? {
+        AppString("Every active player must have a pick entered before the round can be closed.")
+    }
+}
+
 /// Outcome of closing a round, for the UI to react to.
 struct RoundCloseResult {
     let eliminated: [Player]
@@ -245,12 +253,23 @@ enum GameLogicService {
     // MARK: - Close round
 
     /// Compute eliminations, update player statuses/stats, mark the round closed.
+    /// - Throws: `GameLogicError.incompletePicks` if any active player has no
+    ///   `Pick` for this round. The shipping UI already gates "Close Round" on
+    ///   every active player having picked (`openRoundPicksComplete`), but
+    ///   without this guard the engine itself would silently drop an unpicked
+    ///   player from `outcomes` (via `compactMap`) and let them survive with
+    ///   no warning — a real gap for any future direct caller of this
+    ///   function that doesn't go through that UI gate. Mirrors Killer/
+    ///   Predictor's `closeRound`, which already throw on incomplete slates.
     static func closeRound(
         _ round: Round,
         game: Game,
         context: ModelContext
-    ) -> RoundCloseResult {
+    ) throws -> RoundCloseResult {
         let activeBefore = game.players.filter { $0.status == .active }
+        guard activeBefore.allSatisfy({ pick(for: $0, in: round) != nil }) else {
+            throw GameLogicError.incompletePicks
+        }
 
         let outcomes: [PickOutcome] = activeBefore.compactMap { player in
             guard let pick = pick(for: player, in: round) else { return nil }

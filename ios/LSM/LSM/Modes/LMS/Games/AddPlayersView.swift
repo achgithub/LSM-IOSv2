@@ -146,6 +146,7 @@ struct AddPlayersView: View {
 
     /// Remove a player from this game (cascade deletes their picks).
     private func remove(_ player: Player) {
+        KillerScoringService.clearHitTargets(referencing: player, in: game)
         game.players.removeAll { $0.id == player.id }
         context.delete(player)
     }
@@ -172,6 +173,7 @@ struct AddPlayersView: View {
     private func removeManager() {
         for player in game.players where player.isManager
             || player.name.localizedCaseInsensitiveCompare(managerTrimmed) == .orderedSame {
+            KillerScoringService.clearHitTargets(referencing: player, in: game)
             context.delete(player)
         }
     }

@@ -25,11 +25,27 @@ struct LMSStandingsViewV2: View {
         }
     }
 
+    /// Matches `GameEngine.computeEliminations`'s own rule for which pick
+    /// results actually eliminate a player — not just `.loss`, but `.draw`/
+    /// `.postponed` too when the game's toggles make them eliminating.
+    /// Missing either meant a draw/postponed elimination showed as generic
+    /// "out" with no round number. Rounds are sorted by `roundNumber` before
+    /// searching since `game.rounds` (a SwiftData relationship) isn't
+    /// guaranteed to already be in round order.
     private func roundEliminated(_ player: Player) -> Int? {
         game.rounds
             .filter { $0.status == .closed }
+            .sorted { $0.roundNumber < $1.roundNumber }
             .first { round in
-                round.picks.contains { $0.player?.id == player.id && $0.result == .loss }
+                round.picks.contains { pick in
+                    guard pick.player?.id == player.id else { return false }
+                    switch pick.result {
+                    case .loss: return true
+                    case .draw: return game.drawEliminates
+                    case .postponed: return game.postponedEliminates
+                    case .win, .none: return false
+                    }
+                }
             }?.roundNumber
     }
 

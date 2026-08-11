@@ -80,7 +80,7 @@ enum TutorialDataService {
 
     static func closeLMSRound1(game: Game, round: Round, context: ModelContext) {
         applyResults(TutorialDataGenerator.lmsRound1Fixtures, to: round)
-        GameLogicService.closeRound(round, game: game, context: context)
+        try? GameLogicService.closeRound(round, game: game, context: context)
     }
 
     @discardableResult
@@ -99,7 +99,7 @@ enum TutorialDataService {
 
     static func closeLMSRound2AndDeclareWinner(game: Game, round: Round, context: ModelContext) {
         applyResults(TutorialDataGenerator.lmsRound2Fixtures, to: round)
-        GameLogicService.closeRound(round, game: game, context: context)
+        try? GameLogicService.closeRound(round, game: game, context: context)
         let winnerIds = game.activePlayers.map(\.id)
         if !winnerIds.isEmpty { GameLogicService.apply(.winners(winnerIds), game: game) }
     }

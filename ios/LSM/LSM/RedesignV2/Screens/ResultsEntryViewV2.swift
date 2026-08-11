@@ -28,6 +28,7 @@ struct ResultsEntryViewV2: View {
     @State private var refresh = LiveMatchRefreshState()
     @State private var pendingSubmissionCount = 0
     @State private var showingPendingSubmissionsWarning = false
+    @State private var closeError: String?
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -82,6 +83,14 @@ struct ResultsEntryViewV2: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Closing this round leaves them unresolved in the Submission Queue. Review them first, or close anyway.")
+            }
+            .alert("Cannot close round", isPresented: Binding(
+                get: { closeError != nil },
+                set: { if !$0 { closeError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(closeError ?? "")
             }
         }
     }
@@ -225,7 +234,19 @@ struct ResultsEntryViewV2: View {
             }
         }
 
-        let result = GameLogicService.closeRound(round, game: game, context: context)
+        // The UI already gates opening this screen behind every active player
+        // having picked (`openRoundPicksComplete`), so `closeRound`'s
+        // incomplete-picks guard should never actually trip here. It CAN
+        // still trip if a player is added mid-session while this sheet is
+        // already open, so this surfaces an alert rather than silently
+        // leaving a dead button — no crash, no dropped tap with no feedback.
+        let result: RoundCloseResult
+        do {
+            result = try GameLogicService.closeRound(round, game: game, context: context)
+        } catch {
+            closeError = error.localizedDescription
+            return
+        }
         try? context.save()
 
         if result.allEliminated {

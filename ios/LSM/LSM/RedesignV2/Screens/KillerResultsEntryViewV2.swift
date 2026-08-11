@@ -22,12 +22,23 @@ struct KillerResultsEntryViewV2: View {
     @State private var errorMessage: String?
     @State private var outcomes: [Int: FixtureOutcome] = [:]
     @State private var voided: Set<Int> = []
+    /// Fixtures the manager has manually un-voided — `seedOutcomesFromCache`
+    /// must not re-void these just because the source data still shows
+    /// POSTPONED, or a deliberate un-void gets silently reverted on the next
+    /// refresh.
+    @State private var manuallyUnvoided: Set<Int> = []
     @State private var refresh = LiveMatchRefreshState()
     @State private var closeError: String?
     @State private var splitMessage: String?
     @State private var showingIncompleteWarning = false
     @State private var pendingSubmissionCount = 0
     @State private var showingPendingSubmissionsWarning = false
+    /// Guards the async gap in `attemptClose()` (awaiting the PWA pending-
+    /// submissions check) during which the button would otherwise stay
+    /// tappable — a second tap in that window reaches `close()` again before
+    /// `round.status` flips, double-scoring predictions and double-applying
+    /// Kill Phase Hit damage.
+    @State private var isClosing = false
 
     private var roundFixtures: [MatchDTO] {
         guard let data else { return [] }
@@ -122,8 +133,10 @@ struct KillerResultsEntryViewV2: View {
     private func toggleVoid(_ id: Int) {
         if voided.contains(id) {
             voided.remove(id)
+            manuallyUnvoided.insert(id)
         } else {
             voided.insert(id)
+            manuallyUnvoided.remove(id)
             outcomes[id] = nil
         }
     }
@@ -145,7 +158,7 @@ struct KillerResultsEntryViewV2: View {
             .foregroundStyle(V2Theme.accentOnAccent)
             .background(V2Theme.Mode.killer, in: RoundedRectangle(cornerRadius: V2Theme.Radius.button, style: .continuous))
             .opacity(round.status == .closed || !allResultsSet ? 0.4 : 1)
-            .disabled(round.status == .closed || !allResultsSet)
+            .disabled(round.status == .closed || !allResultsSet || isClosing)
             .padding(.top, 4)
         }
         .padding(.bottom, 6)
@@ -208,6 +221,7 @@ struct KillerResultsEntryViewV2: View {
     private func seedOutcomesFromCache() {
         for fixture in roundFixtures where outcomes[fixture.id] == nil && !voided.contains(fixture.id) {
             if fixture.status == "POSTPONED" {
+                guard !manuallyUnvoided.contains(fixture.id) else { continue }
                 voided.insert(fixture.id)
             } else if let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
                 outcomes[fixture.id] = outcome
@@ -225,11 +239,14 @@ struct KillerResultsEntryViewV2: View {
             checkIncompleteThenClose()
             return
         }
+        guard !isClosing else { return }
+        isClosing = true
         Task {
             let count = (try? await SubmissionsClient.shared.listSubmissions(
                 gameToken: gameToken, round: round.roundNumber
             ))?.filter { $0.status == "pending" }.count ?? 0
             await MainActor.run {
+                isClosing = false
                 if count > 0 {
                     pendingSubmissionCount = count
                     showingPendingSubmissionsWarning = true
