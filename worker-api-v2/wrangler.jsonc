@@ -1,0 +1,86 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ── LSM API v2 — standalone KV-backed authority Worker ───────────────────
+  // NOT a replacement for worker-api (V1's live production Worker) — a new,
+  // separate deployment built to validate the KV-based sync design in
+  // isolation. Nothing here calls into or shares state with worker-api; it
+  // has its own D1 database (attest_devices only) and its own KV namespace.
+  //
+  // Whether/how the RedesignV2 iOS client eventually points at this Worker
+  // in production, and what happens to worker-api/V1 long-term, is an
+  // explicitly separate follow-up decision — not part of standing this up.
+  //
+  // Scope, relative to worker-api:
+  //   • App Attest device registry + JWT issuance — duplicated as-is
+  //     (attest.ts, attest-config.ts, attest-store.ts, routes/attest.ts,
+  //     jwt.ts, middleware/jwt.ts, auth.ts) so this Worker can issue and
+  //     verify its own JWTs without depending on worker-api at runtime.
+  //     Same D1-backed attest_devices approach, own database.
+  //   • Links / rounds / submissions / manager lifecycle — new KV design
+  //     (kv/, routes/submissions.ts, routes/manager.ts). See kv/keys.ts for
+  //     the full key catalog.
+  //   • Global outage flag + /admin/* ops endpoints — intentionally NOT
+  //     duplicated here (out of scope for standing up the KV design; would
+  //     need its own FLAGS KV namespace with no reuse of worker-api's).
+  //
+  // Secrets (set with `wrangler secret put <KEY> --env uk`, or via
+  // .dev.vars for local dev — see test/smoke.sh):
+  //   UK_ATTEST_CHALLENGE_KEY  — HMAC secret for challenge issuance
+  //   UK_JWT_PRIVATE_KEY       — base64 PKCS8 ECDSA P-256 private key for JWT signing
+  //   UK_ADMIN_TOKEN           — bearer token for routes/attest.ts's admin device-list/delete endpoints
+
+  "name": "lsm-api-v2",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-14",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+
+  "env": {
+    "uk": {
+      "name": "lsm-api-v2-uk",
+
+      "workers_dev": true,
+      // No custom_domain route yet — this Worker isn't live/deployed
+      // anywhere; routing/domain is part of the deferred migration decision.
+
+      "vars": {
+        "REGION": "uk",
+        "APP_ATTEST_TEAM_ID": "UD928WR9RR",
+        "APP_ATTEST_BUNDLE_ID": "com.sportsmanager.LMS",
+        "APP_ATTEST_ENV": "production",
+        "JWT_KID": "uk-2026-01",
+        // Placeholder — this Worker has its own signing keypair, distinct
+        // from worker-api's. Generate a real one before any real deploy (see
+        // jwt.ts's header comment for the one-off Web Crypto snippet); for
+        // local dev, .dev.vars overrides this with a throwaway keypair.
+        "JWT_PUBLIC_KEYS": "{}"
+      },
+
+      // Own database — attest_devices only (schema.sql). Not shared with
+      // worker-api's lsm-api-uk-db.
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "lsm-api-v2-uk-db",
+          "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID"
+        }
+      ],
+
+      // Own namespace — player links, round pushes, submissions, manager
+      // lifecycle. See kv/keys.ts for the full key catalog. `wrangler dev`
+      // without --remote uses local (on-disk) KV automatically regardless
+      // of this id, so local dev/smoke-testing is unaffected either way.
+      "kv_namespaces": [
+        { "binding": "SUBMISSIONS_KV", "id": "REPLACE_WITH_REAL_KV_NAMESPACE_ID" }
+      ]
+
+      // No triggers.crons — expiry is `expirationTtl` on every KV write,
+      // enforced by Cloudflare itself. See kv/retention.ts.
+    }
+  }
+}

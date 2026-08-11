@@ -1,0 +1,29 @@
+{
+  "name": "lsm-api-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone KV-backed successor to worker-api's PWA submission queue + manager lifecycle — App Attest/JWT issuance duplicated as-is, links/rounds/submissions/manager-lifecycle rebuilt on KV. Not deployed anywhere yet; isolated from worker-api at runtime.",
+  "type": "module",
+  "packageManager": "pnpm@11.2.2",
+  "volta": {
+    "node": "22.22.3",
+    "pnpm": "11.2.2"
+  },
+  "scripts": {
+    "dev": "wrangler dev --env uk",
+    "deploy:uk": "wrangler deploy --env uk",
+    "types": "wrangler types --env uk",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:uk": "wrangler d1 execute lsm-api-v2-uk-db --remote --env uk --file=./schema.sql",
+    "test:smoke": "bash test/smoke.sh"
+  },
+  "dependencies": {
+    "@levischuck/tiny-cbor": "^0.3.4",
+    "@peculiar/x509": "^1.14.3",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "wrangler": "^4.100.0"
+  }
+}
