@@ -16,9 +16,12 @@ import SwiftData
 struct GamesPortalViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(SubmissionBadgeStore.self) private var badgeStore
+    @Environment(SyncCoordinator.self) private var syncCoordinator
+    @Environment(\.modelContext) private var context
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNewGame = false
     @State private var showingGameLimit = false
+    @State private var showingSyncSummary = false
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
@@ -29,6 +32,29 @@ struct GamesPortalViewV2: View {
     /// explanatory alert instead of a silent no-op inside `NewGameViewV2`.
     private var atGameLimit: Bool {
         games.filter { $0.status != .complete }.count >= entitlements.maxActiveGames
+    }
+
+    /// Brief post-sync summary ("3 games synced, 2 pending submissions"),
+    /// surfacing errors instead of the pending count when any game failed to
+    /// push. Reads `syncCoordinator.lastSyncResult`, set once `sync()`
+    /// finishes — see `SyncCoordinator`.
+    private var syncSummaryText: String {
+        guard let result = syncCoordinator.lastSyncResult else { return "" }
+        let gamesPart = result.gamesPushed == 1 ? "1 game synced" : "\(result.gamesPushed) games synced"
+        if result.errors.isEmpty {
+            let pendingPart = result.pendingCount == 1 ? "1 pending submission" : "\(result.pendingCount) pending submissions"
+            return "\(gamesPart), \(pendingPart)"
+        } else {
+            let errorPart = result.errors.count == 1 ? "1 game failed" : "\(result.errors.count) games failed"
+            return "\(gamesPart) — \(errorPart)"
+        }
+    }
+
+    private func performSync() async {
+        await syncCoordinator.sync(context: context)
+        withAnimation { showingSyncSummary = true }
+        try? await Task.sleep(nanoseconds: 3_500_000_000)
+        withAnimation { showingSyncSummary = false }
     }
 
     var body: some View {
@@ -53,7 +79,27 @@ struct GamesPortalViewV2: View {
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Games", trailingBadgeCount: badgeStore.pendingCount)
         .task { await badgeStore.refresh() }
-        .refreshable { await badgeStore.refresh() }
+        // Pull-to-refresh now runs the full Sync (push every open round +
+        // refresh the pending count), not just a badge refresh — same action
+        // as the toolbar button, per the plan's "explicit button and
+        // pull-to-refresh do the same thing".
+        .refreshable { await performSync() }
+        .overlay(alignment: .top) {
+            if showingSyncSummary, let result = syncCoordinator.lastSyncResult {
+                Card {
+                    HStack(spacing: 10) {
+                        Image(systemName: result.errors.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(result.errors.isEmpty ? V2Theme.accent : V2Theme.warning)
+                        Text(syncSummaryText)
+                            .font(V2Theme.Typography.metadata)
+                            .foregroundStyle(V2Theme.textPrimary)
+                    }
+                }
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -63,6 +109,20 @@ struct GamesPortalViewV2: View {
                         .foregroundStyle(V2Theme.accent)
                 }
                 .accessibilityLabel("New Game")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await performSync() }
+                } label: {
+                    if syncCoordinator.isSyncing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(V2Theme.accent)
+                    }
+                }
+                .disabled(syncCoordinator.isSyncing)
+                .accessibilityLabel("Sync")
             }
         }
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }

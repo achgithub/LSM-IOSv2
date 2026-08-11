@@ -106,10 +106,10 @@ actor SubmissionsClient {
 
     // ── Manager-facing ────────────────────────────────────────────────────────
 
-    func mintLink(playerName: String, managerName: String) async throws -> String {
+    func mintLink(playerName: String, managerName: String, baseURLOverride: URL? = nil) async throws -> String {
         struct Body: Encodable { let playerName: String; let managerToken: String; let managerName: String }
         struct Response: Decodable { let token: String }
-        var req = try await request(path: "/links", method: "POST")
+        var req = try await request(path: "/links", method: "POST", baseURLOverride: baseURLOverride)
         req.httpBody = try encoder.encode(Body(playerName: playerName, managerToken: ManagerToken.current, managerName: managerName))
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let data = try await send(req)
@@ -151,7 +151,8 @@ actor SubmissionsClient {
         players: [PlayerPushItem],
         extraJSON: String? = nil,
         previousResultsRoundNumber: Int? = nil,
-        previousResultsJSON: String? = nil
+        previousResultsJSON: String? = nil,
+        baseURLOverride: URL? = nil
     ) async throws {
         struct Body: Encodable {
             let mode: String
@@ -174,7 +175,8 @@ actor SubmissionsClient {
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
         var req = try await request(
-            path: "/games/\(gameToken.uuidString.lowercased())/push", method: "POST"
+            path: "/games/\(gameToken.uuidString.lowercased())/push", method: "POST",
+            baseURLOverride: baseURLOverride
         )
         req.httpBody = try encoder.encode(
             Body(mode: mode, roundNumber: roundNumber, deadline: deadlineStr, gameName: gameName,
@@ -200,11 +202,11 @@ actor SubmissionsClient {
     /// Aggregates pending submissions across every game this manager owns —
     /// one call, backed by the worker's `/manager/submissions/pending` join,
     /// not a per-game fan-out.
-    func listPendingSubmissions() async throws -> [SubmissionItem] {
+    func listPendingSubmissions(baseURLOverride: URL? = nil) async throws -> [SubmissionItem] {
         struct Response: Decodable { let submissions: [SubmissionItem] }
         let req = try await request(
             path: "/manager/submissions/pending", method: "GET",
-            includeManagerToken: true
+            includeManagerToken: true, baseURLOverride: baseURLOverride
         )
         let data = try await send(req)
         return try decoder.decode(Response.self, from: data).submissions
@@ -240,8 +242,24 @@ actor SubmissionsClient {
     /// gameToken alone is disclosed to every enrolled player and isn't proof
     /// of ownership. `push` sends its managerToken in the body instead
     /// (pre-existing convention), so it doesn't need the header.
-    private func request(path: String, method: String, includeManagerToken: Bool = false) async throws -> URLRequest {
-        let base = await AppAttestService.shared.authorityURL()
+    ///
+    /// `baseURLOverride`: nil (the default, every existing call site) keeps
+    /// hitting the manager's resolved V1 authority exactly as before. Passing
+    /// a value routes this one request elsewhere instead — used only by
+    /// RedesignV2's `SyncCoordinator` to reach `worker-api-v2` for testing in
+    /// isolation. The Authorization JWT still comes from `AppAttestService`
+    /// either way (V1 remains the sole attestation authority; worker-api-v2
+    /// only verifies that JWT, it doesn't issue its own — see worker-api-v2's
+    /// wrangler.jsonc header comment).
+    private func request(
+        path: String, method: String, includeManagerToken: Bool = false, baseURLOverride: URL? = nil
+    ) async throws -> URLRequest {
+        let base: URL
+        if let baseURLOverride {
+            base = baseURLOverride
+        } else {
+            base = await AppAttestService.shared.authorityURL()
+        }
         guard let url = URL(string: path, relativeTo: base) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = method

@@ -16,9 +16,13 @@ final class SubmissionBadgeStore {
 
     private init() {}
 
-    func refresh() async {
+    /// `baseURLOverride`: nil (every existing call site) keeps reading V1's
+    /// aggregate pending count exactly as before. `SyncCoordinator` passes
+    /// worker-api-v2's URL after its own pushes, so the post-sync count
+    /// reflects what Sync itself just pushed there — not V1's count.
+    func refresh(baseURLOverride: URL? = nil) async {
         do {
-            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions().count
+            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions(baseURLOverride: baseURLOverride).count
         } catch {
             badgeLog.warning("Badge refresh failed: \(error.localizedDescription)")
         }
