@@ -34,17 +34,31 @@ struct PredictionsEntryViewV2: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    /// Defaults to the first alphabetical player with no submission yet
-    /// (0 predictions) rather than just the first player, so opening this
-    /// screen lands the manager straight on someone who still needs entry
-    /// instead of re-showing whoever's alphabetically first regardless of
-    /// progress. Falls back to the first not-yet-fully-complete player, then
-    /// to the first player outright once everyone's done.
+    /// Resolves the explicitly selected player only — no live fallback here.
+    /// `selectedPlayerId` is seeded once (see `seedDefaultPlayerIfNeeded`) and
+    /// otherwise only changes via the player picker; it must NOT recompute a
+    /// "first incomplete player" default on every render, because entering a
+    /// player's first fixture makes them stop matching "no predictions yet,"
+    /// which used to silently swap the active player out from under the
+    /// manager mid-entry — the cause of the home-score-appears-to-clear bug
+    /// and predictions landing on the wrong player.
     private var selectedPlayer: Player? {
         if let id = selectedPlayerId, let match = activePlayers.first(where: { $0.id == id }) { return match }
-        return activePlayers.first { PredictorScoringService.predictions(for: $0, in: round).isEmpty }
+        return activePlayers.first
+    }
+
+    /// Defaults to the first alphabetical player with no submission yet (0
+    /// predictions) so opening this screen lands the manager straight on
+    /// someone who still needs entry, falling back to the first not-yet-
+    /// fully-complete player, then to the first player outright once
+    /// everyone's done. Computed once at load and written into
+    /// `selectedPlayerId` so it never recomputes mid-entry — see
+    /// `selectedPlayer`'s doc comment.
+    private func seedDefaultPlayerIfNeeded() {
+        guard selectedPlayerId == nil else { return }
+        selectedPlayerId = (activePlayers.first { PredictorScoringService.predictions(for: $0, in: round).isEmpty }
             ?? activePlayers.first { !isFullyComplete($0) }
-            ?? activePlayers.first
+            ?? activePlayers.first)?.id
     }
 
     private func slateComplete(_ player: Player) -> Bool {
@@ -170,6 +184,7 @@ struct PredictionsEntryViewV2: View {
                     )
                 }
             }
+            .onAppear { seedDefaultPlayerIfNeeded() }
             .task { await store.load(game: game, round: round) }
         }
     }
