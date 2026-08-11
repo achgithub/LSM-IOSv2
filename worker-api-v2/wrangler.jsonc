@@ -47,8 +47,7 @@
       "name": "lsm-api-v2-uk",
 
       "workers_dev": true,
-      // No custom_domain route yet — this Worker isn't live/deployed
-      // anywhere; routing/domain is part of the deferred migration decision.
+      "routes": [{ "pattern": "api-v2.uk.sportsmanager.site", "custom_domain": true }],
 
       "vars": {
         "REGION": "uk",
@@ -66,7 +65,7 @@
       // without --remote uses local (on-disk) KV automatically regardless
       // of this id, so local dev/smoke-testing is unaffected either way.
       "kv_namespaces": [
-        { "binding": "SUBMISSIONS_KV", "id": "REPLACE_WITH_REAL_KV_NAMESPACE_ID" }
+        { "binding": "SUBMISSIONS_KV", "id": "5fd6aee1be624c679b16a82de43ae477" }
       ]
 
       // No d1_databases — this Worker has no database of any kind, pure KV.
