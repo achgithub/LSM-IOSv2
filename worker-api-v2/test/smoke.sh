@@ -1,11 +1,22 @@
 #!/bin/bash
-# Manual smoke test against `wrangler dev --env uk` (local D1 + local KV, no
-# --remote, no production data involved). Modeled on Clubroom2's
+# Manual smoke test against `wrangler dev --env uk` (local KV only — no D1,
+# no --remote, no production data involved). Modeled on Clubroom2's
 # worker/test/smoke.sh (curl/pass/fail structure).
 #
-# Requires .dev.vars to set ATTEST_DEV_BYPASS=1 + APP_ATTEST_ENV=development
-# (so POST /attest/assert issues a JWT without a real device assertion) and a
-# throwaway UK_JWT_PRIVATE_KEY/JWT_PUBLIC_KEYS keypair — see .dev.vars.
+# worker-api-v2 doesn't mint JWTs itself — worker-api is the identity
+# authority (App Attest device registry + JWT signing); this Worker only
+# verifies. So this script mints its own throwaway test JWT locally in Node,
+# signed with a private key that ONLY ever exists here and in .dev.vars'
+# matching JWT_PUBLIC_KEYS override — never a real secret, never used against
+# a real deploy. This means the smoke test runs fully offline: no live
+# worker-api instance needs to be running.
+#
+# (If you'd rather test against a *real* worker-api-issued JWT instead, run
+# worker-api's own POST /attest/assert dev-bypass flow separately and pass
+# the resulting token in via JWT="<token>" test/smoke.sh — but note that only
+# verifies if wrangler.jsonc's JWT_PUBLIC_KEYS — worker-api's real public
+# key — is what's actually loaded, i.e. you're not running under the
+# .dev.vars override below.)
 #
 # Exercises the full lifecycle: mint a link → push a round → player GET →
 # player submit → manager list (per-game + aggregate) → approve → re-GET →
@@ -15,6 +26,12 @@
 set -euo pipefail
 
 BASE="${1:-http://127.0.0.1:8788}"
+
+# Throwaway ES256 keypair, local-test-only — matches .dev.vars'
+# JWT_PUBLIC_KEYS override for kid "uk-2026-01". Never used for a real
+# deploy; regenerate freely if needed (see jwt.ts's header comment for the
+# one-off Web Crypto snippet), just keep .dev.vars' public half in sync.
+TEST_JWT_PRIVATE_KEY_PKCS8_B64="MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWzL+sx1HTuDh++5c1dviViNLotw+Pl+Agfgsc2rXd16hRANCAATaJ0p4Cpide5RNLfYqivRAMlwggLtyTeVH6+KzQwWPSWbgd5a+0LYXT4FgONaOpTmEqu/xcXlRQt/fJJ0WUN4i"
 # Randomized per run (not just GAME_TOKEN) — local KV/D1 state persists on
 # disk across repeated `wrangler dev` sessions, so a fixed manager/player
 # name would let one run's leftover (still-active, short-TTL-but-not-yet-
@@ -27,9 +44,28 @@ PLAYER_NAME="Smoke Test Player $RUN_ID"
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; exit 1; }
 
-echo "== get a manager JWT (dev bypass) =="
-JWT=$(curl -sf -X POST "$BASE/attest/assert" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token))")
-[ -n "$JWT" ] && pass "got JWT" || fail "no JWT returned"
+echo "== mint a test JWT locally (no live worker-api needed) =="
+if [ -n "${JWT:-}" ]; then
+  pass "using caller-supplied JWT"
+else
+  JWT=$(node -e "
+    const { subtle } = require('crypto').webcrypto;
+    const kid = 'uk-2026-01';
+    const b64uFromBytes = (bytes) => Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const b64uFromObj = (obj) => b64uFromBytes(Buffer.from(JSON.stringify(obj)));
+    (async () => {
+      const der = Buffer.from('$TEST_JWT_PRIVATE_KEY_PKCS8_B64', 'base64');
+      const key = await subtle.importKey('pkcs8', der, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+      const now = Math.floor(Date.now() / 1000);
+      const header = b64uFromObj({ alg: 'ES256', typ: 'JWT', kid });
+      const payload = b64uFromObj({ iss: 'https://api.uk.sportsmanager.site', iat: now, exp: now + 900 });
+      const toSign = Buffer.from(header + '.' + payload);
+      const sig = await subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, toSign);
+      console.log(header + '.' + payload + '.' + b64uFromBytes(Buffer.from(sig)));
+    })();
+  ")
+  [ -n "$JWT" ] && pass "minted test JWT" || fail "JWT minting failed"
+fi
 AUTH=(-H "Authorization: Bearer $JWT")
 
 echo "== mint a player link =="

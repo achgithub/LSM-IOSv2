@@ -5,17 +5,21 @@
 // untouched by this build. See wrangler.jsonc's header comment for scope.
 //
 // Owns:
-//   • App Attest device registry + JWT issuance   /attest/*   (duplicated
-//     as-is from worker-api — own D1 database, own JWT keypair)
 //   • PWA submission queue (manager + player)     /links, /games/*, /s/*
 //   • Manager lifecycle                           /manager/*
+//
+// Does NOT own App Attest / JWT issuance — worker-api is the identity
+// authority (it owns the device registry and signs JWTs). This Worker only
+// *verifies* JWTs worker-api issued (jwt.ts + middleware/jwt.ts), the same
+// pattern the sports-data shards (worker/) already use to trust worker-api
+// without duplicating its authority role. There is no D1 database here at
+// all — pure KV.
 //
 // No /admin/* (outage flag / ops endpoints) — intentionally not duplicated,
 // out of scope for standing up the KV design (see wrangler.jsonc).
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { attest } from "./routes/attest";
 import { manager } from "./routes/manager";
 import { submissions } from "./routes/submissions";
 import { requireJWT } from "./middleware/jwt";
@@ -24,12 +28,10 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/", (c) => c.json({ service: "lsm-api-v2", region: c.env.REGION }));
 
-app.get("/health", async (c) => {
-  const row = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM attest_devices"
-  ).first<{ n: number }>();
-  return c.json({ ok: true, region: c.env.REGION, devices: row?.n ?? 0 });
-});
+// No D1 here to count against — this Worker is pure KV. A real liveness
+// check would ping SUBMISSIONS_KV, but KV has no cheap "is it up" query
+// analogous to D1's COUNT(*); presence of a 200 response is the check.
+app.get("/health", (c) => c.json({ ok: true, region: c.env.REGION }));
 
 // CORS for player-facing PWA routes (cross-origin from a submit.* origin) —
 // registered before any gating middleware so a gate's short-circuit still
@@ -40,14 +42,11 @@ app.use("/s/*", cors({
   allowHeaders: ["Content-Type"],
 }));
 
-// ── Public ────────────────────────────────────────────────────────────────────
-
-// Attest enrolment + JWT issuance.
-app.route("/attest", attest);
-
 // ── JWT-gated ─────────────────────────────────────────────────────────────────
 // Middleware registered before any route mount so every matching path is covered.
 // /s/* and /s/:token/games/* are deliberately absent — player PWA is browser-only.
+// JWTs are minted by worker-api's /attest/* flow, never here — see this
+// file's header comment and jwt.ts.
 
 app.use("/links", requireJWT);
 app.use("/links/*", requireJWT);
