@@ -41,12 +41,17 @@ struct GamesPortalViewV2: View {
     private var syncSummaryText: String {
         guard let result = syncCoordinator.lastSyncResult else { return "" }
         let gamesPart = result.gamesPushed == 1 ? "1 game synced" : "\(result.gamesPushed) games synced"
+        let skippedPart: String = {
+            guard !result.skippedNoOpenRound.isEmpty else { return "" }
+            let count = result.skippedNoOpenRound.count
+            return count == 1 ? ", 1 waiting for a round" : ", \(count) waiting for a round"
+        }()
         if result.errors.isEmpty {
             let pendingPart = result.pendingCount == 1 ? "1 pending submission" : "\(result.pendingCount) pending submissions"
-            return "\(gamesPart), \(pendingPart)"
+            return "\(gamesPart), \(pendingPart)\(skippedPart)"
         } else {
             let errorPart = result.errors.count == 1 ? "1 game failed" : "\(result.errors.count) games failed"
-            return "\(gamesPart) — \(errorPart)"
+            return "\(gamesPart) — \(errorPart)\(skippedPart)"
         }
     }
 

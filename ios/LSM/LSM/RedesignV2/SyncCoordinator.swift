@@ -20,6 +20,11 @@ struct SyncResult {
     let gamesPushed: Int
     let pendingCount: Int
     let errors: [SyncGameError]
+    /// Games with no open round, so nothing was pushed for them — surfaced
+    /// separately from `errors` since it isn't a failure, but a manager
+    /// still needs to know: until a round opens and a sync pushes it,
+    /// that game's player link isn't live yet.
+    let skippedNoOpenRound: [String]
 }
 
 /// Unified "Sync" action, **RedesignV2 only**: one tap pushes every open
@@ -77,7 +82,7 @@ final class SyncCoordinator {
             // push, but still worth refreshing the badge in case tier/toggle
             // changed since the last look.
             await SubmissionBadgeStore.shared.refresh()
-            lastSyncResult = SyncResult(gamesPushed: 0, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: [])
+            lastSyncResult = SyncResult(gamesPushed: 0, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: [], skippedNoOpenRound: [])
             lastSyncedAt = Date()
             return
         }
@@ -85,9 +90,13 @@ final class SyncCoordinator {
         let games = (try? context.fetch(FetchDescriptor<Game>())) ?? []
         var pushed = 0
         var errors: [SyncGameError] = []
+        var skippedNoOpenRound: [String] = []
 
         for game in games {
-            guard let openRound = game.rounds.first(where: { $0.status == .open }) else { continue }
+            guard let openRound = game.rounds.first(where: { $0.status == .open }) else {
+                skippedNoOpenRound.append(game.name)
+                continue
+            }
             do {
                 switch game.mode {
                 case .lms, .predictor:
@@ -110,7 +119,7 @@ final class SyncCoordinator {
 
         await SubmissionBadgeStore.shared.refresh(baseURLOverride: v2BaseURL)
 
-        lastSyncResult = SyncResult(gamesPushed: pushed, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: errors)
+        lastSyncResult = SyncResult(gamesPushed: pushed, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: errors, skippedNoOpenRound: skippedNoOpenRound)
         lastSyncedAt = Date()
     }
 }
