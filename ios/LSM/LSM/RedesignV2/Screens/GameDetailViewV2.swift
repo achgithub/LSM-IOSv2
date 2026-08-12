@@ -2,20 +2,20 @@ import SwiftUI
 import SwiftData
 
 private enum LMSSheetV2: String, Identifiable {
-    case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome, submissions, standings
+    case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome, standings
     var id: String { rawValue }
 }
 
 /// Card restyle of `GameDetailView` (LMS). Same actions/scope as the
-/// original (rename, remove player, edit fixtures, PWA resend, submission
-/// queue, share cards, the tie-resolution state machine) — every sheet
-/// still opens the existing unstyled v1 screen except the ones restyled in
-/// this pass (Open Round, Picks Entry, Results Entry, Declare Winners, Tie
-/// Resolution); share cards stay v1 (out of scope — see `SummaryShareView`).
-/// The original view is untouched.
+/// original (rename, remove player, edit fixtures, PWA resend, share cards,
+/// the tie-resolution state machine) — every sheet still opens the existing
+/// unstyled v1 screen except the ones restyled in this pass (Open Round,
+/// Picks Entry, Results Entry, Declare Winners, Tie Resolution); share cards
+/// stay v1 (out of scope — see `SummaryShareView`). The original view is
+/// untouched. No per-game Submission Queue entry point — the always-visible
+/// Home/Games bell (`AppHeader`) reaches every game's submissions already.
 struct GameDetailViewV2: View {
     @Environment(\.modelContext) private var context
-    @Environment(Entitlements.self) private var entitlements
 
     @Bindable var game: Game
     @State private var showingAddPlayers = false
@@ -33,13 +33,10 @@ struct GameDetailViewV2: View {
     @State private var pendingEditFixtures = false
     @State private var renaming = false
     @State private var renameText = ""
-    @State private var lifecycleStatus: ManagerLifecycleStatus?
     /// CSV/Transfer export — mirrors Predictor/Killer V2.
     @State private var isPreparingExport = false
     @State private var exportFiles: [URL]?
     @State private var exportError: String?
-
-    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -69,10 +66,6 @@ struct GameDetailViewV2: View {
             !round.picks.contains { $0.player?.id == player.id }
         }
     }
-    private var canReachExistingCloudData: Bool {
-        entitlements.canUseCloud || lifecycleStatus?.isPendingDelete == true
-    }
-
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
@@ -112,11 +105,6 @@ struct GameDetailViewV2: View {
                             .foregroundStyle(V2Theme.textPrimary)
                     }
                 }
-            }
-        }
-        .task {
-            if !entitlements.canUseCloud {
-                lifecycleStatus = await ManagerLifecycleClient.shared.status()
             }
         }
         .alert("Rename game", isPresented: $renaming) {
@@ -166,12 +154,6 @@ struct GameDetailViewV2: View {
             case .summaryOutcome:
                 if let ending = game.lastOutcome, let round = latestClosedRound {
                     SummaryShareView(game: game, round: round, type: .outcome(ending))
-                }
-            case .submissions:
-                if let gameToken = game.cloudGameToken {
-                    NavigationStack {
-                        SubmissionInboxViewV2(filterGameToken: gameToken)
-                    }
                 }
             case .standings:
                 LMSStandingsViewV2(game: game)
@@ -232,22 +214,6 @@ struct GameDetailViewV2: View {
                     }
                 }
                 .foregroundStyle(V2Theme.Mode.lms)
-                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                    // Not gated on an open round — the Home/Games bell already
-                    // reaches this game's submissions regardless of round
-                    // state, so hiding this entry point behind "has an open
-                    // round" was just an inconsistent extra gate. Kept as its
-                    // own `if` (looser `canReachExistingCloudData`, not
-                    // `entitlements.canUseCloud`) so a downgraded manager in
-                    // their pending-delete grace period can still reach
-                    // existing submissions.
-                    Button {
-                        sheet = .submissions
-                    } label: {
-                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
-                    }
-                    .foregroundStyle(V2Theme.textSecondary)
-                }
             }
         }
     }

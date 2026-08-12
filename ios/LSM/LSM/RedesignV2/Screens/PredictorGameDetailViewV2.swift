@@ -2,21 +2,22 @@ import SwiftUI
 import SwiftData
 
 private enum PredictorSheetV2: String, Identifiable {
-    case open, predictions, results, standings, submissions
+    case open, predictions, results, standings
     case shareFixtures, shareEntryClosed, shareWeeklyResults, shareLeague, shareWinner
     var id: String { rawValue }
 }
 
 /// Card restyle of `PredictorGameDetailView`. Same actions/scope as the
-/// original (rename, remove player, edit fixtures, PWA resend, submission
-/// queue, all 5 share cards, tutorial anchors) — only "Enter Predictions"
-/// routes to the new `PredictionsEntryViewV2`; every other sheet (standings,
-/// results entry, submissions, share cards) still opens the existing
-/// unstyled screen, matching the portal's "outer shell first, inner sheets
-/// next phase" pattern. The original view is untouched.
+/// original (rename, remove player, edit fixtures, PWA resend, all 5 share
+/// cards, tutorial anchors) — only "Enter Predictions" routes to the new
+/// `PredictionsEntryViewV2`; every other sheet (standings, results entry,
+/// share cards) still opens the existing unstyled screen, matching the
+/// portal's "outer shell first, inner sheets next phase" pattern. The
+/// original view is untouched. No per-game Submission Queue entry point —
+/// the always-visible Home/Games bell (`AppHeader`) reaches every game's
+/// submissions already.
 struct PredictorGameDetailViewV2: View {
     @Environment(\.modelContext) private var context
-    @Environment(Entitlements.self) private var entitlements
 
     @Bindable var game: Game
     @State private var showingAddPlayers = false
@@ -25,13 +26,10 @@ struct PredictorGameDetailViewV2: View {
     @State private var pendingEditFixtures = false
     @State private var renaming = false
     @State private var renameText = ""
-    @State private var lifecycleStatus: ManagerLifecycleStatus?
     /// CSV export (manual backup) — mirrors LMS's `GameDetailView`.
     @State private var isPreparingExport = false
     @State private var exportFiles: [URL]?
     @State private var exportError: String?
-
-    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -47,10 +45,6 @@ struct PredictorGameDetailViewV2: View {
     }
     private func incompletePlayers(for round: Round) -> [Player] {
         PredictorScoringService.incompletePlayers(round: round, game: game)
-    }
-
-    private var canReachExistingCloudData: Bool {
-        entitlements.canUseCloud || lifecycleStatus?.isPendingDelete == true
     }
 
     var body: some View {
@@ -94,11 +88,6 @@ struct PredictorGameDetailViewV2: View {
                 }
             }
         }
-        .task {
-            if !entitlements.canUseCloud {
-                lifecycleStatus = await ManagerLifecycleClient.shared.status()
-            }
-        }
         .alert("Rename game", isPresented: $renaming) {
             TextField("Game name", text: $renameText)
             Button("Rename") { commitRename() }
@@ -129,12 +118,6 @@ struct PredictorGameDetailViewV2: View {
                 if let round = openRound { PredictorResultsEntryViewV2(game: game, round: round) }
             case .standings:
                 PredictorStandingsViewV2(game: game)
-            case .submissions:
-                if let gameToken = game.cloudGameToken {
-                    NavigationStack {
-                        SubmissionInboxViewV2(filterGameToken: gameToken)
-                    }
-                }
             case .shareFixtures:
                 if let round = openRound {
                     PredictorShareView(game: game, round: round, type: .fixtures)
@@ -199,22 +182,6 @@ struct PredictorGameDetailViewV2: View {
                         Image(systemName: "chevron.right").font(.caption)
                     }
                     .foregroundStyle(V2Theme.Mode.predictor)
-                }
-                if canReachExistingCloudData && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                    // Not gated on an open round — the Home/Games bell already
-                    // reaches this game's submissions regardless of round
-                    // state, so hiding this entry point behind "has an open
-                    // round" was just an inconsistent extra gate. Kept as its
-                    // own `if` (looser `canReachExistingCloudData`, not
-                    // `entitlements.canUseCloud`) so a downgraded manager in
-                    // their pending-delete grace period can still reach
-                    // existing submissions.
-                    Button {
-                        sheet = .submissions
-                    } label: {
-                        Label("Submission Queue", systemImage: "tray.and.arrow.down")
-                    }
-                    .foregroundStyle(V2Theme.textSecondary)
                 }
             }
         }
