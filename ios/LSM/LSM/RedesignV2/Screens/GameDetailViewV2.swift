@@ -10,10 +10,11 @@ private enum LMSSheetV2: String, Identifiable {
 /// original (rename, remove player, edit fixtures, PWA resend, share cards,
 /// the tie-resolution state machine) — every sheet still opens the existing
 /// unstyled v1 screen except the ones restyled in this pass (Open Round,
-/// Picks Entry, Results Entry, Declare Winners, Tie Resolution); share cards
-/// stay v1 (out of scope — see `SummaryShareView`). The original view is
-/// untouched. No per-game Submission Queue entry point — the always-visible
-/// Home/Games bell (`AppHeader`) reaches every game's submissions already.
+/// Picks Entry, Results Entry, Declare Winners, Tie Resolution, Add Players);
+/// share cards stay v1 (out of scope — see `SummaryShareView`). The original
+/// view is untouched. No per-game Submission Queue entry point — the
+/// always-visible Home/Games bell (`AppHeader`) reaches every game's
+/// submissions already.
 struct GameDetailViewV2: View {
     @Environment(\.modelContext) private var context
 
@@ -126,7 +127,7 @@ struct GameDetailViewV2: View {
         } message: {
             Text(exportError ?? "")
         }
-        .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
+        .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet, onDismiss: presentPendingResolve) { which in
             switch which {
             case .open:

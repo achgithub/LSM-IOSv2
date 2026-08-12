@@ -9,11 +9,11 @@ private enum PredictorSheetV2: String, Identifiable {
 
 /// Card restyle of `PredictorGameDetailView`. Same actions/scope as the
 /// original (rename, remove player, edit fixtures, PWA resend, all 5 share
-/// cards, tutorial anchors) — only "Enter Predictions" routes to the new
-/// `PredictionsEntryViewV2`; every other sheet (standings, results entry,
-/// share cards) still opens the existing unstyled screen, matching the
-/// portal's "outer shell first, inner sheets next phase" pattern. The
-/// original view is untouched. No per-game Submission Queue entry point —
+/// cards, tutorial anchors) — "Enter Predictions" and "Add Players" route to
+/// their new V2 screens; every other sheet (standings, results entry, share
+/// cards) still opens the existing unstyled screen, matching the portal's
+/// "outer shell first, inner sheets next phase" pattern. The original view
+/// is untouched. No per-game Submission Queue entry point —
 /// the always-visible Home/Games bell (`AppHeader`) reaches every game's
 /// submissions already.
 struct PredictorGameDetailViewV2: View {
@@ -107,7 +107,7 @@ struct PredictorGameDetailViewV2: View {
         } message: {
             Text(exportError ?? "")
         }
-        .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
+        .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet) { which in
             switch which {
             case .open:

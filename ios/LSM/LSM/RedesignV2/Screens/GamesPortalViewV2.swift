@@ -23,6 +23,8 @@ struct GamesPortalViewV2: View {
     @State private var showingGameLimit = false
     @State private var showingSyncSummary = false
     @State private var showingSyncPicker = false
+    @State private var showingWizard = false
+    @State private var wizardGame: Game?
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
@@ -75,7 +77,9 @@ struct GamesPortalViewV2: View {
                     .padding(.top, 40)
                 } else {
                     ForEach(modesInPlay, id: \.self) { mode in
-                        ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode })
+                        ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode }) { game in
+                            wizardGame = game
+                        }
                     }
                 }
             }
@@ -130,6 +134,15 @@ struct GamesPortalViewV2: View {
                 .disabled(syncCoordinator.isSyncing)
                 .accessibilityLabel("Sync")
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingWizard = true
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundStyle(V2Theme.accent)
+                }
+                .accessibilityLabel("Guided Setup")
+            }
         }
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
         .sheet(isPresented: $showingSyncPicker) {
@@ -137,6 +150,8 @@ struct GamesPortalViewV2: View {
                 Task { await performSync(gameIDs: gameIDs) }
             }
         }
+        .fullScreenCover(isPresented: $showingWizard) { GameWizardViewV2() }
+        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
         .alert("Game limit reached", isPresented: $showingGameLimit) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -149,6 +164,7 @@ struct GamesPortalViewV2: View {
 private struct ModeSectionCard: View {
     let mode: GameMode
     let games: [Game]
+    var onResume: (Game) -> Void = { _ in }
 
     private var title: String {
         switch mode {
@@ -198,7 +214,7 @@ private struct ModeSectionCard: View {
                 if isExpanded {
                     VStack(spacing: 10) {
                         ForEach(games) { game in
-                            GameSummaryRow(game: game)
+                            GameSummaryRow(game: game) { onResume(game) }
                         }
                     }
                 }
@@ -206,4 +222,3 @@ private struct ModeSectionCard: View {
         }
     }
 }
-

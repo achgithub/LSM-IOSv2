@@ -17,6 +17,7 @@ import SwiftData
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @Environment(SubmissionBadgeStore.self) private var badgeStore
+    @State private var wizardGame: Game?
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
@@ -29,7 +30,7 @@ struct V2PreviewMenuView: View {
                             SectionHeader(title: "Favourites")
                             VStack(spacing: 10) {
                                 ForEach(favouriteGames) { game in
-                                    GameSummaryRow(game: game)
+                                    GameSummaryRow(game: game) { wizardGame = game }
                                 }
                             }
                         }
@@ -69,6 +70,7 @@ struct V2PreviewMenuView: View {
         // already have their own .refreshable for the screens where it's
         // actually live data.
         .task { await badgeStore.refresh() }
+        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
     }
 }
 

@@ -7,6 +7,10 @@ import SwiftUI
 /// from the real share-card numbers.
 struct GameSummaryRow: View {
     let game: Game
+    /// Resumes this game's Guided Setup wizard at its current phase. Wired
+    /// up by both the Games portal and Home's Favourites card; default
+    /// no-op only as a safety net for any future caller that doesn't need it.
+    var onResume: () -> Void = {}
     @State private var expanded = false
 
     private var managerStatus: ManagerRoundStatus? { ManagerRoundStatus.make(for: game) }
@@ -20,6 +24,21 @@ struct GameSummaryRow: View {
                     .foregroundStyle(V2Theme.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
+                Button {
+                    onResume()
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                        .font(.body)
+                        .foregroundStyle(V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Resume Guided Setup")
+                // Fixed extra gap (beyond the row's base 8pt spacing), not
+                // another flexible Spacer — this needs to stay a constant
+                // distance from the favourite/chevron pair, not compete with
+                // the leading Spacer for the row's slack space. A mis-tap
+                // here launches a full-screen wizard, not a toggle.
+                Spacer().frame(width: 16)
                 Button {
                     game.isFavourite.toggle()
                 } label: {

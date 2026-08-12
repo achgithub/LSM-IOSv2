@@ -175,7 +175,7 @@ private struct KillerFixturePredictionRowV2: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
-                FixtureLabel(fixture: fixture, teamsById: teamsById)
+                FixtureLabelV2(fixture: fixture, teamsById: teamsById)
                     .foregroundStyle(V2Theme.textPrimary)
                 HStack(spacing: 8) {
                     outcomePill(.homeWin, title: "Home")

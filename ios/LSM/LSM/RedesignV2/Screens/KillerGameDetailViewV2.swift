@@ -10,8 +10,9 @@ private enum KillerSheetV2: String, Identifiable {
 /// Card restyle of `KillerGameDetailView`. Same actions/scope as the
 /// original (rename, remove player, PWA resend, share cards) minus
 /// Scratchpad — that was a v1 proof-of-concept, intentionally dropped from
-/// V2. Predictions/Results/Lives route to their own restyled V2 screens; the
-/// rest still open the original view. The original view is untouched. No
+/// V2. Predictions/Results/Lives/Add Players route to their own restyled V2
+/// screens; the rest still open the original view. The original view is
+/// untouched (bar the Add Players sheet target). No
 /// per-game Submission Queue entry point — the always-visible Home/Games
 /// bell (`AppHeader`) reaches every game's submissions already.
 struct KillerGameDetailViewV2: View {
@@ -109,7 +110,7 @@ struct KillerGameDetailViewV2: View {
         } message: {
             Text(exportError ?? "")
         }
-        .sheet(isPresented: $showingAddPlayers) { AddPlayersView(game: game) }
+        .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet) { which in
             switch which {
             case .open:
