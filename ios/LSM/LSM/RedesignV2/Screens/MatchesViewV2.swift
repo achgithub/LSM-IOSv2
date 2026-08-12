@@ -119,15 +119,6 @@ struct MatchesViewV2: View {
         }
         .safeAreaInset(edge: .bottom) { footer }
         .v2Header("Fixtures")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { store.refresh(leagues: enabled.leagues) } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("Refresh")
-                .disabled(store.isLoading || store.isThrottled)
-            }
-        }
         .task(id: enabled.leagues.map(\.id)) {
             let validIds = Set(enabled.leagues.map(\.id))
             selectedLeagueIds.formIntersection(validIds)

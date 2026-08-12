@@ -564,7 +564,8 @@ private enum LinkOpState: Equatable {
 
 /// Toggle which groups a player belongs to — presented as a sheet from the
 /// player detail's Groups section.
-private struct GroupMembershipEditorView: View {
+/// Not private — reused as-is by `PlayerDetailViewV2` (see that file).
+struct GroupMembershipEditorView: View {
     @Bindable var member: RosterMember
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]

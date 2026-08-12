@@ -53,15 +53,6 @@ struct StandingsViewV2: View {
         }
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Standings")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { store.refresh(league: league) } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("Refresh")
-                .disabled(store.isLoading || store.isThrottled)
-            }
-        }
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
     }

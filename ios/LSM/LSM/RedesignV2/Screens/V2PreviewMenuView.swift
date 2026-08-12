@@ -47,18 +47,7 @@ struct V2PreviewMenuView: View {
                     MenuRow(systemImage: "person.2", title: "Players")
                 }
                 .buttonStyle(.plain)
-                NavigationLink {
-                    MatchesViewV2()
-                } label: {
-                    MenuRow(systemImage: "sportscourt", title: "Fixtures")
-                }
-                .buttonStyle(.plain)
-                NavigationLink {
-                    StandingsViewV2()
-                } label: {
-                    MenuRow(systemImage: "list.number", title: "Leagues")
-                }
-                .buttonStyle(.plain)
+                FootballDataCard()
                 NavigationLink {
                     SettingsViewV2()
                 } label: {
@@ -80,5 +69,103 @@ struct V2PreviewMenuView: View {
         // already have their own .refreshable for the screens where it's
         // actually live data.
         .task { await badgeStore.refresh() }
+    }
+}
+
+/// Expandable Home-screen card grouping "Leagues" and "Fixtures" under one
+/// disclosure, plus an "Update football data" action refreshing both at
+/// once — distinct from `SyncCoordinator`'s "Sync" (that pushes/pulls game
+/// rounds and player submissions, not football provider data). See
+/// `FootballDataStore` for the throttle/ad-gate rationale.
+private struct FootballDataCard: View {
+    @Environment(EnabledLeagues.self) private var enabled
+    @State private var isExpanded = false
+    @State private var store = FootballDataStore()
+
+    private var updateLabel: String { store.isLoading ? "Updating…" : "Update football data" }
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sportscourt.fill")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(V2Theme.accent)
+                            .frame(width: 22)
+                        Text("Football Data")
+                            .font(V2Theme.Typography.rowTitle)
+                            .foregroundStyle(V2Theme.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(V2Theme.textSecondary)
+                            .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isExpanded {
+                    VStack(spacing: 10) {
+                        NavigationLink {
+                            StandingsViewV2()
+                        } label: {
+                            MenuRow(systemImage: "list.number", title: "Leagues")
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink {
+                            MatchesViewV2()
+                        } label: {
+                            MenuRow(systemImage: "sportscourt", title: "Fixtures")
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            store.refresh(leagues: enabled.leagues)
+                        } label: {
+                            HStack(spacing: 8) {
+                                if store.isLoading {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                }
+                                Text(updateLabel)
+                                    .font(V2Theme.Typography.rowTitle.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                            .foregroundStyle(store.isThrottled ? V2Theme.textTertiary : V2Theme.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.isLoading || store.isThrottled)
+
+                        statusLine
+                    }
+                }
+            }
+        }
+        .task(id: store.freshUntil) { await store.armClock() }
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if store.isThrottled, let freshUntil = store.freshUntil {
+            let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
+            Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
+                .font(.caption2)
+                .foregroundStyle(V2Theme.textSecondary)
+        } else if let lastRefreshed = store.lastRefreshed {
+            Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                .font(.caption2)
+                .foregroundStyle(V2Theme.textSecondary)
+        } else if let errorMessage = store.errorMessage {
+            Text(errorMessage)
+                .font(.caption2)
+                .foregroundStyle(V2Theme.danger)
+        }
     }
 }

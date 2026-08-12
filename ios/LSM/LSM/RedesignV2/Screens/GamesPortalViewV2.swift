@@ -22,6 +22,7 @@ struct GamesPortalViewV2: View {
     @State private var showingNewGame = false
     @State private var showingGameLimit = false
     @State private var showingSyncSummary = false
+    @State private var showingSyncPicker = false
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
@@ -55,8 +56,8 @@ struct GamesPortalViewV2: View {
         }
     }
 
-    private func performSync() async {
-        await syncCoordinator.sync(context: context)
+    private func performSync(gameIDs: Set<UUID>) async {
+        await syncCoordinator.sync(context: context, gameIDs: gameIDs)
         withAnimation { showingSyncSummary = true }
         try? await Task.sleep(nanoseconds: 3_500_000_000)
         withAnimation { showingSyncSummary = false }
@@ -84,11 +85,11 @@ struct GamesPortalViewV2: View {
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Games", trailingBadgeCount: badgeStore.pendingCount)
         .task { await badgeStore.refresh() }
-        // Pull-to-refresh now runs the full Sync (push every open round +
-        // refresh the pending count), not just a badge refresh — same action
-        // as the toolbar button, per the plan's "explicit button and
-        // pull-to-refresh do the same thing".
-        .refreshable { await performSync() }
+        // Pull-to-refresh opens the same game picker as the toolbar button —
+        // both routes into Sync go through an explicit per-game choice, so
+        // pulling to refresh can't silently fan a push out across every
+        // running game (each push is a billed Worker call).
+        .refreshable { showingSyncPicker = true }
         .overlay(alignment: .top) {
             if showingSyncSummary, let result = syncCoordinator.lastSyncResult {
                 Card {
@@ -117,7 +118,7 @@ struct GamesPortalViewV2: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await performSync() }
+                    showingSyncPicker = true
                 } label: {
                     if syncCoordinator.isSyncing {
                         ProgressView()
@@ -131,6 +132,11 @@ struct GamesPortalViewV2: View {
             }
         }
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
+        .sheet(isPresented: $showingSyncPicker) {
+            SyncGamePickerViewV2(games: games) { gameIDs in
+                Task { await performSync(gameIDs: gameIDs) }
+            }
+        }
         .alert("Game limit reached", isPresented: $showingGameLimit) {
             Button("OK", role: .cancel) {}
         } message: {

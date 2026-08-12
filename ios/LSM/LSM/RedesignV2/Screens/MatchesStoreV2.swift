@@ -29,34 +29,6 @@ final class MatchesStoreV2 {
         LeagueDataCache.sharedMatchesThrottleUntil(for: leagues.map(\.id))
     }
 
-    /// Refresh button. Honours the local TTL (Rule A) and self-heals
-    /// corruption, identically to `MatchesView.refresh()`:
-    /// - every league fresh within TTL → re-show cache, no ad, no call;
-    /// - any corrupt cache → recover with a free fetch;
-    /// - otherwise (any stale/empty) → the normal ad-gated fetch.
-    func refresh(leagues: [LeagueOption]) {
-        var anyCorrupt = false
-        var allFresh = true
-        for league in leagues {
-            switch LeagueDataCache.read(LeagueDataCache.Matches.self, key: LeagueDataCache.matchesKey(league.id)) {
-            case .hit(let cached):
-                if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.matches) { allFresh = false }
-            case .empty:
-                allFresh = false
-            case .corrupt:
-                allFresh = false
-                anyCorrupt = true
-            }
-        }
-        if allFresh {
-            Task { await load(leagues: leagues) }
-        } else if anyCorrupt {
-            Task { await load(leagues: leagues, force: true) }
-        } else {
-            AdGate.run { [weak self] in Task { await self?.load(leagues: leagues, force: true) } }
-        }
-    }
-
     /// `force` (the ad-gated refresh) always hits the network and overwrites
     /// the per-league cache; otherwise each league is served purely from its
     /// cache — identical semantics to `MatchesView.load(force:)`.

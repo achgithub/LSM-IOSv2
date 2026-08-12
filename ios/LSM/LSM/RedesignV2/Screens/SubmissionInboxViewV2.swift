@@ -130,7 +130,7 @@ struct SubmissionInboxViewV2: View {
         isLoading = true
         errorMessage = nil
         do {
-            items = try await SubmissionsClient.shared.listPendingSubmissions()
+            items = try await SubmissionsClient.shared.listPendingSubmissions(baseURLOverride: SubmissionsClient.v2BaseURL)
         } catch {
             errorMessage = "Couldn't load submissions: \(error.localizedDescription)"
         }
@@ -140,7 +140,7 @@ struct SubmissionInboxViewV2: View {
     private func approve(_ item: SubmissionItem, game: Game) async {
         guard let tokenString = item.gameToken, let gameToken = UUID(uuidString: tokenString) else { return }
         do {
-            let result = try await SubmissionsClient.shared.approve(submissionId: item.id, gameToken: gameToken)
+            let result = try await SubmissionsClient.shared.approve(submissionId: item.id, gameToken: gameToken, baseURLOverride: SubmissionsClient.v2BaseURL)
             if let round = game.currentRound, round.status != .closed {
                 await MainActor.run {
                     SubmissionApplyService.apply(result, playerName: item.playerName, game: game, round: round, context: context)
@@ -159,7 +159,7 @@ struct SubmissionInboxViewV2: View {
     private func reject(_ item: SubmissionItem) async {
         guard let tokenString = item.gameToken, let gameToken = UUID(uuidString: tokenString) else { return }
         do {
-            try await SubmissionsClient.shared.reject(submissionId: item.id, gameToken: gameToken)
+            try await SubmissionsClient.shared.reject(submissionId: item.id, gameToken: gameToken, baseURLOverride: SubmissionsClient.v2BaseURL)
             await load()
             await SubmissionBadgeStore.shared.refresh()
         } catch {

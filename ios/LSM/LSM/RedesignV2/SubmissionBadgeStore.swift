@@ -16,13 +16,16 @@ final class SubmissionBadgeStore {
 
     private init() {}
 
-    /// `baseURLOverride`: nil (every existing call site) keeps reading V1's
-    /// aggregate pending count exactly as before. `SyncCoordinator` passes
-    /// worker-api-v2's URL after its own pushes, so the post-sync count
-    /// reflects what Sync itself just pushed there — not V1's count.
-    func refresh(baseURLOverride: URL? = nil) async {
+    /// Always reads worker-api-v2 — the only backend RedesignV2's submission
+    /// flow (Sync's pushes, this badge, the inbox) writes to. Every V2 call
+    /// site used to pass its own `baseURLOverride` (or omit it and silently
+    /// fall back to V1's separate aggregate, which Sync never pushes to —
+    /// the bell would read 0 pending and hide itself even when players had
+    /// real submissions waiting in v2). Fixed by making this store single-
+    /// sourced instead of override-dependent.
+    func refresh() async {
         do {
-            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions(baseURLOverride: baseURLOverride).count
+            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions(baseURLOverride: SubmissionsClient.v2BaseURL).count
         } catch {
             badgeLog.warning("Badge refresh failed: \(error.localizedDescription)")
         }

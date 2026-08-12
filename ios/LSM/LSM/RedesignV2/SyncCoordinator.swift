@@ -27,8 +27,9 @@ struct SyncResult {
     let skippedNoOpenRound: [String]
 }
 
-/// Unified "Sync" action, **RedesignV2 only**: one tap pushes every open
-/// round (across LMS/Predictor/Killer) to the Player App and refreshes the
+/// Unified "Sync" action, **RedesignV2 only**: pushes the open round of
+/// every game the manager explicitly picks in `SyncGamePickerViewV2`
+/// (across LMS/Predictor/Killer) to the Player App and refreshes the
 /// pending-submission count, replacing what today is three separate manual
 /// flows (per-game "Resend to Player App", pull-to-refresh inside the
 /// submission queue, and — unaffected here — approve/reject). V1 keeps its
@@ -50,28 +51,25 @@ final class SyncCoordinator {
     private(set) var lastSyncedAt: Date?
     private(set) var lastSyncResult: SyncResult?
 
-    /// worker-api-v2 — the standalone KV-backed Worker being validated in
-    /// isolation (see wobbly-greeting-kazoo.md). Deliberately hardcoded here
-    /// rather than threaded through settings: this override is scoped to
-    /// exactly one call site (this coordinator) for exactly one purpose
-    /// (on-device testing of the new backend before any migration decision
-    /// is made), not a general per-environment config knob. V1 screens never
-    /// see this URL. The Authorization JWT still comes from V1's attestation
-    /// authority either way — worker-api-v2 only verifies it.
-    private let v2BaseURL = URL(string: "https://api-v2.uk.sportsmanager.site")!
-
     private init() {}
 
-    /// Pushes every local game (any mode) that currently has an open round,
-    /// reusing the *existing* per-game push logic in `PWARoundPusher`
+    /// Pushes every **selected** game (any mode) that currently has an open
+    /// round, reusing the *existing* per-game push logic in `PWARoundPusher`
     /// (`pushLMSOrPredictor`/`pushKiller`) — no new push implementation.
+    /// `gameIDs` is required, not defaulted to "all games": every call site
+    /// goes through `SyncGamePickerViewV2` so a manager explicitly picks
+    /// which games to push each time, rather than a stray tap fanning out
+    /// a network call per game — each push is a billed Worker invocation, so
+    /// an unfiltered "sync everything" button was a standing cost risk with
+    /// more than a couple of games running (there's deliberately no
+    /// select-all shortcut in the picker either, for the same reason).
     /// Failures are collected per-game rather than aborting the whole sync on
     /// one bad game. Once every push has settled, refreshes
     /// `SubmissionBadgeStore` so the pending count reflects whatever the
     /// pushes just made visible (subject to the backend's own ≤60s KV
     /// propagation window — the summary reads as "as of now", not exact).
-    func sync(context: ModelContext) async {
-        guard !isSyncing else { return }
+    func sync(context: ModelContext, gameIDs: Set<UUID>) async {
+        guard !isSyncing, !gameIDs.isEmpty else { return }
         isSyncing = true
         defer { isSyncing = false }
 
@@ -87,7 +85,7 @@ final class SyncCoordinator {
             return
         }
 
-        let games = (try? context.fetch(FetchDescriptor<Game>())) ?? []
+        let games = ((try? context.fetch(FetchDescriptor<Game>())) ?? []).filter { gameIDs.contains($0.id) }
         var pushed = 0
         var errors: [SyncGameError] = []
         var skippedNoOpenRound: [String] = []
@@ -102,12 +100,12 @@ final class SyncCoordinator {
                 case .lms, .predictor:
                     try await PWARoundPusher.pushLMSOrPredictor(
                         game: game, round: openRound, managerName: managerName, context: context,
-                        baseURLOverride: v2BaseURL
+                        baseURLOverride: SubmissionsClient.v2BaseURL
                     )
                 case .killer:
                     try await PWARoundPusher.pushKiller(
                         game: game, round: openRound, managerName: managerName, context: context,
-                        baseURLOverride: v2BaseURL
+                        baseURLOverride: SubmissionsClient.v2BaseURL
                     )
                 }
                 pushed += 1
@@ -117,7 +115,7 @@ final class SyncCoordinator {
             }
         }
 
-        await SubmissionBadgeStore.shared.refresh(baseURLOverride: v2BaseURL)
+        await SubmissionBadgeStore.shared.refresh()
 
         lastSyncResult = SyncResult(gamesPushed: pushed, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: errors, skippedNoOpenRound: skippedNoOpenRound)
         lastSyncedAt = Date()

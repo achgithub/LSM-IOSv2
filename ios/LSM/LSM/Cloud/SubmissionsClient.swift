@@ -92,6 +92,15 @@ actor SubmissionsClient {
 
     static let playerBase = URL(string: "https://submit.sportsmanager.site")!
 
+    /// worker-api-v2 — the standalone KV-backed Worker every RedesignV2
+    /// submission flow (Sync's pushes, the bell badge, the inbox) reads from
+    /// and writes to. Hoisted here (was private to `SyncCoordinator`) so
+    /// every V2 call site — badge refresh, inbox list/approve/reject — stays
+    /// on the same backend Sync actually pushed to, rather than some reading
+    /// v2 and others silently falling back to V1's separate aggregate. V1
+    /// screens never see this URL.
+    static let v2BaseURL = URL(string: "https://api-v2.uk.sportsmanager.site")!
+
     static func playerLinkURL(token: String) -> URL {
         playerBase.appending(path: "s/\(token.lowercased())")
     }
@@ -212,16 +221,16 @@ actor SubmissionsClient {
         return try decoder.decode(Response.self, from: data).submissions
     }
 
-    func approve(submissionId: String, gameToken: UUID) async throws -> ApproveResult {
+    func approve(submissionId: String, gameToken: UUID, baseURLOverride: URL? = nil) async throws -> ApproveResult {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/approve"
-        let req = try await request(path: path, method: "POST", includeManagerToken: true)
+        let req = try await request(path: path, method: "POST", includeManagerToken: true, baseURLOverride: baseURLOverride)
         let data = try await send(req)
         return try decoder.decode(ApproveResult.self, from: data)
     }
 
-    func reject(submissionId: String, gameToken: UUID) async throws {
+    func reject(submissionId: String, gameToken: UUID, baseURLOverride: URL? = nil) async throws {
         let path = "/games/\(gameToken.uuidString.lowercased())/submissions/\(submissionId.lowercased())/reject"
-        let req = try await request(path: path, method: "POST", includeManagerToken: true)
+        let req = try await request(path: path, method: "POST", includeManagerToken: true, baseURLOverride: baseURLOverride)
         _ = try await send(req)
     }
 

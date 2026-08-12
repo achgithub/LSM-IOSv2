@@ -3,10 +3,8 @@ import SwiftData
 
 /// Card-based restyle of `PlayersView` — same roster data/filtering, pushed
 /// into an existing NavigationStack (no `List`, no embedded NavigationStack).
-/// Row tap pushes the unchanged v1 `PlayerDetailView` — link management,
-/// renaming, and group editing haven't been restyled yet, matching the
-/// "restyle the list, not-yet-restyled detail stays v1" precedent set by
-/// `GamesPortalViewV2`.
+/// Row tap pushes `PlayerDetailViewV2` — see that file for the detail
+/// restyle.
 struct PlayersViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
@@ -129,7 +127,7 @@ struct PlayersViewV2: View {
                     VStack(spacing: 6) {
                         ForEach(filteredMembers) { member in
                             NavigationLink {
-                                PlayerDetailView(member: member, pwaEnabled: pwaEnabled)
+                                PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
                             } label: {
                                 playerRow(member)
                             }

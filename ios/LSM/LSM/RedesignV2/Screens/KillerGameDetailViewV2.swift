@@ -23,8 +23,6 @@ struct KillerGameDetailViewV2: View {
     @State private var pendingRemovePlayer: Player?
     @State private var renaming = false
     @State private var renameText = ""
-    @State private var isResending = false
-    @State private var resendMessage: String?
     @State private var lifecycleStatus: ManagerLifecycleStatus?
     /// CSV export (manual backup) — mirrors LMS's `GameDetailView`.
     @State private var isPreparingExport = false
@@ -32,7 +30,6 @@ struct KillerGameDetailViewV2: View {
     @State private var exportError: String?
 
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
-    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -198,8 +195,7 @@ struct KillerGameDetailViewV2: View {
                     // own `if` (looser `canReachExistingCloudData`, not
                     // `entitlements.canUseCloud`) so a downgraded manager in
                     // their pending-delete grace period can still reach
-                    // existing submissions even though Resend (a write) is
-                    // gated stricter below.
+                    // existing submissions.
                     Button {
                         sheet = .submissions
                     } label: {
@@ -207,36 +203,7 @@ struct KillerGameDetailViewV2: View {
                     }
                     .foregroundStyle(V2Theme.textSecondary)
                 }
-                if entitlements.canUseCloud && pwaSubmissionsEnabled, game.cloudGameToken != nil {
-                    Button {
-                        Task { await resend() }
-                    } label: {
-                        if isResending {
-                            ProgressView()
-                        } else {
-                            Label("Resend to Player App", systemImage: "arrow.clockwise.icloud")
-                        }
-                    }
-                    .disabled(isResending)
-                    .foregroundStyle(V2Theme.textSecondary)
-                    if let resendMessage {
-                        Text(resendMessage).font(.caption).foregroundStyle(V2Theme.textTertiary)
-                    }
-                }
             }
-        }
-    }
-
-    private func resend() async {
-        isResending = true
-        resendMessage = nil
-        defer { isResending = false }
-        let name = managerName
-        do {
-            try await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context)
-            resendMessage = AppString("Sent to Player App just now.")
-        } catch {
-            resendMessage = AppString("Send failed: \(error.localizedDescription)")
         }
     }
 
