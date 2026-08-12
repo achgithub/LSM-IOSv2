@@ -272,7 +272,7 @@ private struct MatchRowV2: View {
     private var isPad: Bool { sizeClass == .regular }
     private var nameFont: Font { isPad ? .title3 : .body }
     private var scoreFont: Font { isPad ? .title3 : .subheadline }
-    private var centreWidth: CGFloat { isPad ? 56 : 44 }
+    private var centreWidth: CGFloat { isPad ? 52 : 40 }
 
     private func shortName(_ id: Int) -> String { teamsById[id]?.shortName ?? teamsById[id]?.name ?? "Team \(id)" }
     private func fullName(_ id: Int) -> String { teamsById[id]?.name ?? "Team \(id)" }
@@ -292,41 +292,54 @@ private struct MatchRowV2: View {
         }
     }
 
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(displayName(item.homeTeamId)).font(nameFont).lineLimit(expanded ? nil : 1)
-                .foregroundStyle(V2Theme.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            VStack(spacing: 1) {
-                Text(scoreText).font(scoreFont).bold().monospacedDigit()
-                    .foregroundStyle(V2Theme.textPrimary)
-                if let live = liveStatus {
-                    Text(live.text).font(.caption2).foregroundStyle(live.color).lineLimit(1)
-                }
-            }
-            .frame(width: centreWidth)
-
-            Text(displayName(item.awayTeamId)).font(nameFont).lineLimit(expanded ? nil : 1)
-                .foregroundStyle(V2Theme.textPrimary)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-
-            VStack(alignment: .trailing, spacing: 1) {
-                if let kickoff = FixtureFormat.kickoffDate(item.kickoff) {
+    /// "Sat 23 Aug · 15:00" leading, "MD3" trailing — kickoff/matchday moved
+    /// off the row into this header line so team names get the full row
+    /// width instead of sharing it with a fixed trailing date column.
+    @ViewBuilder
+    private var scheduleLine: some View {
+        let kickoff = FixtureFormat.kickoffDate(item.kickoff)
+        if kickoff != nil || item.matchday != nil {
+            HStack(spacing: 4) {
+                if let kickoff {
                     Text(kickoff, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                        .font(.caption2).foregroundStyle(V2Theme.textSecondary)
+                    Text("·").foregroundStyle(V2Theme.textTertiary)
                     Text(kickoff, format: .dateTime.hour().minute())
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(V2Theme.textPrimary)
                 }
+                Spacer(minLength: 8)
                 if let md = item.matchday {
-                    Text("MD \(md)").font(.caption2).foregroundStyle(V2Theme.textTertiary)
+                    Text("MD \(md)")
                 }
             }
-            .frame(width: isPad ? 96 : 74, alignment: .trailing)
+            .font(.caption2)
+            .foregroundStyle(V2Theme.textSecondary)
         }
-        .padding(12)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            scheduleLine
+            HStack(spacing: 8) {
+                Text(displayName(item.homeTeamId)).font(nameFont).lineLimit(expanded ? nil : 1)
+                    .foregroundStyle(V2Theme.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(spacing: 1) {
+                    Text(scoreText).font(scoreFont).bold().monospacedDigit()
+                        .foregroundStyle(V2Theme.textPrimary)
+                    if let live = liveStatus {
+                        Text(live.text).font(.caption2).foregroundStyle(live.color).lineLimit(1)
+                    }
+                }
+                .frame(width: centreWidth)
+
+                Text(displayName(item.awayTeamId)).font(nameFont).lineLimit(expanded ? nil : 1)
+                    .foregroundStyle(V2Theme.textPrimary)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() } }
