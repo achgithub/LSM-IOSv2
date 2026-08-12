@@ -47,6 +47,7 @@ const en = {
   },
   footer: {
     reviewed: "Submissions are reviewed by your game's manager before they go live.",
+    getApp: 'Prefer the full app? Get it on the App Store →',
   },
   status: {
     submitted: 'Submitted',

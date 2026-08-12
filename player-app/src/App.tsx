@@ -216,7 +216,12 @@ export default function App() {
           )}
         </section>
 
-        <footer className="mt-auto p-2 text-center text-sm text-slate-500">{t('footer.reviewed')}</footer>
+        <footer className="mt-auto grid gap-1 p-2 text-center text-sm text-slate-500">
+          <span>{t('footer.reviewed')}</span>
+          <a href="https://apps.apple.com/gb/app/last-stand-manager/id6782657173" className="text-slate-500 underline-offset-2 hover:text-slate-400 hover:underline">
+            {t('footer.getApp')}
+          </a>
+        </footer>
       </div>
     </>
   );

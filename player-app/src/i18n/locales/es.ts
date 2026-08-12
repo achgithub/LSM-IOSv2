@@ -49,6 +49,7 @@ const es: Translations = {
   },
   footer: {
     reviewed: "Submissions are reviewed by your game's manager before they go live.",
+    getApp: '¿Prefieres la app completa? Consíguela en el App Store →',
   },
   status: {
     submitted: 'Submitted',
