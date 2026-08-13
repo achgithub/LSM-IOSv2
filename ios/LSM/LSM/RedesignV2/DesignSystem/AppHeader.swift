@@ -6,9 +6,14 @@ import SwiftUI
 /// restyled, so no custom navigation stack to maintain.
 struct AppHeader: ToolbarContent {
     let title: String
-    /// Submission-inbox badge count, shown as a trailing bell icon when > 0.
-    /// Backed by `SubmissionBadgeStore` — tapping it pushes the unfiltered
-    /// `SubmissionInboxViewV2` (all games, color-coded).
+    /// Submission-inbox bell — shown whenever the caller opts in (Home/Games
+    /// pass a count; other screens leave this nil and get no bell at all).
+    /// Always visible once opted in, regardless of the count — not gated on
+    /// > 0 — so the queue stays reachable rather than the bell vanishing
+    /// whenever it happens to read 0 pending. Backed by `SubmissionBadgeStore`;
+    /// tapping it pushes the unfiltered `SubmissionInboxViewV2` (all games,
+    /// color-coded). The small numeric badge overlay only renders when count
+    /// > 0.
     var trailingBadgeCount: Int?
     @Environment(\.dismiss) private var dismiss
 
@@ -30,7 +35,7 @@ struct AppHeader: ToolbarContent {
                 .font(V2Theme.Typography.pageTitle)
                 .foregroundStyle(V2Theme.textPrimary)
         }
-        if let trailingBadgeCount, trailingBadgeCount > 0 {
+        if let trailingBadgeCount {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     SubmissionInboxViewV2()
@@ -41,15 +46,21 @@ struct AppHeader: ToolbarContent {
                             .foregroundStyle(V2Theme.textPrimary)
                             .frame(width: 36, height: 36)
                             .background(V2Theme.cardBackground, in: Circle())
-                        Text("\(trailingBadgeCount)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(4)
-                            .background(V2Theme.danger, in: Circle())
-                            .offset(x: 6, y: -6)
+                        if trailingBadgeCount > 0 {
+                            Text("\(trailingBadgeCount)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(V2Theme.danger, in: Circle())
+                                .offset(x: 6, y: -6)
+                        }
                     }
                 }
-                .accessibilityLabel("Submission queue: \(trailingBadgeCount) pending")
+                .accessibilityLabel(
+                    trailingBadgeCount > 0
+                        ? "Submission queue: \(trailingBadgeCount) pending"
+                        : "Submission queue"
+                )
             }
         }
     }

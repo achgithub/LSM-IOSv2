@@ -37,7 +37,9 @@ enum PWARoundPusher {
     /// completed game keeps resending its final round's data unchanged).
     /// Always attempts to attach the most-recently-closed round's results,
     /// regardless of trigger — safe/idempotent to resend the same result twice.
-    static func pushLMSOrPredictor(game: Game, round: Round?, managerName: String, context: ModelContext) async throws {
+    static func pushLMSOrPredictor(
+        game: Game, round: Round?, managerName: String, context: ModelContext, baseURLOverride: URL? = nil
+    ) async throws {
         guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
         guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
             throw PWAPushError.noRound
@@ -142,7 +144,8 @@ enum PWARoundPusher {
                 managerName: trimmedManagerName,
                 players: playerItems,
                 previousResultsRoundNumber: prevRoundNumber,
-                previousResultsJSON: prevResultsJSON
+                previousResultsJSON: prevResultsJSON,
+                baseURLOverride: baseURLOverride
             )
         } catch {
             pwaPushLog.warning("Round push failed: \(error.localizedDescription)")
@@ -199,7 +202,9 @@ enum PWARoundPusher {
     /// Same shape as `pushLMSOrPredictor` but for Killer's phase/roster
     /// `extra` payload and its own per-player result fields (lives/hits
     /// rather than survived/points).
-    static func pushKiller(game: Game, round: Round?, managerName: String, context: ModelContext) async throws {
+    static func pushKiller(
+        game: Game, round: Round?, managerName: String, context: ModelContext, baseURLOverride: URL? = nil
+    ) async throws {
         guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
         guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
             throw PWAPushError.noRound
@@ -272,7 +277,8 @@ enum PWARoundPusher {
                 players: playerItems,
                 extraJSON: extraJSON,
                 previousResultsRoundNumber: prevRoundNumber,
-                previousResultsJSON: prevResultsJSON
+                previousResultsJSON: prevResultsJSON,
+                baseURLOverride: baseURLOverride
             )
         } catch {
             pwaPushLog.warning("Killer round push failed: \(error.localizedDescription)")

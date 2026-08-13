@@ -102,7 +102,7 @@ struct ResultsEntryViewV2: View {
                     VStack(spacing: 14) {
                         ForEach(roundFixtures) { fixture in
                             VStack(alignment: .leading, spacing: 8) {
-                                FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
+                                FixtureLabelV2(fixture: fixture, teamsById: data?.teamsById ?? [:])
                                     .foregroundStyle(V2Theme.textPrimary)
                                 outcomeRow(for: fixture)
                             }

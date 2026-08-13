@@ -36,6 +36,7 @@ struct StandingsViewV2: View {
                     )
                     .padding(.top, 40)
                 } else {
+                    StandingsHeaderRow()
                     ForEach(store.standings) { row in
                         let team = store.teamsById[row.teamId]
                         StandingsCard(
@@ -43,7 +44,10 @@ struct StandingsViewV2: View {
                             name: team?.shortName ?? team?.name ?? "Team \(row.teamId)",
                             played: row.played,
                             won: row.won,
-                            winPercentage: row.played > 0 ? Int((Double(row.won) / Double(row.played) * 100).rounded()) : 0
+                            drawn: row.drawn,
+                            lost: row.lost,
+                            goalDifference: row.goalDifference,
+                            points: row.points
                         )
                     }
                 }
@@ -53,15 +57,6 @@ struct StandingsViewV2: View {
         }
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Standings")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { store.refresh(league: league) } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("Refresh")
-                .disabled(store.isLoading || store.isThrottled)
-            }
-        }
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
     }

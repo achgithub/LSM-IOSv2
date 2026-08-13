@@ -16,9 +16,15 @@ import SwiftData
 struct GamesPortalViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(SubmissionBadgeStore.self) private var badgeStore
+    @Environment(SyncCoordinator.self) private var syncCoordinator
+    @Environment(\.modelContext) private var context
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNewGame = false
     @State private var showingGameLimit = false
+    @State private var showingSyncSummary = false
+    @State private var showingSyncPicker = false
+    @State private var showingWizard = false
+    @State private var wizardGame: Game?
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
@@ -29,6 +35,34 @@ struct GamesPortalViewV2: View {
     /// explanatory alert instead of a silent no-op inside `NewGameViewV2`.
     private var atGameLimit: Bool {
         games.filter { $0.status != .complete }.count >= entitlements.maxActiveGames
+    }
+
+    /// Brief post-sync summary ("3 games synced, 2 pending submissions"),
+    /// surfacing errors instead of the pending count when any game failed to
+    /// push. Reads `syncCoordinator.lastSyncResult`, set once `sync()`
+    /// finishes — see `SyncCoordinator`.
+    private var syncSummaryText: String {
+        guard let result = syncCoordinator.lastSyncResult else { return "" }
+        let gamesPart = result.gamesPushed == 1 ? "1 game synced" : "\(result.gamesPushed) games synced"
+        let skippedPart: String = {
+            guard !result.skippedNoOpenRound.isEmpty else { return "" }
+            let count = result.skippedNoOpenRound.count
+            return count == 1 ? ", 1 waiting for a round" : ", \(count) waiting for a round"
+        }()
+        if result.errors.isEmpty {
+            let pendingPart = result.pendingCount == 1 ? "1 pending submission" : "\(result.pendingCount) pending submissions"
+            return "\(gamesPart), \(pendingPart)\(skippedPart)"
+        } else {
+            let errorPart = result.errors.count == 1 ? "1 game failed" : "\(result.errors.count) games failed"
+            return "\(gamesPart) — \(errorPart)\(skippedPart)"
+        }
+    }
+
+    private func performSync(gameIDs: Set<UUID>) async {
+        await syncCoordinator.sync(context: context, gameIDs: gameIDs)
+        withAnimation { showingSyncSummary = true }
+        try? await Task.sleep(nanoseconds: 3_500_000_000)
+        withAnimation { showingSyncSummary = false }
     }
 
     var body: some View {
@@ -43,7 +77,9 @@ struct GamesPortalViewV2: View {
                     .padding(.top, 40)
                 } else {
                     ForEach(modesInPlay, id: \.self) { mode in
-                        ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode })
+                        ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode }) { game in
+                            wizardGame = game
+                        }
                     }
                 }
             }
@@ -53,7 +89,27 @@ struct GamesPortalViewV2: View {
         .background(V2Theme.background.ignoresSafeArea())
         .v2Header("Games", trailingBadgeCount: badgeStore.pendingCount)
         .task { await badgeStore.refresh() }
-        .refreshable { await badgeStore.refresh() }
+        // Pull-to-refresh opens the same game picker as the toolbar button —
+        // both routes into Sync go through an explicit per-game choice, so
+        // pulling to refresh can't silently fan a push out across every
+        // running game (each push is a billed Worker call).
+        .refreshable { showingSyncPicker = true }
+        .overlay(alignment: .top) {
+            if showingSyncSummary, let result = syncCoordinator.lastSyncResult {
+                Card {
+                    HStack(spacing: 10) {
+                        Image(systemName: result.errors.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(result.errors.isEmpty ? V2Theme.accent : V2Theme.warning)
+                        Text(syncSummaryText)
+                            .font(V2Theme.Typography.metadata)
+                            .foregroundStyle(V2Theme.textPrimary)
+                    }
+                }
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -64,8 +120,38 @@ struct GamesPortalViewV2: View {
                 }
                 .accessibilityLabel("New Game")
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingSyncPicker = true
+                } label: {
+                    if syncCoordinator.isSyncing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(V2Theme.accent)
+                    }
+                }
+                .disabled(syncCoordinator.isSyncing)
+                .accessibilityLabel("Sync")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingWizard = true
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundStyle(V2Theme.accent)
+                }
+                .accessibilityLabel("Guided Setup")
+            }
         }
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
+        .sheet(isPresented: $showingSyncPicker) {
+            SyncGamePickerViewV2(games: games) { gameIDs in
+                Task { await performSync(gameIDs: gameIDs) }
+            }
+        }
+        .fullScreenCover(isPresented: $showingWizard) { GameWizardViewV2() }
+        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
         .alert("Game limit reached", isPresented: $showingGameLimit) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -78,6 +164,7 @@ struct GamesPortalViewV2: View {
 private struct ModeSectionCard: View {
     let mode: GameMode
     let games: [Game]
+    var onResume: (Game) -> Void = { _ in }
 
     private var title: String {
         switch mode {
@@ -127,7 +214,7 @@ private struct ModeSectionCard: View {
                 if isExpanded {
                     VStack(spacing: 10) {
                         ForEach(games) { game in
-                            GameSummaryRow(game: game)
+                            GameSummaryRow(game: game) { onResume(game) }
                         }
                     }
                 }
@@ -135,4 +222,3 @@ private struct ModeSectionCard: View {
         }
     }
 }
-

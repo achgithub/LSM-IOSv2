@@ -1,11 +1,10 @@
 import SwiftUI
 
 /// Card restyle of `SettingsView`'s row list — pushed into an existing
-/// NavigationStack (no `List`, no embedded NavigationStack), matching the
-/// "restyle the list, not-yet-restyled detail stays v1" precedent set by
-/// `PlayersViewV2`/`GamesPortalViewV2`. Every row still pushes the unchanged
-/// v1 detail screen (Profile, Subscription, Leagues, Roster, Language,
-/// About, Report a Bug) — none of those have been restyled yet.
+/// NavigationStack (no `List`, no embedded NavigationStack). Every row now
+/// pushes its own restyled V2 detail screen (see `ProfileSettingsViewV2`
+/// etc.) — the v1 originals are untouched, reachable only from v1's own
+/// `SettingsView`.
 struct SettingsViewV2: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @Environment(Entitlements.self) private var entitlements
@@ -17,27 +16,27 @@ struct SettingsViewV2: View {
             LazyVStack(spacing: V2Theme.Spacing.section) {
                 VStack(spacing: 10) {
                     NavigationLink {
-                        ProfileSettingsView()
+                        ProfileSettingsViewV2()
                     } label: {
                         MenuRow(systemImage: "person.crop.circle.fill", title: "Profile",
                                 value: managerName.isEmpty ? nil : managerName)
                     }
                     .buttonStyle(.plain)
                     NavigationLink {
-                        SubscriptionSettingsView()
+                        SubscriptionSettingsViewV2()
                     } label: {
                         MenuRow(systemImage: "star.fill", title: "Subscription", value: entitlements.tier.label)
                     }
                     .buttonStyle(.plain)
                     NavigationLink {
-                        LeagueSettingsView()
+                        LeagueSettingsViewV2()
                     } label: {
                         MenuRow(systemImage: "trophy.fill", title: "Leagues",
                                 value: "\(enabled.ids.count)/\(entitlements.leagueAllowance)")
                     }
                     .buttonStyle(.plain)
                     NavigationLink {
-                        RosterSettingsView()
+                        RosterSettingsViewV2()
                     } label: {
                         MenuRow(systemImage: "person.2.fill", title: "Roster")
                     }
@@ -46,19 +45,19 @@ struct SettingsViewV2: View {
 
                 VStack(spacing: 10) {
                     NavigationLink {
-                        LanguageSettingsView()
+                        LanguageSettingsViewV2()
                     } label: {
                         MenuRow(systemImage: "globe", title: "Language", value: localization.language.displayName)
                     }
                     .buttonStyle(.plain)
                     NavigationLink {
-                        AboutView()
+                        AboutViewV2()
                     } label: {
                         MenuRow(systemImage: "info.circle.fill", title: "About")
                     }
                     .buttonStyle(.plain)
                     NavigationLink {
-                        ReportBugView()
+                        ReportBugViewV2()
                     } label: {
                         MenuRow(systemImage: "ladybug.fill", title: "Report a Bug")
                     }

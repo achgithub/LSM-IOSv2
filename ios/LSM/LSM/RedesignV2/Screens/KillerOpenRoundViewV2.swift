@@ -117,7 +117,7 @@ struct KillerOpenRoundViewV2: View {
                                         HStack(spacing: 10) {
                                             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                                                 .foregroundStyle(selected ? V2Theme.Mode.killer : V2Theme.textTertiary)
-                                            FixtureLabel(fixture: fixture, teamsById: data?.teamsById ?? [:])
+                                            FixtureLabelV2(fixture: fixture, teamsById: data?.teamsById ?? [:])
                                                 .foregroundStyle(V2Theme.textPrimary)
                                             if isBlended, let lid = fixture.leagueId, let l = Leagues.lookup(lid) {
                                                 Text(l.shortName)
