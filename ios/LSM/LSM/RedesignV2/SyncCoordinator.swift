@@ -99,13 +99,11 @@ final class SyncCoordinator {
                 switch game.mode {
                 case .lms, .predictor:
                     try await PWARoundPusher.pushLMSOrPredictor(
-                        game: game, round: openRound, managerName: managerName, context: context,
-                        baseURLOverride: SubmissionsClient.v2BaseURL
+                        game: game, round: openRound, managerName: managerName, context: context
                     )
                 case .killer:
                     try await PWARoundPusher.pushKiller(
-                        game: game, round: openRound, managerName: managerName, context: context,
-                        baseURLOverride: SubmissionsClient.v2BaseURL
+                        game: game, round: openRound, managerName: managerName, context: context
                     )
                 }
                 pushed += 1

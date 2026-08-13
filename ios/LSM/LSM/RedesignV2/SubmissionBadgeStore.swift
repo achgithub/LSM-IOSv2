@@ -25,7 +25,7 @@ final class SubmissionBadgeStore {
     /// sourced instead of override-dependent.
     func refresh() async {
         do {
-            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions(baseURLOverride: SubmissionsClient.v2BaseURL).count
+            pendingCount = try await SubmissionsClient.shared.listPendingSubmissions().count
         } catch {
             badgeLog.warning("Badge refresh failed: \(error.localizedDescription)")
         }

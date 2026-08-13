@@ -92,15 +92,6 @@ actor SubmissionsClient {
 
     static let playerBase = URL(string: "https://submit.sportsmanager.site")!
 
-    /// worker-api-v2 — the standalone KV-backed Worker every RedesignV2
-    /// submission flow (Sync's pushes, the bell badge, the inbox) reads from
-    /// and writes to. Hoisted here (was private to `SyncCoordinator`) so
-    /// every V2 call site — badge refresh, inbox list/approve/reject — stays
-    /// on the same backend Sync actually pushed to, rather than some reading
-    /// v2 and others silently falling back to V1's separate aggregate. V1
-    /// screens never see this URL.
-    static let v2BaseURL = URL(string: "https://api-v2.uk.sportsmanager.site")!
-
     static func playerLinkURL(token: String) -> URL {
         playerBase.appending(path: "s/\(token.lowercased())")
     }
@@ -252,14 +243,12 @@ actor SubmissionsClient {
     /// of ownership. `push` sends its managerToken in the body instead
     /// (pre-existing convention), so it doesn't need the header.
     ///
-    /// `baseURLOverride`: nil (the default, every existing call site) keeps
-    /// hitting the manager's resolved V1 authority exactly as before. Passing
-    /// a value routes this one request elsewhere instead — used only by
-    /// RedesignV2's `SyncCoordinator` to reach `worker-api-v2` for testing in
-    /// isolation. The Authorization JWT still comes from `AppAttestService`
-    /// either way (V1 remains the sole attestation authority; worker-api-v2
-    /// only verifies that JWT, it doesn't issue its own — see worker-api-v2's
-    /// wrangler.jsonc header comment).
+    /// `baseURLOverride`: nil (every current call site, V1 and V2 alike)
+    /// hits the manager's resolved authority exactly as before. worker-api-v2
+    /// (KV-backed, reached this way in an earlier design) is gone — see
+    /// kv-to-d1-reversal-plan. Kept as a hook for the eventual per-game
+    /// schemaVersion routing (new D1 tables inside worker-api itself, not a
+    /// separate Worker), not wired to anything yet.
     private func request(
         path: String, method: String, includeManagerToken: Bool = false, baseURLOverride: URL? = nil
     ) async throws -> URLRequest {
