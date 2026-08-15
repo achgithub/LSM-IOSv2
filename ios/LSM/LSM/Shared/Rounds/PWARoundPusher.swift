@@ -185,8 +185,10 @@ enum PWARoundPusher {
                 await DiagnosticLog.shared.log("outbox cleared for \(game.name)", category: "submissions")
             }
         } catch {
+            // The underlying failure is already logged by SubmissionsClient
+            // at the same chokepoint — nothing new to add here beyond
+            // leaving game.pushPending true, which is all the outbox is.
             pwaPushLog.warning("Round push failed: \(error.localizedDescription)")
-            await DiagnosticLog.shared.log("outbox queued for \(game.name): \(error.localizedDescription)", category: "submissions")
             throw error
         }
     }
@@ -333,8 +335,9 @@ enum PWARoundPusher {
                 await DiagnosticLog.shared.log("outbox cleared for \(game.name)", category: "submissions")
             }
         } catch {
+            // See the LMS/Predictor push above — the underlying failure is
+            // already logged by SubmissionsClient at the same chokepoint.
             pwaPushLog.warning("Killer round push failed: \(error.localizedDescription)")
-            await DiagnosticLog.shared.log("outbox queued for \(game.name): \(error.localizedDescription)", category: "submissions")
             throw error
         }
     }

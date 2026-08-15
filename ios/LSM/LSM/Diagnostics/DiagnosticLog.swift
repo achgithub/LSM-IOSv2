@@ -5,7 +5,17 @@ import Foundation
 /// raw detail behind a friendly on-screen error message isn't lost — it's
 /// captured here instead, for a manager to attach via Settings → Report a
 /// Bug. Caches-directory-backed (not iCloud, ephemeral only), trimmed to the
-/// most recent ~150KB so it never grows unbounded.
+/// most recent ~300KB so it never grows unbounded.
+///
+/// Mostly failure-only, matching those chokepoints, with one deliberate
+/// exception: the sync outbox (`PWARoundPusher`/`SyncCoordinator`) also logs
+/// its *successful* retries here ("outbox cleared", "outbox sweep retried
+/// N") — that's new information a failure log alone wouldn't capture (did a
+/// queued write ever actually land?), not duplicate noise. It does NOT log
+/// the outbox's own queuing-on-failure event, since that's the same
+/// underlying request `SubmissionsClient` already logs on the same failure.
+/// The size cap was doubled from 150KB alongside adding this so the
+/// slightly higher volume doesn't evict error history faster than before.
 ///
 /// An `actor` (not a plain enum with static funcs) because multiple network
 /// calls can fail and log concurrently — actor isolation serializes the
@@ -13,7 +23,7 @@ import Foundation
 actor DiagnosticLog {
     static let shared = DiagnosticLog()
 
-    private let maxBytes = 150_000
+    private let maxBytes = 300_000
     private let url: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         return dir.appendingPathComponent("diagnostic.log")
