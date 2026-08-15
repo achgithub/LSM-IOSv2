@@ -4,6 +4,11 @@ import { CHALLENGE_MAX_AGE_MS, attestBypassed, getAttestConfig, getChallengeSecr
 import { getDevice, insertDevice, updateSignCount } from "../attest-store";
 import { requireAdmin, regionSecret } from "../auth";
 import { signJWT } from "../jwt";
+import { resolveManagerDB, resolveKeyShardDB, pinIdentityToShard } from "../shardRouter";
+
+function shardHeader(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  return c.req.header("X-Shard-Id") ?? null;
+}
 
 // ── App Attest enrolment + JWT issuance ──────────────────────────────────────
 //
@@ -42,14 +47,23 @@ attest.post("/register", async (c) => {
 
   try {
     const verified = await verifyAttestation(attestation, keyId, challenge, getAttestConfig(c.env));
-    await insertDevice(c.env.DB, {
+    // Register is the earliest point a brand-new manager's device ever
+    // touches this API (it's a prerequisite for the JWT every other
+    // manager-facing route requires) — resolving the shard here, before
+    // anything else exists for this manager, is what lets a genuinely new
+    // manager get load-balanced from their very first request. Echoed back
+    // below so the client can cache it immediately.
+    const { shardId, db } = await resolveManagerDB(c.env, shardHeader(c), managerToken);
+    await insertDevice(db, {
       keyId,
       publicKey: verified.publicKey,
       signCount: verified.signCount,
       environment: verified.environment,
       managerToken,
     });
-    return c.json({ ok: true });
+    // Same shard as the device row just written — free, no re-derivation.
+    await pinIdentityToShard(c.env, "key", keyId, shardId);
+    return c.json({ ok: true, shardId });
   } catch (err) {
     console.error(JSON.stringify({ msg: "attestation rejected", error: String(err) }));
     return c.json({ error: "attestation rejected" }, 403);
@@ -83,14 +97,15 @@ attest.post("/assert", async (c) => {
     return c.json({ error: "invalid or expired challenge" }, 401);
   }
 
-  const device = await getDevice(c.env.DB, keyId);
+  const { shardId, db } = await resolveKeyShardDB(c.env, shardHeader(c), keyId);
+  const device = await getDevice(db, keyId);
   if (!device) return c.json({ error: "device not registered" }, 403);
 
   try {
     const result = await verifyAssertion(
       assertion, device.publicKey, device.signCount, challenge, getAttestConfig(c.env),
     );
-    await updateSignCount(c.env.DB, keyId, result.signCount);
+    await updateSignCount(db, keyId, result.signCount);
   } catch (err) {
     console.error(JSON.stringify({ msg: "assertion rejected", keyId, error: String(err) }));
     return c.json({ error: "assertion rejected" }, 403);
@@ -102,11 +117,17 @@ attest.post("/assert", async (c) => {
   const issuer = `https://api.${c.env.REGION}.sportsmanager.site`;
   const token = await signJWT(privateKey, c.env.JWT_KID, issuer);
   const exp = Math.floor(Date.now() / 1000) + 900;
-  return c.json({ token, expiresAt: new Date(exp * 1000).toISOString() });
+  // Echoed on every JWT refresh (every 15 min) — cheap self-heal for a
+  // client whose cached shard id was ever lost (reinstall, cache clear).
+  return c.json({ token, expiresAt: new Date(exp * 1000).toISOString(), shardId });
 });
 
 // ── Admin: device management ──────────────────────────────────────────────────
 // All routes require Bearer <UK_ADMIN_TOKEN>.
+// Not shard-routed — these are low-traffic ops tools, not the live customer
+// path. They query env.DB (the default shard) directly; extend them to loop
+// over every configured shard once a 2nd one is actually provisioned and
+// this tooling needs to see across all of them.
 
 // List all registered devices.
 // GET /attest/devices → { count, devices: [{ keyId, signCount, environment, createdAt }] }

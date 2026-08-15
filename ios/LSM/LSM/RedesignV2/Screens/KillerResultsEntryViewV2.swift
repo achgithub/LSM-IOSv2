@@ -288,6 +288,6 @@ struct KillerResultsEntryViewV2: View {
     private func pushGameCompleteIfNeeded() {
         guard entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil else { return }
         let name = managerName
-        Task { try? await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context) }
+        Task { try? await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context, scope: PWAPlayerScope.forRoundPush(game: game)) }
     }
 }

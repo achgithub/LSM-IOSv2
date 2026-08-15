@@ -123,6 +123,12 @@ struct RootTabView: View {
             // Fire-and-forget: refreshes the league list for the *next* launch
             // (see Leagues.refreshFromRegistry) — never blocks this launch.
             Task { await Leagues.refreshFromRegistry() }
+            // Fire-and-forget: clears the client-side outbox — any push from
+            // a previous session that never confirmed (dropped connection,
+            // backgrounded mid-request) gets retried now rather than waiting
+            // for the manager to notice and tap Sync. See
+            // `SyncCoordinator.retryOutstanding`/`Game.pushPending`.
+            Task { await syncCoordinator.retryOutstanding(context: context) }
         }
         // Interstitial dropped (2026-06-15) — foreground trigger disabled.
         // .onChange(of: scenePhase) { _, phase in

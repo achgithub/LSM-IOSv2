@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { validateSubmissionPayload, referencedFixtureIds } from "../validation/submissionPayload";
+import { resolveManagerDB, resolveTokenDB, pinIdentityToShard } from "../shardRouter";
 
 // ── Submissions (the anonymous PWA approval queue) — Phase 5 ─────────────────
 //
@@ -16,6 +17,11 @@ import { validateSubmissionPayload, referencedFixtureIds } from "../validation/s
 //
 //   MANAGER (LSM app) — mints tokens per roster member, pushes rounds,
 //   reviews queues, approves/rejects. Revoke kills the token everywhere.
+//
+// Every route below resolves which D1 shard to query via shardRouter — see
+// that file's header comment. Today there's exactly one shard, so this is a
+// zero-cost no-op; the resolution exists so a second shard is a config
+// change, not a rewrite of every route here.
 
 export const submissions = new Hono<{ Bindings: Env }>();
 
@@ -29,8 +35,12 @@ function now(): string {
   return new Date().toISOString();
 }
 
-async function ensureManagerLifecycle(env: Env, managerToken: string): Promise<void> {
-  await env.DB.prepare(
+function shardHeader(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  return c.req.header("X-Shard-Id") ?? null;
+}
+
+async function ensureManagerLifecycle(db: D1Database, managerToken: string): Promise<void> {
+  await db.prepare(
     `INSERT OR IGNORE INTO manager_lifecycle (manager_token, created_at) VALUES (?, ?)`
   ).bind(managerToken, new Date().toISOString()).run();
 }
@@ -38,8 +48,8 @@ async function ensureManagerLifecycle(env: Env, managerToken: string): Promise<v
 // The owning manager_token for a game, as recorded on its round_pushes row.
 // `undefined` = no such game; `null` = game exists but predates ownership
 // binding (grandfathered — allowed through until the next push claims it).
-async function loadGameOwner(env: Env, gameToken: string): Promise<string | null | undefined> {
-  const row = await env.DB.prepare(
+async function loadGameOwner(db: D1Database, gameToken: string): Promise<string | null | undefined> {
+  const row = await db.prepare(
     `SELECT manager_token FROM round_pushes WHERE game_token = ?`
   ).bind(gameToken).first<{ manager_token: string | null }>();
   return row ? row.manager_token : undefined;
@@ -59,20 +69,26 @@ submissions.post("/links", async (c) => {
   const playerName = body?.playerName?.trim();
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
 
-  const existing = await c.env.DB.prepare(
+  const managerToken = body?.managerToken?.toLowerCase() ?? null;
+  const { shardId, db } = await resolveManagerDB(c.env, shardHeader(c), managerToken);
+
+  const existing = await db.prepare(
     `SELECT 1 FROM player_tokens WHERE player_name = ? AND revoked_at IS NULL LIMIT 1`
   ).bind(playerName).first();
 
   if (existing) return c.json({ error: "A submission link already exists for this player. Revoke it first, then create a new one." }, 409);
 
   const token = crypto.randomUUID().toLowerCase();
-  const managerToken = body?.managerToken?.toLowerCase() ?? null;
   const managerName = body?.managerName?.trim() ?? null;
-  await c.env.DB.prepare(
+  await db.prepare(
     `INSERT INTO player_tokens (token, player_name, manager_name, created_at, manager_token) VALUES (?, ?, ?, ?, ?)`
   ).bind(token, playerName, managerName, now(), managerToken).run();
 
-  if (managerToken) await ensureManagerLifecycle(c.env, managerToken);
+  if (managerToken) await ensureManagerLifecycle(db, managerToken);
+  // Piggyback the just-resolved shard onto this new token — free (same data
+  // already in hand), and it's the only way /s/:token can ever find this
+  // player without a manager identity of its own. See shardRouter.ts.
+  await pinIdentityToShard(c.env, "token", token, shardId);
 
   return c.json({ token });
 });
@@ -80,7 +96,8 @@ submissions.post("/links", async (c) => {
 // POST /links/:token/revoke
 submissions.post("/links/:token/revoke", async (c) => {
   const token = c.req.param("token").toLowerCase();
-  const result = await c.env.DB.prepare(
+  const db = await resolveTokenDB(c.env, shardHeader(c), token);
+  const result = await db.prepare(
     `UPDATE player_tokens SET revoked_at = ? WHERE token = ? AND revoked_at IS NULL`
   ).bind(now(), token).run();
   if (result.meta.changes === 0) return c.json({ error: "token not found or already revoked" }, 404);
@@ -100,7 +117,8 @@ submissions.post("/links/revoke-by-name", async (c) => {
   if (!playerName) return c.json({ error: "playerName is required" }, 400);
   if (!managerToken) return c.json({ error: "managerToken is required" }, 400);
 
-  const result = await c.env.DB.prepare(
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerToken);
+  const result = await db.prepare(
     `UPDATE player_tokens SET revoked_at = ?
      WHERE player_name = ? AND manager_token = ? AND revoked_at IS NULL`
   ).bind(now(), playerName, managerToken).run();
@@ -162,18 +180,19 @@ submissions.post("/games/:gameToken/push", async (c) => {
 
   const ts = now();
   const mgrToken = managerToken?.toLowerCase() ?? null;
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), mgrToken);
 
   // gameToken alone isn't proof of ownership — it's disclosed to every player
   // enrolled in the game via GET /s/:token, so anything mutating here must
   // also check the (non-disclosed) managerToken that claimed the game on its
   // first push. Games pushed before this check existed have manager_token
   // NULL and are grandfathered through — this push will claim them.
-  const owner = await loadGameOwner(c.env, gameToken);
+  const owner = await loadGameOwner(db, gameToken);
   if (owner && owner !== mgrToken) {
     return c.json({ error: "forbidden" }, 403);
   }
 
-  await c.env.DB.prepare(
+  await db.prepare(
     `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at, extra_json)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
@@ -188,12 +207,12 @@ submissions.post("/games/:gameToken/push", async (c) => {
        extra_json = excluded.extra_json`
   ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts, extra ?? null).run();
 
-  if (mgrToken) await ensureManagerLifecycle(c.env, mgrToken);
+  if (mgrToken) await ensureManagerLifecycle(db, mgrToken);
 
   if (previousResultsRoundNumber != null && previousResults) {
     // `previousResults` arrives already JSON.stringify'd by the client (same
     // convention as `extra`) — stored verbatim, no re-serialization needed.
-    await c.env.DB.prepare(
+    await db.prepare(
       `INSERT INTO round_results (game_token, round_number, mode, results_json, created_at)
        VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (game_token, round_number) DO UPDATE SET
@@ -201,20 +220,6 @@ submissions.post("/games/:gameToken/push", async (c) => {
          results_json = excluded.results_json,
          created_at = excluded.created_at`
     ).bind(gameToken, previousResultsRoundNumber, mode, previousResults, ts).run();
-
-    // Keep the last 2 results rows per game (matches submissions' retention).
-    if (previousResultsRoundNumber > 1) {
-      await c.env.DB.prepare(
-        `DELETE FROM round_results WHERE game_token = ? AND round_number < ?`
-      ).bind(gameToken, previousResultsRoundNumber - 1).run();
-    }
-  }
-
-  // Prune submissions older than 2 rounds (aligned with Predictor publish retention).
-  if (roundNumber > 2) {
-    await c.env.DB.prepare(
-      `DELETE FROM submissions WHERE game_token = ? AND round_number < ?`
-    ).bind(gameToken, roundNumber - 2).run();
   }
 
   const suffix = managerSuffix?.toLowerCase() ?? null;
@@ -225,12 +230,12 @@ submissions.post("/games/:gameToken/push", async (c) => {
       const tk = p.token.toLowerCase();
       const pid = p.localPlayerId.toLowerCase();
       const eligJson = p.eligibleTeams != null ? JSON.stringify(p.eligibleTeams) : null;
-      const exists = await c.env.DB.prepare(
+      const exists = await db.prepare(
         `SELECT 1 FROM player_tokens WHERE token = ? AND revoked_at IS NULL`
       ).bind(tk).first();
       if (!exists) continue;
 
-      await c.env.DB.prepare(
+      await db.prepare(
         `INSERT INTO game_enrollments (token, game_token, local_player_id, eligible_team_ids_json, manager_suffix)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (token, game_token) DO UPDATE SET
@@ -241,15 +246,15 @@ submissions.post("/games/:gameToken/push", async (c) => {
 
       const newName = p.playerName?.trim() || null;
       if (mgrName && newName) {
-        await c.env.DB.prepare(
+        await db.prepare(
           `UPDATE player_tokens SET manager_name = ?, player_name = ? WHERE token = ?`
         ).bind(mgrName, newName, tk).run();
       } else if (mgrName) {
-        await c.env.DB.prepare(
+        await db.prepare(
           `UPDATE player_tokens SET manager_name = ? WHERE token = ?`
         ).bind(mgrName, tk).run();
       } else if (newName) {
-        await c.env.DB.prepare(
+        await db.prepare(
           `UPDATE player_tokens SET player_name = ? WHERE token = ?`
         ).bind(newName, tk).run();
       }
@@ -264,14 +269,15 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const round = c.req.query("round");
 
-  const owner = await loadGameOwner(c.env, gameToken);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerTokenHeader(c));
+  const owner = await loadGameOwner(db, gameToken);
   if (owner === undefined) return c.json({ error: "game not found" }, 404);
   if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
 
   let rows;
   if (round) {
     const rn = parseInt(round, 10);
-    rows = await c.env.DB.prepare(
+    rows = await db.prepare(
       `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
               s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at
        FROM submissions s
@@ -281,7 +287,7 @@ submissions.get("/games/:gameToken/submissions", async (c) => {
        ORDER BY s.submitted_at ASC`
     ).bind(gameToken, rn).all();
   } else {
-    rows = await c.env.DB.prepare(
+    rows = await db.prepare(
       `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
               s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at
        FROM submissions s
@@ -316,7 +322,8 @@ submissions.get("/manager/submissions/pending", async (c) => {
   const managerToken = managerTokenHeader(c);
   if (!managerToken) return c.json({ error: "X-Manager-Token header is required" }, 400);
 
-  const rows = await c.env.DB.prepare(
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerToken);
+  const rows = await db.prepare(
     `SELECT s.id, s.token, pt.player_name, ge.local_player_id, ge.manager_suffix,
             s.round_number, s.payload_json, s.status, s.submitted_at, s.decided_at,
             s.game_token, rp.game_name, rp.mode
@@ -352,18 +359,19 @@ submissions.post("/games/:gameToken/submissions/:id/approve", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const id = c.req.param("id").toLowerCase();
 
-  const owner = await loadGameOwner(c.env, gameToken);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerTokenHeader(c));
+  const owner = await loadGameOwner(db, gameToken);
   if (owner === undefined) return c.json({ error: "game not found" }, 404);
   if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
 
   const ts = now();
-  const result = await c.env.DB.prepare(
+  const result = await db.prepare(
     `UPDATE submissions SET status = 'approved', decided_at = ?
      WHERE id = ? AND game_token = ? AND status = 'pending'`
   ).bind(ts, id, gameToken).run();
   if (result.meta.changes === 0) return c.json({ error: "submission not found or already decided" }, 404);
 
-  const row = await c.env.DB.prepare(
+  const row = await db.prepare(
     `SELECT s.id, ge.local_player_id, ge.manager_suffix, s.round_number, s.payload_json
      FROM submissions s
      JOIN game_enrollments ge ON ge.token = s.token AND ge.game_token = s.game_token
@@ -385,12 +393,13 @@ submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   const id = c.req.param("id").toLowerCase();
 
-  const owner = await loadGameOwner(c.env, gameToken);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerTokenHeader(c));
+  const owner = await loadGameOwner(db, gameToken);
   if (owner === undefined) return c.json({ error: "game not found" }, 404);
   if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
 
   const ts = now();
-  const result = await c.env.DB.prepare(
+  const result = await db.prepare(
     `UPDATE submissions SET status = 'rejected', decided_at = ?
      WHERE id = ? AND game_token = ? AND status = 'pending'`
   ).bind(ts, id, gameToken).run();
@@ -405,14 +414,15 @@ submissions.post("/games/:gameToken/submissions/:id/reject", async (c) => {
 submissions.delete("/games/:gameToken", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
 
-  const owner = await loadGameOwner(c.env, gameToken);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), managerTokenHeader(c));
+  const owner = await loadGameOwner(db, gameToken);
   if (owner === undefined) return c.json({ error: "game not found" }, 404);
   if (owner && owner !== managerTokenHeader(c)) return c.json({ error: "forbidden" }, 403);
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(`DELETE FROM round_pushes WHERE game_token = ?`).bind(gameToken),
-    c.env.DB.prepare(`DELETE FROM game_enrollments WHERE game_token = ?`).bind(gameToken),
-    c.env.DB.prepare(`DELETE FROM submissions WHERE game_token = ?`).bind(gameToken),
+  await db.batch([
+    db.prepare(`DELETE FROM round_pushes WHERE game_token = ?`).bind(gameToken),
+    db.prepare(`DELETE FROM game_enrollments WHERE game_token = ?`).bind(gameToken),
+    db.prepare(`DELETE FROM submissions WHERE game_token = ?`).bind(gameToken),
   ]);
   return c.json({ ok: true });
 });
@@ -424,19 +434,20 @@ submissions.delete("/games/:gameToken", async (c) => {
 // managerSuffix so the PWA can display identity and render the joker control.
 submissions.get("/s/:token", async (c) => {
   const token = c.req.param("token").toLowerCase();
+  const db = await resolveTokenDB(c.env, shardHeader(c), token);
 
-  const pt = await c.env.DB.prepare(
+  const pt = await db.prepare(
     `SELECT token, player_name, manager_name, revoked_at FROM player_tokens WHERE token = ?`
   ).bind(token).first<any>();
 
   if (!pt) return c.json({ error: "Link not found." }, 404);
   if (pt.revoked_at) return c.json({ error: "This link has been revoked." }, 404);
 
-  await c.env.DB.prepare(
+  await db.prepare(
     `UPDATE player_tokens SET last_used_at = ? WHERE token = ?`
   ).bind(new Date().toISOString(), token).run();
 
-  const enrollments = await c.env.DB.prepare(
+  const enrollments = await db.prepare(
     `SELECT ge.game_token, ge.eligible_team_ids_json, ge.manager_suffix, ge.local_player_id,
             rp.mode, rp.round_number, rp.deadline, rp.game_name, rp.fixtures_json, rp.joker_enabled, rp.extra_json
      FROM game_enrollments ge
@@ -445,15 +456,16 @@ submissions.get("/s/:token", async (c) => {
   ).bind(token).all();
 
   const games = await Promise.all((enrollments.results ?? []).map(async (row: any) => {
-    const prior = await c.env.DB.prepare(
+    const prior = await db.prepare(
       `SELECT round_number, status, submitted_at, payload_json
        FROM submissions WHERE token = ? AND game_token = ? AND round_number = ?`
     ).bind(token, row.game_token, row.round_number).first<any>();
 
-    // Last-2-rounds submission history — the `submissions` table already
-    // retains the prior round's rows (pruned at round_number < current - 2 on
-    // push), this just surfaces what's already there. "What did I submit."
-    const historyRows = await c.env.DB.prepare(
+    // Last-2-rounds submission history — the `submissions` table isn't
+    // pruned (rows accumulate; see the sync-cost redesign, 2026-08), this
+    // query just bounds what it surfaces to the last 2 rounds. "What did I
+    // submit."
+    const historyRows = await db.prepare(
       `SELECT round_number, status, submitted_at, payload_json
        FROM submissions
        WHERE token = ? AND game_token = ? AND round_number < ? AND round_number >= ?
@@ -464,7 +476,7 @@ submissions.get("/s/:token", async (c) => {
     // fetched independently of `historyRows` since a player can have a
     // result for a round without ever having submitted anything there (e.g.
     // the manager entered their pick manually). Merged below by round number.
-    const resultsRows = await c.env.DB.prepare(
+    const resultsRows = await db.prepare(
       `SELECT round_number, results_json
        FROM round_results
        WHERE game_token = ? AND round_number < ? AND round_number >= ?
@@ -544,8 +556,9 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
   const token = c.req.param("token").toLowerCase();
   const gameToken = c.req.param("gameToken").toLowerCase();
   const body = await c.req.json<Record<string, unknown>>();
+  const db = await resolveTokenDB(c.env, shardHeader(c), token);
 
-  const enrollment = await c.env.DB.prepare(
+  const enrollment = await db.prepare(
     `SELECT ge.game_token
      FROM game_enrollments ge
      JOIN player_tokens pt ON pt.token = ge.token
@@ -553,7 +566,7 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
   ).bind(token, gameToken).first();
   if (!enrollment) return c.json({ error: "Link not found, revoked, or not enrolled in this game." }, 404);
 
-  const push = await c.env.DB.prepare(
+  const push = await db.prepare(
     `SELECT round_number, mode, deadline, fixtures_json FROM round_pushes WHERE game_token = ?`
   ).bind(gameToken).first<{ round_number: number; mode: string; deadline: string | null; fixtures_json: string }>();
   if (!push) return c.json({ error: "No active round for this game." }, 404);
@@ -606,7 +619,7 @@ submissions.post("/s/:token/games/:gameToken", async (c) => {
 
   const ts = now();
   const id = crypto.randomUUID().toLowerCase();
-  await c.env.DB.prepare(
+  await db.prepare(
     `INSERT INTO submissions (id, token, game_token, round_number, payload_json, status, submitted_at)
      VALUES (?, ?, ?, ?, ?, 'pending', ?)
      ON CONFLICT (token, game_token, round_number) DO UPDATE SET

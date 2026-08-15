@@ -67,7 +67,14 @@ actor AppAttestService {
         guard DCAppAttestService.shared.isSupported else { return [:] }
         do {
             let token = try await jwt()
-            return ["Authorization": "Bearer \(token)"]
+            var headers = ["Authorization": "Bearer \(token)"]
+            // Declared explicitly so the server can bind straight to this
+            // manager's shard with no lookup — see ShardID's doc comment and
+            // worker-api's shardRouter.ts. Absent until the first successful
+            // register/assert response has supplied one; the server's
+            // fallback path covers that gap.
+            if let shardId = ShardID.current { headers["X-Shard-Id"] = shardId }
+            return headers
         } catch {
             return [:]
         }
@@ -119,7 +126,9 @@ actor AppAttestService {
 
     // MARK: - JWT mint via POST /attest/assert
 
-    private struct AssertResponse: Decodable { let token: String; let expiresAt: String }
+    // `shardId` is absent from the dev-attest-bypass response server-side —
+    // decoded as optional so that path still parses cleanly.
+    private struct AssertResponse: Decodable { let token: String; let expiresAt: String; let shardId: String? }
 
     private func mintJWT(
         authority: URL, keyId: String,
@@ -136,6 +145,9 @@ actor AppAttestService {
         let parsed = try JSONDecoder().decode(AssertResponse.self, from: data)
         cachedToken    = parsed.token
         tokenExpiresAt = Self.parseExpiry(parsed.expiresAt)
+        // Refreshed on every JWT mint (every ~15 min), so a cache that was
+        // ever cleared self-heals without a dedicated round trip.
+        if let shardId = parsed.shardId { ShardID.current = shardId }
         return parsed.token
     }
 
@@ -212,6 +224,8 @@ actor AppAttestService {
         return try JSONDecoder().decode(ChallengeResponse.self, from: data).challenge
     }
 
+    private struct RegisterResponse: Decodable { let ok: Bool; let shardId: String? }
+
     private func register(
         baseURL: URL, keyId: String, attestation: String, challenge: String
     ) async throws {
@@ -225,6 +239,13 @@ actor AppAttestService {
         ])
         let (data, response) = try await URLSession.shared.data(for: req)
         try await Self.check(response, data: data)
+        // Register is the earliest point a brand-new manager's device ever
+        // touches the API — this is where a new manager first learns which
+        // shard it's been assigned to.
+        if let parsed = try? JSONDecoder().decode(RegisterResponse.self, from: data),
+           let shardId = parsed.shardId {
+            ShardID.current = shardId
+        }
     }
 
     private static func check(_ response: URLResponse, data: Data) async throws {

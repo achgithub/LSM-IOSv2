@@ -209,7 +209,7 @@ struct KillerGameDetailView: View {
         defer { isResending = false }
         let name = managerName
         do {
-            try await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context)
+            try await PWARoundPusher.pushKiller(game: game, round: nil, managerName: name, context: context, scope: PWAPlayerScope.forRoundPush(game: game))
             resendMessage = AppString("Sent to Player App just now.")
         } catch {
             resendMessage = AppString("Send failed: \(error.localizedDescription)")

@@ -16,8 +16,12 @@ import { DEFAULT_RETENTION_DAYS, LINK_CAP_GRACE_DAYS, WARN_LEAD_DAYS } from "./r
 // Retention policy summary (all age-based thresholds unified to 100 days —
 // see routes/admin.ts's GET /admin/cleanup-preview for a dry-run of these
 // same numbers before they're ever activated):
-//   Submissions:      keep last 2 rounds per game (prune on each new round push
-//                     AND here as a safety net)
+//   Submissions:      keep last 2 rounds per game — this cron is now the
+//                     ONLY pruning for submissions; the on-push prune in
+//                     routes/submissions.ts was removed (sync-cost redesign,
+//                     2026-08) so round_results is no longer pruned at all,
+//                     but submissions pruning still happens here if/when
+//                     this cron is activated
 //   Revoked tokens:   hard-delete 100 days after revocation (cascade cleans enrollments)
 //   Abandoned games:  warn at 86 days, delete at 100 (measured by round_pushes.updated_at)
 //   Attest devices:   delete 100 days after last assertion
@@ -31,7 +35,7 @@ export async function runDailyCleanup(env: Env): Promise<void> {
   const log = (msg: string) => console.log(JSON.stringify({ cron: "daily-cleanup", msg }));
   log("starting");
 
-  // ── 1. Submission pruning (safety net — primary pruning happens on push) ───
+  // ── 1. Submission pruning (the only pruning left — push no longer prunes) ──
   // Delete submissions more than 2 rounds behind the current open round per game.
   const gamePushes = await env.DB.prepare(
     `SELECT game_token, round_number FROM round_pushes`

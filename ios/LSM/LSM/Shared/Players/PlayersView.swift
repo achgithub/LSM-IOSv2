@@ -371,9 +371,10 @@ struct PlayerDetailView: View {
     /// Renames the roster member and cascades the new name to every per-game
     /// `Player` stamped from them, across every game and mode — the roster
     /// member is the one global player identity; games just copy its name in.
-    /// Shares/pushes read the name live, so nothing else needs to change here;
-    /// the backend's cached copy self-heals on the next round push instead of
-    /// a dedicated network call (see `OpenRoundView` push, `submissions.ts`).
+    /// Used to rely on the backend's cached `player_tokens.player_name`
+    /// self-healing on the next round push — no longer safe to assume now
+    /// that Predictor/Killer round-opens can omit `players[]` entirely, so
+    /// this triggers its own single-player push instead.
     private func commitRename() {
         let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
@@ -387,6 +388,10 @@ struct PlayerDetailView: View {
         let fd = FetchDescriptor<Player>(predicate: #Predicate { $0.rosterMemberId == memberId })
         if let players = try? context.fetch(fd) {
             for player in players { player.name = name }
+        }
+
+        if member.submissionTokenRaw != nil {
+            Task { await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context) }
         }
     }
 
@@ -463,6 +468,7 @@ struct PlayerDetailView: View {
                     member.submissionTokenRaw = token.lowercased()
                     linkOp = .idle
                 }
+                await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
             } catch let error as APIError {
                 if case .badStatus(409, _) = error {
                     // The 409 means the server still has an active link for
@@ -491,6 +497,7 @@ struct PlayerDetailView: View {
                 member.submissionTokenRaw = token.lowercased()
                 linkOp = .idle
             }
+            await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
         } catch {
             await MainActor.run {
                 linkOp = .error("A link already exists for this player under a different manager — ask them to revoke it, or use a different player name.")
@@ -522,6 +529,7 @@ struct PlayerDetailView: View {
                     member.submissionTokenRaw = newToken.lowercased()
                     linkOp = .idle
                 }
+                await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
             } catch {
                 await MainActor.run {
                     linkOp = .error("The old link stopped working, but we couldn't create a new one. Tap Get Submission Link to try again.")

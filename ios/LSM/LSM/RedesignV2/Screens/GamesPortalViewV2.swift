@@ -49,12 +49,19 @@ struct GamesPortalViewV2: View {
             let count = result.skippedNoOpenRound.count
             return count == 1 ? ", 1 waiting for a round" : ", \(count) waiting for a round"
         }()
+        // A retry-driven push to a game the manager didn't select this time
+        // (the outbox catching up on a previously dropped write) — surfaced
+        // so it's visible, not silent.
+        let retriedPart: String = {
+            guard result.retriedOutstanding > 0 else { return "" }
+            return result.retriedOutstanding == 1 ? ", 1 retried" : ", \(result.retriedOutstanding) retried"
+        }()
         if result.errors.isEmpty {
             let pendingPart = result.pendingCount == 1 ? "1 pending submission" : "\(result.pendingCount) pending submissions"
-            return "\(gamesPart), \(pendingPart)\(skippedPart)"
+            return "\(gamesPart), \(pendingPart)\(skippedPart)\(retriedPart)"
         } else {
             let errorPart = result.errors.count == 1 ? "1 game failed" : "\(result.errors.count) games failed"
-            return "\(gamesPart) — \(errorPart)\(skippedPart)"
+            return "\(gamesPart) — \(errorPart)\(skippedPart)\(retriedPart)"
         }
     }
 

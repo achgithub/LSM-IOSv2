@@ -412,7 +412,7 @@ struct OpenRoundViewV2: View {
         try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             let name = managerName
-            Task { try? await PWARoundPusher.pushLMSOrPredictor(game: game, round: round, managerName: name, context: context) }
+            Task { try? await PWARoundPusher.pushLMSOrPredictor(game: game, round: round, managerName: name, context: context, scope: PWAPlayerScope.forRoundPush(game: game)) }
         }
         onOpened()
         dismiss()

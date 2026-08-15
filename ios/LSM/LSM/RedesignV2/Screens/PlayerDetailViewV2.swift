@@ -285,6 +285,14 @@ struct PlayerDetailViewV2: View {
         if let players = try? context.fetch(fd) {
             for player in players { player.name = name }
         }
+
+        // player_tokens.player_name only updates server-side inside a push's
+        // players[] loop — now that Predictor/Killer round-opens can omit
+        // that array entirely, a rename needs its own push to reach the
+        // server rather than riding along with the next full-roster one.
+        if member.submissionTokenRaw != nil {
+            Task { await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context) }
+        }
     }
 
     private func attemptMintLink() {
@@ -307,6 +315,7 @@ struct PlayerDetailViewV2: View {
                     member.submissionTokenRaw = token.lowercased()
                     linkOp = .idle
                 }
+                await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
             } catch let error as APIError {
                 if case .badStatus(409, _) = error {
                     await retryMintAfterRevokeByName(name: name, managerName: trimmedManagerName)
@@ -327,6 +336,7 @@ struct PlayerDetailViewV2: View {
                 member.submissionTokenRaw = token.lowercased()
                 linkOp = .idle
             }
+            await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
         } catch {
             await MainActor.run {
                 linkOp = .error("A link already exists for this player under a different manager — ask them to revoke it, or use a different player name.")
@@ -355,6 +365,7 @@ struct PlayerDetailViewV2: View {
                     member.submissionTokenRaw = newToken.lowercased()
                     linkOp = .idle
                 }
+                await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context)
             } catch {
                 await MainActor.run {
                     linkOp = .error("The old link stopped working, but we couldn't create a new one. Tap Get Submission Link to try again.")

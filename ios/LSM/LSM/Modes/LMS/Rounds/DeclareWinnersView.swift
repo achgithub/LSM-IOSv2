@@ -66,7 +66,7 @@ struct DeclareWinnersView: View {
         try? context.save()
         if entitlements.canUseCloud, pwaSubmissionsEnabled, game.cloudGameToken != nil {
             let name = managerName
-            Task { try? await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context) }
+            Task { try? await PWARoundPusher.pushLMSOrPredictor(game: game, round: nil, managerName: name, context: context, scope: PWAPlayerScope.forRoundPush(game: game)) }
         }
         onDone()
         dismiss()

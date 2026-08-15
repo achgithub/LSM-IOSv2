@@ -21,6 +21,29 @@ enum PWAPushError: LocalizedError {
     }
 }
 
+/// Which players a push should enroll/re-enroll server-side. LMS always
+/// passes `.all` (used-teams eligibility is genuinely per-round, per-player
+/// data). Predictor/Killer pass `.all` only for the first push a game ever
+/// makes (nobody's enrolled yet) and `.none` on every subsequent round-open
+/// — `game_enrollments` has nothing new to say for those modes once the
+/// roster's already in. `.only` is a single-player push: mint, rename, or
+/// adding an already-linked player to a game with a round already open —
+/// cases where waiting for the next full-roster push would leave that one
+/// player unenrolled or stale server-side. See `Game.cloudRosterEnrolled`.
+enum PWAPlayerScope {
+    case all
+    case none
+    case only(Set<UUID>)
+
+    /// The scope for an ordinary round-open/game-complete/manual-resend push
+    /// — every call site that isn't a single-player mint/rename/add-to-game
+    /// push should use this rather than re-deriving the rule inline.
+    static func forRoundPush(game: Game) -> PWAPlayerScope {
+        if game.mode == .lms { return .all }
+        return game.cloudRosterEnrolled ? .none : .all
+    }
+}
+
 /// Central place for pushing PWA round state — used by all three triggers
 /// (round-open, game-complete, manual "resend") across all three modes, not
 /// just the round-open flow. Game-complete and manual-resend don't have a
@@ -38,7 +61,8 @@ enum PWARoundPusher {
     /// Always attempts to attach the most-recently-closed round's results,
     /// regardless of trigger — safe/idempotent to resend the same result twice.
     static func pushLMSOrPredictor(
-        game: Game, round: Round?, managerName: String, context: ModelContext, baseURLOverride: URL? = nil
+        game: Game, round: Round?, managerName: String, context: ModelContext,
+        scope: PWAPlayerScope, baseURLOverride: URL? = nil
     ) async throws {
         guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
         guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
@@ -101,13 +125,19 @@ enum PWARoundPusher {
             String($0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
         }
         let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
+        let scopedPlayers: [Player]
+        switch scope {
+        case .all: scopedPlayers = linkedPlayers
+        case .none: scopedPlayers = []
+        case .only(let ids): scopedPlayers = linkedPlayers.filter { ids.contains($0.id) }
+        }
         let trimmedManagerName: String? = {
             let n = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
             return n.isEmpty ? nil : n
         }()
 
         var playerItems: [PlayerPushItem] = []
-        for player in linkedPlayers {
+        for player in scopedPlayers {
             guard let token = playerTokenMap[player.id] else { continue }
             let eligibleTeams: [EligibleTeam]
             if mode == .lms {
@@ -131,6 +161,7 @@ enum PWARoundPusher {
 
         let (prevRoundNumber, prevResultsJSON) = lmsOrPredictorPreviousResults(game: game, mode: mode, data: ld)
 
+        game.pushPending = true
         do {
             try await SubmissionsClient.shared.pushRound(
                 gameToken: gameToken,
@@ -147,6 +178,8 @@ enum PWARoundPusher {
                 previousResultsJSON: prevResultsJSON,
                 baseURLOverride: baseURLOverride
             )
+            game.pushPending = false
+            if case .all = scope { game.cloudRosterEnrolled = true }
         } catch {
             pwaPushLog.warning("Round push failed: \(error.localizedDescription)")
             throw error
@@ -203,7 +236,8 @@ enum PWARoundPusher {
     /// `extra` payload and its own per-player result fields (lives/hits
     /// rather than survived/points).
     static func pushKiller(
-        game: Game, round: Round?, managerName: String, context: ModelContext, baseURLOverride: URL? = nil
+        game: Game, round: Round?, managerName: String, context: ModelContext,
+        scope: PWAPlayerScope, baseURLOverride: URL? = nil
     ) async throws {
         guard let ld = try? await LeagueData.load(for: game.leagues) else { throw PWAPushError.noLeagueData }
         guard let targetRound = round ?? game.rounds.max(by: { $0.roundNumber < $1.roundNumber }) else {
@@ -248,12 +282,18 @@ enum PWARoundPusher {
             String($0.id.uuidString.replacingOccurrences(of: "-", with: "").suffix(8)).lowercased()
         }
         let linkedPlayers = game.activePlayers.filter { !$0.isManager && playerTokenMap[$0.id] != nil }
+        let scopedPlayers: [Player]
+        switch scope {
+        case .all: scopedPlayers = linkedPlayers
+        case .none: scopedPlayers = []
+        case .only(let ids): scopedPlayers = linkedPlayers.filter { ids.contains($0.id) }
+        }
         let trimmedManagerName: String? = {
             let n = managerName.trimmingCharacters(in: .whitespacesAndNewlines)
             return n.isEmpty ? nil : n
         }()
 
-        let playerItems: [PlayerPushItem] = linkedPlayers.compactMap { player in
+        let playerItems: [PlayerPushItem] = scopedPlayers.compactMap { player in
             guard let token = playerTokenMap[player.id] else { return nil }
             return PlayerPushItem(
                 token: token, localPlayerId: player.id.uuidString.lowercased(),
@@ -263,6 +303,7 @@ enum PWARoundPusher {
 
         let (prevRoundNumber, prevResultsJSON) = killerPreviousResults(game: game)
 
+        game.pushPending = true
         do {
             try await SubmissionsClient.shared.pushRound(
                 gameToken: gameToken,
@@ -280,6 +321,8 @@ enum PWARoundPusher {
                 previousResultsJSON: prevResultsJSON,
                 baseURLOverride: baseURLOverride
             )
+            game.pushPending = false
+            if case .all = scope { game.cloudRosterEnrolled = true }
         } catch {
             pwaPushLog.warning("Killer round push failed: \(error.localizedDescription)")
             throw error
@@ -347,5 +390,53 @@ enum PWARoundPusher {
         }
         guard !items.isEmpty, let json = try? String(data: JSONEncoder().encode(items), encoding: .utf8) else { return (nil, nil) }
         return (lastClosed.roundNumber, json)
+    }
+
+    // MARK: - Single-player push (mint / rename / add-to-game)
+
+    /// Pushes one roster member's enrollment into every game with an open
+    /// round that they're linked to — the counterpart to the full-roster
+    /// pushes above for mint, rename, and "add an existing player to a game
+    /// already in progress." Needed now that Predictor/Killer round-opens
+    /// omit `players[]` once `Game.cloudRosterEnrolled` is true: without
+    /// this, a player minted, renamed, or added mid-round would never reach
+    /// `game_enrollments`/`player_tokens` until the next full-roster push —
+    /// which, for those two modes, may not happen again for the rest of the
+    /// game. Silently skips a game with no cloud token yet (round 1 hasn't
+    /// pushed, so the eventual first push already covers this player) or no
+    /// currently-open round — matches "mint before round 1 opens: no
+    /// change." Best-effort: failures are logged, not surfaced, since this
+    /// rides along with an unrelated user action (rename, add-to-game) that
+    /// shouldn't itself appear to fail because a background enrollment push
+    /// didn't land — the outbox (`Game.pushPending`) picks up the retry.
+    static func pushSinglePlayerIfNeeded(rosterMember: RosterMember, context: ModelContext) async {
+        let memberId = rosterMember.id
+        let fd = FetchDescriptor<Player>(predicate: #Predicate { $0.rosterMemberId == memberId })
+        guard let players = try? context.fetch(fd) else { return }
+
+        let managerName = UserDefaults.standard.string(forKey: ManagerSettings.nameKey) ?? ""
+
+        for player in players where !player.isManager {
+            guard let game = player.game else { continue }
+            guard game.cloudGameTokenRaw != nil else { continue }
+            guard let openRound = game.rounds.first(where: { $0.status == .open }) else { continue }
+
+            do {
+                switch game.mode {
+                case .lms, .predictor:
+                    try await pushLMSOrPredictor(
+                        game: game, round: openRound, managerName: managerName, context: context,
+                        scope: .only([player.id])
+                    )
+                case .killer:
+                    try await pushKiller(
+                        game: game, round: openRound, managerName: managerName, context: context,
+                        scope: .only([player.id])
+                    )
+                }
+            } catch {
+                pwaPushLog.warning("Single-player push failed for \(game.name): \(error.localizedDescription)")
+            }
+        }
     }
 }

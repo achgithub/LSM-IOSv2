@@ -158,6 +158,14 @@ struct AddPlayersView: View {
         context.insert(player)
         game.players.append(player)
         KillerScoringService.attachStateIfNeeded(to: player, game: game, context: context)
+
+        // If this game already has an open round, the new player needs their
+        // own enrollment push — Predictor/Killer round-opens can now omit
+        // players[] entirely, so waiting for the next one would leave them
+        // unenrolled server-side.
+        if member.submissionTokenRaw != nil {
+            Task { await PWARoundPusher.pushSinglePlayerIfNeeded(rosterMember: member, context: context) }
+        }
     }
 
     private func addManager() {

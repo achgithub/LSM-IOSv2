@@ -88,11 +88,12 @@ CREATE TABLE IF NOT EXISTS round_pushes (
 CREATE INDEX IF NOT EXISTS idx_round_pushes_manager ON round_pushes (manager_token);
 
 -- ── Round results ─────────────────────────────────────────────────────────────
--- Last-2-rounds "what happened" per game — survived/eliminated (LMS), points
--- (Predictor), lives/hits (Killer). Written alongside a round_pushes upsert
--- (piggybacked on round-open, game-complete, or a manual resend — never a
--- dedicated push), pruned to the last 2 rows per game_token. Opaque
--- results_json, same pattern as fixtures_json/payload_json/extra_json above.
+-- "What happened" per game — survived/eliminated (LMS), points (Predictor),
+-- lives/hits (Killer). Written alongside a round_pushes upsert (piggybacked
+-- on round-open, game-complete, or a manual resend — never a dedicated
+-- push). Not pruned — rows accumulate per (game_token, round_number); see
+-- the sync-cost redesign (2026-08) for why. Opaque results_json, same
+-- pattern as fixtures_json/payload_json/extra_json above.
 CREATE TABLE IF NOT EXISTS round_results (
   game_token    TEXT NOT NULL,
   round_number  INTEGER NOT NULL,

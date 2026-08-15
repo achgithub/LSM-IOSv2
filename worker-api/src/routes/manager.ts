@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { resolveManagerDB } from "../shardRouter";
 
 // ── Manager lifecycle (Phase 6) ───────────────────────────────────────────────
 //
@@ -33,14 +34,19 @@ function tokenFromHeader(c: any): string | null {
   return c.req.header("X-Manager-Token")?.toLowerCase() ?? null;
 }
 
+function shardHeader(c: any): string | null {
+  return c.req.header("X-Shard-Id") ?? null;
+}
+
 // GET /manager/status
 // Returns the lifecycle state for the iOS Cloud Settings screen.
 // Called when the Cloud Settings section is opened — not on every app launch.
 manager.get("/status", async (c) => {
   const token = tokenFromHeader(c);
   if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
 
-  const row = await c.env.DB.prepare(
+  const row = await db.prepare(
     `SELECT manager_token, created_at, unsubscribed_at, scheduled_delete_at
      FROM manager_lifecycle WHERE manager_token = ?`
   ).bind(token).first<any>();
@@ -58,7 +64,7 @@ manager.get("/status", async (c) => {
   }
 
   // Check if they have been warned (abandoned path)
-  const warnedPush = await c.env.DB.prepare(
+  const warnedPush = await db.prepare(
     `SELECT warned_at FROM round_pushes WHERE manager_token = ? AND warned_at IS NOT NULL LIMIT 1`
   ).bind(token).first<any>();
 
@@ -75,12 +81,13 @@ manager.get("/status", async (c) => {
 manager.post("/unsubscribe", async (c) => {
   const token = tokenFromHeader(c);
   if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
 
   const ts = now();
   const deleteAt = addDays(ts, 14);
 
   // Upsert lifecycle row, only setting scheduled_delete_at if not already set.
-  await c.env.DB.prepare(
+  await db.prepare(
     `INSERT INTO manager_lifecycle (manager_token, created_at, unsubscribed_at, scheduled_delete_at)
      VALUES (?, ?, ?, ?)
      ON CONFLICT (manager_token) DO UPDATE SET
@@ -97,8 +104,9 @@ manager.post("/unsubscribe", async (c) => {
 manager.post("/resubscribe", async (c) => {
   const token = tokenFromHeader(c);
   if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
 
-  await c.env.DB.prepare(
+  await db.prepare(
     `UPDATE manager_lifecycle
      SET unsubscribed_at = NULL, scheduled_delete_at = NULL
      WHERE manager_token = ?`
@@ -118,24 +126,25 @@ manager.post("/resubscribe", async (c) => {
 manager.post("/entitlements", async (c) => {
   const token = tokenFromHeader(c);
   if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
 
   const body = await c.req.json<{ maxPWALinks?: number | null }>().catch(() => null);
   const maxPWALinks = typeof body?.maxPWALinks === "number" ? body.maxPWALinks : null;
   const ts = now();
 
-  await c.env.DB.prepare(
+  await db.prepare(
     `INSERT INTO manager_lifecycle (manager_token, created_at, max_pwa_links)
      VALUES (?, ?, ?)
      ON CONFLICT (manager_token) DO UPDATE SET max_pwa_links = excluded.max_pwa_links`
   ).bind(token, ts, maxPWALinks).run();
 
   if (maxPWALinks != null) {
-    const activeCount = await c.env.DB.prepare(
+    const activeCount = await db.prepare(
       `SELECT COUNT(*) AS n FROM player_tokens WHERE manager_token = ? AND revoked_at IS NULL`
     ).bind(token).first<{ n: number }>();
 
     if ((activeCount?.n ?? 0) <= maxPWALinks) {
-      await c.env.DB.prepare(
+      await db.prepare(
         `UPDATE manager_lifecycle SET link_cap_warned_at = NULL
          WHERE manager_token = ? AND link_cap_warned_at IS NOT NULL`
       ).bind(token).run();

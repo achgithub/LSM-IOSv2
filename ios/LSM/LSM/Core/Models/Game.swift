@@ -77,6 +77,29 @@ final class Game {
     /// Typed accessor; nil if PWA submissions have never been activated.
     var cloudGameToken: UUID? { cloudGameTokenRaw.flatMap(UUID.init) }
 
+    /// True once a full-roster push has completed successfully for this game
+    /// (every active linked player enrolled in `game_enrollments` server-side).
+    /// Predictor/Killer round-opens after this point omit `players[]` entirely
+    /// — those modes have no personalized round-scoped player data, so
+    /// re-enrolling everyone on every push was pure waste. LMS ignores this
+    /// flag and always sends the full roster (used-teams eligibility is
+    /// genuinely per-round data). Never reset to false — there's no
+    /// "un-enroll everyone" flow. Defaults to false, so existing games
+    /// migrate unchanged (lightweight migration, same pattern as
+    /// `isDemoData`/`isFavourite`).
+    var cloudRosterEnrolled: Bool = false
+
+    /// True from the moment a push to the Player App is sent until a
+    /// confirmed (non-throwing) response clears it — the client-side outbox.
+    /// A push that never confirms (dropped connection, backgrounded app)
+    /// leaves this true, so the next manual Sync or app launch knows to
+    /// resend this game's current state rather than silently losing the
+    /// write. Every push in this system is an idempotent upsert on a natural
+    /// key, so resending is always safe regardless of how many rounds have
+    /// been open in between. Defaults to false, same migration pattern as
+    /// `cloudRosterEnrolled` above.
+    var pushPending: Bool = false
+
     @Relationship(deleteRule: .cascade, inverse: \Player.game)
     var players: [Player] = []
 
