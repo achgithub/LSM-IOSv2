@@ -186,6 +186,13 @@ final class SyncCoordinator {
                 errors.append(SyncGameError(gameName: game.name, message: error.localizedDescription))
             }
         }
+        if retried > 0 {
+            // Per-game "outbox cleared"/"outbox queued" lines already come
+            // from PWARoundPusher itself — this is the summary, useful
+            // mainly for retryOutstanding()'s silent app-launch sweep, which
+            // otherwise leaves no trace anywhere a manager could check.
+            await DiagnosticLog.shared.log("outbox sweep retried \(retried) game(s)", category: "submissions")
+        }
         return PushGamesOutcome(pushed: pushed, retried: retried, errors: errors, skippedNoOpenRound: skippedNoOpenRound)
     }
 }

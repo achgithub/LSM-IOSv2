@@ -161,6 +161,7 @@ enum PWARoundPusher {
 
         let (prevRoundNumber, prevResultsJSON) = lmsOrPredictorPreviousResults(game: game, mode: mode, data: ld)
 
+        let wasPending = game.pushPending
         game.pushPending = true
         do {
             try await SubmissionsClient.shared.pushRound(
@@ -180,8 +181,12 @@ enum PWARoundPusher {
             )
             game.pushPending = false
             if case .all = scope { game.cloudRosterEnrolled = true }
+            if wasPending {
+                await DiagnosticLog.shared.log("outbox cleared for \(game.name)", category: "submissions")
+            }
         } catch {
             pwaPushLog.warning("Round push failed: \(error.localizedDescription)")
+            await DiagnosticLog.shared.log("outbox queued for \(game.name): \(error.localizedDescription)", category: "submissions")
             throw error
         }
     }
@@ -303,6 +308,7 @@ enum PWARoundPusher {
 
         let (prevRoundNumber, prevResultsJSON) = killerPreviousResults(game: game)
 
+        let wasPending = game.pushPending
         game.pushPending = true
         do {
             try await SubmissionsClient.shared.pushRound(
@@ -323,8 +329,12 @@ enum PWARoundPusher {
             )
             game.pushPending = false
             if case .all = scope { game.cloudRosterEnrolled = true }
+            if wasPending {
+                await DiagnosticLog.shared.log("outbox cleared for \(game.name)", category: "submissions")
+            }
         } catch {
             pwaPushLog.warning("Killer round push failed: \(error.localizedDescription)")
+            await DiagnosticLog.shared.log("outbox queued for \(game.name): \(error.localizedDescription)", category: "submissions")
             throw error
         }
     }
