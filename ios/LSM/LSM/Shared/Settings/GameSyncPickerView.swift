@@ -4,40 +4,36 @@ import SwiftData
 /// Lists this manager's cloud games and lets the user pull individual ones
 /// down to this device — one at a time, by explicit choice, never all at
 /// once (see `GameSyncBuilder`'s header comment on why "sync a game" is
-/// deliberately not a bulk restore). Reachable both from onboarding right
-/// after linking a device, and later from Settings for a device that just
-/// wants to pick up an additional game.
+/// deliberately not a bulk restore). Reachable from onboarding right after
+/// linking a device — the only other entry point, "come back later for
+/// another game," is now inlined into `ProfileSettingsView` instead of a
+/// separate screen. State/logic lives in `GameSyncListModel`, shared with
+/// that inline copy so there's one local-existence check and one ad gate.
 struct GameSyncPickerView: View {
     @Environment(\.modelContext) private var context
+    @State private var model = GameSyncListModel()
 
     /// Called once, when the user taps Done — lets a presenting onboarding
     /// flow move on regardless of whether anything was actually synced.
     var onFinished: (() -> Void)?
 
-    @State private var games: [RemoteGameSummary] = []
-    @State private var isLoading = true
-    @State private var loadError: String?
-    @State private var syncingTokens: Set<String> = []
-    @State private var syncedTokens: Set<String> = []
-    @State private var errorsByToken: [String: String] = [:]
-
     var body: some View {
         List {
-            if let loadError {
+            if let loadError = model.loadError {
                 Section {
                     Text(loadError).foregroundStyle(.secondary)
-                    Button("Try Again") { Task { await load() } }
+                    Button("Try Again") { Task { await model.load(context: context) } }
                 }
-            } else if isLoading {
+            } else if model.isLoading {
                 Section { ProgressView() }
-            } else if games.isEmpty {
+            } else if model.games.isEmpty {
                 Section {
                     Text("No cloud games found for this account.")
                         .foregroundStyle(.secondary)
                 }
             } else {
                 Section {
-                    ForEach(games) { game in
+                    ForEach(model.games) { game in
                         gameRow(game)
                     }
                 } footer: {
@@ -47,7 +43,7 @@ struct GameSyncPickerView: View {
         }
         .navigationTitle("Sync Games")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task { await model.load(context: context) }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { onFinished?() }
@@ -69,7 +65,7 @@ struct GameSyncPickerView: View {
                 Spacer()
                 trailingControl(for: game)
             }
-            if let message = errorsByToken[game.gameToken] {
+            if let message = model.errorsByToken[game.gameToken] {
                 Text(message).font(.caption).foregroundStyle(.red)
             }
         }
@@ -77,39 +73,15 @@ struct GameSyncPickerView: View {
 
     @ViewBuilder
     private func trailingControl(for game: RemoteGameSummary) -> some View {
-        if syncedTokens.contains(game.gameToken) {
-            Label("Synced", systemImage: "checkmark.circle.fill")
-                .labelStyle(.iconOnly)
+        if model.isLocal(game) {
+            Label("On This Device", systemImage: "checkmark.circle.fill")
+                .font(.caption)
                 .foregroundStyle(.green)
-        } else if syncingTokens.contains(game.gameToken) {
+        } else if model.syncingTokens.contains(game.gameToken) {
             ProgressView()
         } else {
-            Button("Sync") { Task { await sync(game) } }
+            Button("Sync") { model.sync(game, context: context) }
                 .buttonStyle(.bordered)
-        }
-    }
-
-    private func load() async {
-        isLoading = true
-        loadError = nil
-        defer { isLoading = false }
-        do {
-            games = try await GameSyncClient.shared.listGames()
-        } catch {
-            loadError = error.localizedDescription
-        }
-    }
-
-    private func sync(_ game: RemoteGameSummary) async {
-        syncingTokens.insert(game.gameToken)
-        errorsByToken[game.gameToken] = nil
-        defer { syncingTokens.remove(game.gameToken) }
-        do {
-            let bundle = try await GameSyncClient.shared.pullGame(gameToken: game.gameToken)
-            try GameSyncBuilder.build(from: bundle, gameToken: game.gameToken, into: context)
-            syncedTokens.insert(game.gameToken)
-        } catch {
-            errorsByToken[game.gameToken] = error.localizedDescription
         }
     }
 }

@@ -21,6 +21,7 @@ struct LinkDeviceView: View {
     @State private var otpDraft = ""
     @State private var isBusy = false
     @State private var errorMessage: String?
+    @State private var showTransferConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,16 @@ struct LinkDeviceView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
+        }
+        .alert("Make This Your Active Device?", isPresented: $showTransferConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Link Device") {
+                if case .enterCode(let email) = step {
+                    Task { await verifyAndLink(email: email) }
+                }
+            }
+        } message: {
+            Text("This phone will become the active device for this account. Your other device will stop working until it's linked again.")
         }
     }
 
@@ -83,7 +94,7 @@ struct LinkDeviceView: View {
             }
             Section {
                 Button {
-                    Task { await verifyAndLink(email: email) }
+                    showTransferConfirm = true
                 } label: {
                     if isBusy { ProgressView() } else { Text("Link This Device") }
                 }
