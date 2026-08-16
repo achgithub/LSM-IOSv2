@@ -123,6 +123,10 @@ struct RootTabView: View {
             // Fire-and-forget: refreshes the league list for the *next* launch
             // (see Leagues.refreshFromRegistry) — never blocks this launch.
             Task { await Leagues.refreshFromRegistry() }
+            // One-time-ever: flags existing cloud games so the outbox retry
+            // right below picks them up and backfills game_config_json for
+            // per-game sync. See `SyncCoordinator.backfillGameConfigIfNeeded`.
+            syncCoordinator.backfillGameConfigIfNeeded(context: context)
             // Fire-and-forget: clears the client-side outbox — any push from
             // a previous session that never confirmed (dropped connection,
             // backgrounded mid-request) gets retried now rather than waiting

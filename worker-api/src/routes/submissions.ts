@@ -131,7 +131,7 @@ submissions.post("/links/revoke-by-name", async (c) => {
 // POST /games/:gameToken/push
 // Upsert the open round and (re)enroll every player who has a token.
 // Body: { mode, roundNumber, deadline?, gameName?, fixtures, jokerEnabled?, extra?,
-//         previousResultsRoundNumber?, previousResults?, managerSuffix?, players }
+//         previousResultsRoundNumber?, previousResults?, managerSuffix?, players, gameConfig? }
 // `extra` is an opaque, mode-specific JSON string (e.g. Killer's
 // {"phase":"build"}) — stored and returned unread/unvalidated, exactly like
 // fixtures/payload_json elsewhere in this file. Null/omitted for LMS/Predictor.
@@ -142,6 +142,12 @@ submissions.post("/links/revoke-by-name", async (c) => {
 // game-complete event with no new round, or a manual "resend" retry. Not a
 // separate endpoint — always rides along with the same round_pushes upsert
 // this route already does.
+// `gameConfig` is another opaque JSON string, same convention — the game's
+// own settings (league ids, LMS rules, Predictor/Killer scoring config),
+// needed for GET /manager/games/:gameToken/sync to reconstruct a working
+// game on a different device (see routes/manager.ts). COALESCEd on write so
+// an older app build's push (which won't send this field) never clobbers a
+// value a newer build already stored.
 submissions.post("/games/:gameToken/push", async (c) => {
   const gameToken = c.req.param("gameToken").toLowerCase();
   // fixtureId/opponentName are set when a team plays twice in the round
@@ -169,10 +175,12 @@ submissions.post("/games/:gameToken/push", async (c) => {
     managerName?: string | null;
     managerToken?: string | null;
     players: PushPlayer[];
+    gameConfig?: string | null;
   }>();
   const {
     mode, roundNumber, deadline, gameName, fixtures, jokerEnabled, extra,
     previousResultsRoundNumber, previousResults, managerSuffix, managerName, managerToken, players,
+    gameConfig,
   } = body ?? {};
   if (!mode || roundNumber == null || !Array.isArray(fixtures)) {
     return c.json({ error: "mode, roundNumber, and fixtures are required" }, 400);
@@ -193,8 +201,8 @@ submissions.post("/games/:gameToken/push", async (c) => {
   }
 
   await db.prepare(
-    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at, extra_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO round_pushes (game_token, mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, updated_at, extra_json, game_config_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (game_token) DO UPDATE SET
        mode = excluded.mode,
        round_number = excluded.round_number,
@@ -204,8 +212,9 @@ submissions.post("/games/:gameToken/push", async (c) => {
        joker_enabled = excluded.joker_enabled,
        manager_token = COALESCE(round_pushes.manager_token, excluded.manager_token),
        updated_at = excluded.updated_at,
-       extra_json = excluded.extra_json`
-  ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts, extra ?? null).run();
+       extra_json = excluded.extra_json,
+       game_config_json = COALESCE(excluded.game_config_json, round_pushes.game_config_json)`
+  ).bind(gameToken, mode, roundNumber, deadline ?? null, gameName ?? null, JSON.stringify(fixtures), jokerEnabled ? 1 : 0, mgrToken, ts, extra ?? null, gameConfig ?? null).run();
 
   if (mgrToken) await ensureManagerLifecycle(db, mgrToken);
 

@@ -98,6 +98,132 @@ manager.post("/unsubscribe", async (c) => {
   return c.json({ ok: true, scheduledDeleteAt: deleteAt });
 });
 
+// GET /manager/games
+// Lists this manager's games (current round summary only) — feeds the
+// per-game sync picker on a newly linked device (see routes/account.ts).
+// Not a restore browser: just enough to let the user pick which game to
+// pull down next via /manager/games/:gameToken/sync.
+manager.get("/games", async (c) => {
+  const token = tokenFromHeader(c);
+  if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
+
+  const rows = await db.prepare(
+    `SELECT game_token, mode, game_name, round_number, deadline, updated_at
+     FROM round_pushes WHERE manager_token = ? ORDER BY updated_at DESC`
+  ).bind(token).all<{
+    game_token: string; mode: string; game_name: string | null;
+    round_number: number; deadline: string | null; updated_at: string;
+  }>();
+
+  const games = (rows.results ?? []).map((r) => ({
+    gameToken: r.game_token,
+    mode: r.mode,
+    gameName: r.game_name,
+    roundNumber: r.round_number,
+    deadline: r.deadline,
+    updatedAt: r.updated_at,
+  }));
+  return c.json({ games });
+});
+
+// GET /manager/games/:gameToken/sync
+// Pulls one game's syncable state: the current open round (round_pushes is
+// overwrite-in-place, so this is the only round ever recoverable) plus the
+// full score history (round_results keeps a row per round), enrolled
+// players, and this round's already-approved submissions (a player's pick/
+// prediction that's already locked in — still-pending ones stay reachable
+// via the existing GET /games/:gameToken/submissions approval queue, which
+// only needs gameToken + round, so they don't need duplicating here).
+// Verifies the requesting manager_token actually owns this game before
+// returning anything — an X-Manager-Token header is a claim, not proof, so
+// it can't be trusted on its own for a cross-manager read.
+//
+// `gameConfigJson` can be null — games pushed before this column existed
+// (migrations/0007_add_round_pushes_game_config_json.sql) have none, and
+// neither do games whose owning device never relaunched after that shipped
+// to run the one-time backfill (see PWARoundPusher on iOS). `syncable:
+// false` tells the client not to attempt reconstruction rather than
+// guessing at scoring-critical config (LMS draw/postponed rules, Predictor/
+// Killer point values, etc.) that was never sent to the server at all.
+manager.get("/games/:gameToken/sync", async (c) => {
+  const token = tokenFromHeader(c);
+  if (!token) return c.json({ error: "missing X-Manager-Token" }, 400);
+  const gameToken = c.req.param("gameToken");
+  const { db } = await resolveManagerDB(c.env, shardHeader(c), token);
+
+  const push = await db.prepare(
+    `SELECT mode, round_number, deadline, game_name, fixtures_json, joker_enabled, manager_token, extra_json, game_config_json, updated_at
+     FROM round_pushes WHERE game_token = ?`
+  ).bind(gameToken).first<{
+    mode: string; round_number: number; deadline: string | null; game_name: string | null;
+    fixtures_json: string; joker_enabled: number; manager_token: string | null;
+    extra_json: string | null; game_config_json: string | null; updated_at: string;
+  }>();
+
+  // Same response whether the game doesn't exist or belongs to someone else
+  // — doesn't matter here (game_tokens are unguessable UUIDs, not an
+  // enumeration surface like the account/email routes), but there's no
+  // reason to distinguish the two either.
+  if (!push || push.manager_token !== token) {
+    return c.json({ error: "not authorized for this game" }, 403);
+  }
+
+  const resultsRows = await db.prepare(
+    `SELECT round_number, mode, results_json, created_at FROM round_results
+     WHERE game_token = ? ORDER BY round_number ASC`
+  ).bind(gameToken).all<{ round_number: number; mode: string; results_json: string; created_at: string }>();
+
+  const playerRows = await db.prepare(
+    `SELECT pt.token, pt.player_name, ge.local_player_id, ge.eligible_team_ids_json, ge.manager_suffix
+     FROM game_enrollments ge JOIN player_tokens pt ON pt.token = ge.token
+     WHERE ge.game_token = ?`
+  ).bind(gameToken).all<{
+    token: string; player_name: string; local_player_id: string;
+    eligible_team_ids_json: string | null; manager_suffix: string | null;
+  }>();
+
+  // Only the currently-open round's approved submissions — past rounds are
+  // already summarized in round_results, and pending ones are covered by
+  // the existing approval-queue route (see comment above).
+  const approvedRows = await db.prepare(
+    `SELECT s.token, s.payload_json FROM submissions s
+     WHERE s.game_token = ? AND s.round_number = ? AND s.status = 'approved'`
+  ).bind(gameToken, push.round_number).all<{ token: string; payload_json: string }>();
+
+  return c.json({
+    syncable: push.game_config_json != null,
+    gameConfigJson: push.game_config_json,
+    currentRound: {
+      mode: push.mode,
+      roundNumber: push.round_number,
+      deadline: push.deadline,
+      gameName: push.game_name,
+      fixturesJson: push.fixtures_json,
+      jokerEnabled: !!push.joker_enabled,
+      extraJson: push.extra_json,
+      updatedAt: push.updated_at,
+    },
+    results: (resultsRows.results ?? []).map((r) => ({
+      roundNumber: r.round_number,
+      mode: r.mode,
+      resultsJson: r.results_json,
+      createdAt: r.created_at,
+    })),
+    players: (playerRows.results ?? []).map((p) => ({
+      token: p.token,
+      playerName: p.player_name,
+      localPlayerId: p.local_player_id,
+      eligibleTeamIdsJson: p.eligible_team_ids_json,
+      managerSuffix: p.manager_suffix,
+    })),
+    approvedSubmissions: (approvedRows.results ?? []).map((r) => ({
+      token: r.token,
+      payloadJson: r.payload_json,
+    })),
+  });
+});
+
 // POST /manager/resubscribe
 // Called if the manager re-subscribes within the grace period — clears the
 // pending deletion so the cron doesn't remove active data.

@@ -3,7 +3,8 @@
 // One deployment per region (--env uk | eu | …). Owns:
 //   • App Attest device registry + JWT issuance   /attest/*
 //   • PWA submission queue (manager + player)     /links, /games/*, /s/*
-//   • Manager lifecycle                           /manager/*
+//   • Manager lifecycle + per-game sync            /manager/*
+//   • Email registration + device recovery        /account/*
 //   • Region migration stubs                      /manager/export, /manager/import
 //   • Global outage flag (ops-only)                /admin/outage
 //
@@ -12,13 +13,16 @@
 //
 // Cloud Backup (/backup/*) and Cloud Publish (/publish, /publish/:id/unlock)
 // were removed 2026-08-02 — R2 dependency being shed ahead of launch. Publish
-// was already unreachable from any app UI; Backup is being replaced by a
-// per-game export/import feature (not yet built).
+// was already unreachable from any app UI; Backup is being replaced by
+// /account/* (identity only, not game data) plus /manager/games/* for
+// per-game sync — see routes/account.ts's header comment for how the two
+// fit together.
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { admin } from "./routes/admin";
 import { attest } from "./routes/attest";
+import { account } from "./routes/account";
 import { manager } from "./routes/manager";
 import { submissions } from "./routes/submissions";
 import { migrate } from "./routes/migrate";
@@ -68,11 +72,17 @@ app.use("/links", requireJWT);
 app.use("/links/*", requireJWT);
 app.use("/games/*", requireJWT);
 app.use("/manager/*", requireJWT);
+// Only the already-live-device half of /account/* is gated — /account/link-device/*
+// stays public below, same as /attest/register (a device with no JWT yet is exactly
+// who needs it).
+app.use("/account/register", requireJWT);
+app.use("/account/verify", requireJWT);
 
 // Single submissions mount after middleware — /s/* stays public, everything else gated.
 app.route("/", submissions);
 app.route("/manager", manager);
 app.route("/manager", migrate); // /manager/export, /manager/import
+app.route("/account", account);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {

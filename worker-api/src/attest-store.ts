@@ -63,3 +63,11 @@ export async function updateSignCount(
     .bind(signCount, new Date().toISOString(), keyId)
     .run();
 }
+
+// Used by the account-transfer guard in routes/attest.ts — deleting the
+// previous active device's row is what actually locks it out (its cached
+// JWT still works until it expires, but re-asserting after that fails once
+// this row is gone).
+export async function deleteDevice(db: D1Database, keyId: string): Promise<void> {
+  await db.prepare("DELETE FROM attest_devices WHERE key_id = ?").bind(keyId).run();
+}

@@ -152,6 +152,7 @@ actor SubmissionsClient {
         extraJSON: String? = nil,
         previousResultsRoundNumber: Int? = nil,
         previousResultsJSON: String? = nil,
+        gameConfigJSON: String? = nil,
         baseURLOverride: URL? = nil
     ) async throws {
         struct Body: Encodable {
@@ -172,6 +173,12 @@ actor SubmissionsClient {
             /// string convention as `extra`, paired with the round it's for.
             let previousResultsRoundNumber: Int?
             let previousResults: String?
+            /// The game's own settings (see `GameConfigPayload`) — same
+            /// opaque-JSON-string convention, needed for per-game sync to a
+            /// different device. `nil` is valid (server COALESCEs, never
+            /// clobbers an already-stored value) — every call site should
+            /// still pass it when available so it stays current.
+            let gameConfig: String?
         }
         let deadlineStr = deadline.map { ISO8601DateFormatter().string(from: $0) }
         var req = try await request(
@@ -183,7 +190,8 @@ actor SubmissionsClient {
                  fixtures: fixtures, jokerEnabled: jokerEnabled,
                  managerSuffix: managerSuffix, managerName: managerName,
                  managerToken: ManagerToken.current, players: players, extra: extraJSON,
-                 previousResultsRoundNumber: previousResultsRoundNumber, previousResults: previousResultsJSON)
+                 previousResultsRoundNumber: previousResultsRoundNumber, previousResults: previousResultsJSON,
+                 gameConfig: gameConfigJSON)
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         _ = try await send(req)

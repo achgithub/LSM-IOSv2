@@ -15,13 +15,16 @@ struct PredictorStandingRow: Identifiable {
 enum PredictorStandings {
     /// Total points per player across every closed round's predictions,
     /// ranked by points only (no secondary tiebreakers), ties alphabetical.
+    /// Includes `carriedOverPoints` — normally 0, only ever set by
+    /// `GameSyncBuilder` for a game synced to a new device, where pre-sync
+    /// history isn't available as real `Prediction` rows to sum.
     static func rows(for game: Game) -> [PredictorStandingRow] {
         let totals = game.players.map { player -> (Player, Int) in
             let points = player.predictions
                 .filter { $0.round?.status == .closed }
                 .compactMap(\.pointsAwarded)
                 .reduce(0, +)
-            return (player, points)
+            return (player, points + player.carriedOverPoints)
         }
         let sorted = totals.sorted { a, b in
             if a.1 != b.1 { return a.1 > b.1 }

@@ -125,6 +125,32 @@ final class SyncCoordinator {
         lastSyncedAt = Date()
     }
 
+    /// One-time backfill, run once ever on first launch after this shipped:
+    /// `round_pushes.game_config_json` (added for per-game sync — see
+    /// `GameConfigPayload`) only exists for games pushed *after* the column
+    /// existed, so every game already in the cloud from before needs one
+    /// more push to pick it up. Rather than a dedicated endpoint/call path,
+    /// this piggybacks on the outbox that already exists: flag every
+    /// eligible game as `pushPending` (same flag a dropped-connection retry
+    /// uses) and let the very next `retryOutstanding()` call — already
+    /// scheduled at every launch, see `RootTabView` — resend them through
+    /// the normal push path, which now always includes `gameConfigJSON`.
+    /// Only games with an open round are flagged, matching `pushGames`'s
+    /// own skip condition, so nothing is left permanently stuck pending.
+    /// Games with no cloud token yet have nothing to backfill (their first
+    /// push, whenever it happens, already carries config).
+    private static let configBackfillSweptKey = "gameConfigBackfillSweptV1"
+
+    func backfillGameConfigIfNeeded(context: ModelContext) {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.configBackfillSweptKey) else { return }
+        let allGames = (try? context.fetch(FetchDescriptor<Game>())) ?? []
+        for game in allGames where game.cloudGameTokenRaw != nil && game.rounds.contains(where: { $0.status == .open }) {
+            game.pushPending = true
+        }
+        defaults.set(true, forKey: Self.configBackfillSweptKey)
+    }
+
     /// App-foreground/launch hook: retries every game with an unconfirmed
     /// push, without requiring the manager to open the sync picker. Same
     /// outbox mechanism as the sweep inside `sync()` above, just without an

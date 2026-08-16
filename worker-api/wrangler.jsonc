@@ -18,6 +18,8 @@
   //   UK_ATTEST_CHALLENGE_KEY  — HMAC secret for challenge issuance
   //   UK_JWT_PRIVATE_KEY       — base64 PKCS8 ECDSA P-256 private key for JWT signing
   //   UK_ADMIN_TOKEN           — bearer token for admin/ops endpoints
+  //   UK_RESEND_API_KEY        — Resend API key for OTP emails (src/email.ts);
+  //                              requires a domain verified in the Resend dashboard
   //   EU_*                     — same set for each additional region
 
   "name": "lsm-api",

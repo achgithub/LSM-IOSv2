@@ -1,0 +1,24 @@
+-- One-off migration for existing uk/eu D1 databases (schema.sql's CREATE
+-- TABLE IF NOT EXISTS is a no-op against a table that already exists, so the
+-- new `game_config_json` column on `round_pushes` has to be added here
+-- instead).
+--
+-- Carries the game's own settings (league ids, LMS rules, Predictor/Killer
+-- scoring config) — opaque, client-defined, same convention as extra_json —
+-- so a game can be reconstructed on a new device via GET
+-- /manager/games/:gameToken/sync without guessing at scoring-critical
+-- config. Distinct from extra_json, which is round-scoped Killer data, not
+-- game-level config. Only ever set by POST /games/:gameToken/push going
+-- forward (COALESCEd, so an old app build's push never nulls it back out)
+-- and by the one-time app-launch backfill for games pushed before this
+-- column existed (see PWARoundPusher/SyncCoordinator on the iOS side).
+--
+-- SQLite/D1 doesn't support `ADD COLUMN IF NOT EXISTS`, so this errors with
+-- "duplicate column name" if run twice against the same database — run it
+-- once per region, not as part of the repeatable `db:migrate:*` scripts.
+--
+-- Apply manually, per region, before deploying the worker-api version that
+-- reads/writes this column:
+--   wrangler d1 execute lsm-api-uk-db --remote --env uk --file=./migrations/0007_add_round_pushes_game_config_json.sql
+
+ALTER TABLE round_pushes ADD COLUMN game_config_json TEXT;

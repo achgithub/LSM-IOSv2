@@ -21,6 +21,16 @@ final class Player {
     /// Back-reference to the `RosterMember` this player was added from.
     /// Nil for the manager's own entry or players typed directly (no roster member).
     var rosterMemberId: UUID?
+    /// Predictor only: points earned before this player's history became
+    /// unavailable locally (currently just game sync — see
+    /// `GameSyncBuilder` — set once from the server's last-known
+    /// `cumulativePoints`, since full historical `Prediction` rows aren't
+    /// reconstructable). Added to the live sum in
+    /// `PredictorStandings.rows(for:)` rather than faking historical
+    /// `Round`/`Prediction` rows. Defaults to 0, so existing games migrate
+    /// unchanged — same lightweight-migration pattern as `isFavourite`/
+    /// `cloudRosterEnrolled` on `Game`.
+    var carriedOverPoints: Int = 0
 
     @Relationship(deleteRule: .cascade, inverse: \Pick.player)
     var picks: [Pick] = []

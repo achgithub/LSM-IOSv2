@@ -177,6 +177,7 @@ enum PWARoundPusher {
                 players: playerItems,
                 previousResultsRoundNumber: prevRoundNumber,
                 previousResultsJSON: prevResultsJSON,
+                gameConfigJSON: GameConfigPayload.json(for: game),
                 baseURLOverride: baseURLOverride
             )
             game.pushPending = false
@@ -327,6 +328,7 @@ enum PWARoundPusher {
                 extraJSON: extraJSON,
                 previousResultsRoundNumber: prevRoundNumber,
                 previousResultsJSON: prevResultsJSON,
+                gameConfigJSON: GameConfigPayload.json(for: game),
                 baseURLOverride: baseURLOverride
             )
             game.pushPending = false

@@ -10,6 +10,7 @@ enum ManagerSettings {
 struct ManagerOnboardingView: View {
     @Binding var managerName: String
     @State private var draft = ""
+    @State private var showLinkDevice = false
 
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -27,6 +28,14 @@ struct ManagerOnboardingView: View {
                         .textInputAutocapitalization(.words)
                         .onSubmit(save)
                 }
+                Section {
+                    // Deliberately below the name field, not above — this is
+                    // the exception case (new/lost phone), not the default
+                    // first-launch path. Presented before anything here
+                    // touches ManagerToken.current — see LinkDeviceView's
+                    // header comment for why that ordering matters.
+                    Button("I Already Have an Account") { showLinkDevice = true }
+                }
             }
             .navigationTitle("Welcome")
             .navigationBarTitleDisplayMode(.inline)
@@ -37,6 +46,9 @@ struct ManagerOnboardingView: View {
             }
         }
         .interactiveDismissDisabled()
+        .sheet(isPresented: $showLinkDevice) {
+            LinkDeviceView()
+        }
     }
 
     private func save() {

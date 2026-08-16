@@ -18,7 +18,8 @@
 --
 -- One-off column additions to existing tables live in migrations/*.sql —
 -- apply those manually, once per region, before deploying code that depends
--- on them. See migrations/0001_add_round_pushes_extra_json.sql.
+-- on them. See migrations/0001_add_round_pushes_extra_json.sql and
+-- migrations/0007_add_round_pushes_game_config_json.sql.
 
 PRAGMA foreign_keys = ON;
 
@@ -82,7 +83,13 @@ CREATE TABLE IF NOT EXISTS round_pushes (
   -- migrations/0001_add_round_pushes_extra_json.sql; this CREATE TABLE only
   -- covers fresh databases (CREATE TABLE IF NOT EXISTS is a no-op on an
   -- existing table, so adding a column here does nothing for uk/eu as-is).
-  extra_json    TEXT
+  extra_json    TEXT,
+  -- The game's own settings (league ids, LMS rules, Predictor/Killer scoring
+  -- config) — opaque, client-defined, game-level (not round-scoped like
+  -- extra_json above). Existing uk/eu DBs need
+  -- migrations/0007_add_round_pushes_game_config_json.sql; this CREATE
+  -- TABLE only covers fresh databases, same caveat as extra_json.
+  game_config_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_round_pushes_manager ON round_pushes (manager_token);
@@ -130,4 +137,32 @@ CREATE TABLE IF NOT EXISTS manager_lifecycle (
   max_pwa_links        INTEGER,          -- last-reported Tier.maxPWALinks cap; NULL = unknown/no PWA
   link_cap_warned_at   TEXT              -- when the over-cap grace clock started (separate from scheduled_delete_at)
 );
+
+-- ── Accounts (email registration for device recovery) ───────────────────────
+-- Not a login/session system — email + OTP just proves ownership at two rare
+-- moments (register, link a new device); no session state, nothing checked
+-- per-request. active_key_id is the App Attest key_id of the one device
+-- currently allowed to act as this manager — enforced inside
+-- POST /attest/register (src/routes/attest.ts), not on every request.
+-- Not shard-routed (queried via c.env.DB directly, like the admin device
+-- routes) — a device recovering by email has no manager_token to route by
+-- until this table resolves one.
+CREATE TABLE IF NOT EXISTS accounts (
+  account_uuid        TEXT PRIMARY KEY,
+  email                TEXT NOT NULL UNIQUE,
+  active_key_id        TEXT NOT NULL,
+  active_device_label  TEXT,
+  created_at           TEXT NOT NULL
+);
+
+-- One account can (in principle) link more than one manager_token, though
+-- v1 usage is expected to be one-to-one.
+CREATE TABLE IF NOT EXISTS account_links (
+  account_uuid   TEXT NOT NULL REFERENCES accounts (account_uuid) ON DELETE CASCADE,
+  manager_token  TEXT NOT NULL,
+  linked_at      TEXT NOT NULL,
+  PRIMARY KEY (account_uuid, manager_token)
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_links_manager ON account_links (manager_token);
 

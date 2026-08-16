@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @AppStorage(V2PreviewFlag.key) private var v2PreviewEnabled = false
+    @AppStorage(AccountSettings.linkedEmailKey) private var linkedAccountEmail = ""
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(LocalizationManager.self) private var localization
@@ -36,6 +37,21 @@ struct SettingsView: View {
                         RosterSettingsView()
                     } label: {
                         SettingsRow(systemName: "person.2.fill", title: "Roster")
+                    }
+                    if entitlements.canUseCloud {
+                        NavigationLink {
+                            AccountSettingsView()
+                        } label: {
+                            SettingsRow(
+                                systemName: "envelope.badge.shield.half.filled",
+                                title: "Account", value: linkedAccountEmail.isEmpty ? nil : linkedAccountEmail
+                            )
+                        }
+                        NavigationLink {
+                            GameSyncPickerView()
+                        } label: {
+                            SettingsRow(systemName: "arrow.triangle.2.circlepath", title: "Sync Games")
+                        }
                     }
                 }
 

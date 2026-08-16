@@ -164,6 +164,19 @@ actor AppAttestService {
         return ISO8601DateFormatter().date(from: string)
     }
 
+    /// This device's own App Attest key id, enrolling one first if this is the
+    /// very first cloud call (mirrors what `jwt()` already does internally).
+    /// Used by `AccountClient` when registering an email — the server needs
+    /// to know which device is asking, the same way `/attest/register`
+    /// already does via this same key id.
+    func currentKeyId() async throws -> String {
+        #if canImport(DeviceCheck)
+        return try await attestedKeyId(authority: await authorityURL())
+        #else
+        throw APIError.badStatus(-1, body: "App Attest unavailable on this platform")
+        #endif
+    }
+
     // MARK: - Key enrolment (once per authority)
 
     private var attestationTask: Task<String, Error>?

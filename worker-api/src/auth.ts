@@ -10,7 +10,7 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.subtle.timingSafeEqual(ab, bb);
 }
 
-type SecretName = "ATTEST_CHALLENGE_KEY" | "JWT_PRIVATE_KEY" | "ADMIN_TOKEN";
+type SecretName = "ATTEST_CHALLENGE_KEY" | "JWT_PRIVATE_KEY" | "ADMIN_TOKEN" | "RESEND_API_KEY";
 
 export function regionSecret(env: Env, name: SecretName): string {
   const prefix = env.REGION.toUpperCase();
@@ -20,6 +20,7 @@ export function regionSecret(env: Env, name: SecretName): string {
         case "ATTEST_CHALLENGE_KEY": return env.UK_ATTEST_CHALLENGE_KEY ?? "";
         case "JWT_PRIVATE_KEY":      return env.UK_JWT_PRIVATE_KEY ?? "";
         case "ADMIN_TOKEN":          return env.UK_ADMIN_TOKEN ?? "";
+        case "RESEND_API_KEY":       return env.UK_RESEND_API_KEY ?? "";
       }
       break;
   }

@@ -46,6 +46,15 @@ nonisolated enum ManagerToken {
         return new
     }
 
+    /// Overwrites the stored token with one recovered via email/OTP
+    /// link-device (see AccountClient.linkDeviceVerify) — used instead of
+    /// `current`'s lazy-generate path, which would otherwise mint and
+    /// persist a throwaway UUID the first time anything on this fresh
+    /// install touches `current` before the adopted token is in place.
+    static func adopt(_ token: String) {
+        save(token)
+    }
+
     private static func keychainValue(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
