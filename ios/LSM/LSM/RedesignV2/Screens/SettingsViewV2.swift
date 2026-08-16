@@ -7,6 +7,7 @@ import SwiftUI
 /// `SettingsView`.
 struct SettingsViewV2: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
+    @AppStorage(AccountSettings.linkedEmailKey) private var linkedAccountEmail = ""
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(LocalizationManager.self) private var localization
@@ -41,6 +42,24 @@ struct SettingsViewV2: View {
                         MenuRow(systemImage: "person.2.fill", title: "Roster")
                     }
                     .buttonStyle(.plain)
+                    if entitlements.canUseCloud {
+                        // Not yet restyled — pushes the same v1 screens
+                        // SettingsView (v1) uses, matching the precedent set
+                        // elsewhere in this branch for screens not yet ported.
+                        NavigationLink {
+                            AccountSettingsView()
+                        } label: {
+                            MenuRow(systemImage: "envelope.badge.shield.half.filled", title: "Account",
+                                    value: linkedAccountEmail.isEmpty ? nil : linkedAccountEmail)
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink {
+                            GameSyncPickerView()
+                        } label: {
+                            MenuRow(systemImage: "arrow.triangle.2.circlepath", title: "Sync Games")
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 VStack(spacing: 10) {
