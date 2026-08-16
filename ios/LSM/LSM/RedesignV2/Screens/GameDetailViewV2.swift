@@ -17,6 +17,9 @@ private enum LMSSheetV2: String, Identifiable {
 /// submissions already.
 struct GameDetailViewV2: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @Query private var allMembers: [RosterMember]
 
     @Bindable var game: Game
     @State private var showingAddPlayers = false
@@ -41,6 +44,19 @@ struct GameDetailViewV2: View {
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
+
+    /// `Player` (per-game) -> `RosterMember` (roster-level identity, where the
+    /// submission link actually lives) — nil for the manager's own entry or a
+    /// player typed directly with no roster member. Looked up in the
+    /// already-fetched `allMembers` rather than a fresh `FetchDescriptor` per
+    /// row/render (see `PWARoundPusher`'s version of this lookup, used
+    /// one-off in an async push where that cost doesn't repeat per render).
+    private func rosterMember(for player: Player) -> RosterMember? {
+        guard let id = player.rosterMemberId else { return nil }
+        return allMembers.first { $0.id == id }
     }
 
     private var currentRound: Round? { game.currentRound }
@@ -315,27 +331,12 @@ struct GameDetailViewV2: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(sortedPlayers) { player in
-                            HStack {
-                                Text(player.name)
-                                    .font(V2Theme.Typography.rowTitle)
-                                    .foregroundStyle(V2Theme.textPrimary)
-                                if player.isManager {
-                                    V2StatusBadge(label: "you", tint: V2Theme.Mode.lms)
+                            PlayerRowV2(player: player, member: rosterMember(for: player), pwaEnabled: pwaEnabled, tint: V2Theme.Mode.lms)
+                                .contextMenu {
+                                    Button(role: .destructive) { pendingRemovePlayer = player } label: {
+                                        Label("Remove", systemImage: "person.fill.xmark")
+                                    }
                                 }
-                                Spacer()
-                                if player.status != .active {
-                                    Text(player.status.label)
-                                        .font(.caption)
-                                        .foregroundStyle(player.status == .winner ? V2Theme.accent : V2Theme.danger)
-                                }
-                            }
-                            .padding(10)
-                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                            .contextMenu {
-                                Button(role: .destructive) { pendingRemovePlayer = player } label: {
-                                    Label("Remove", systemImage: "person.fill.xmark")
-                                }
-                            }
                         }
                     }
                 }
@@ -398,5 +399,54 @@ struct GameDetailViewV2: View {
         } catch {
             exportError = AppString("Couldn't prepare the export. Please try again.")
         }
+    }
+}
+
+/// A game's player row — tapping a roster-linked player opens
+/// `PlayerDetailViewV2` (same screen `PlayersViewV2` links to) so link mint/
+/// regenerate/remove queries can be handled right from the game without a
+/// trip to the Players tab. Players with no roster member (manager's own
+/// entry, or typed directly with no link possible) render inert, no tap.
+private struct PlayerRowV2: View {
+    let player: Player
+    let member: RosterMember?
+    let pwaEnabled: Bool
+    let tint: Color
+
+    var body: some View {
+        if let member {
+            NavigationLink {
+                PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        HStack {
+            Text(player.name)
+                .font(V2Theme.Typography.rowTitle)
+                .foregroundStyle(V2Theme.textPrimary)
+            if player.isManager {
+                V2StatusBadge(label: "you", tint: tint)
+            }
+            Spacer()
+            if pwaEnabled, let member {
+                Image(systemName: member.submissionTokenRaw != nil ? "link" : "plus.circle")
+                    .font(.caption)
+                    .foregroundStyle(V2Theme.textSecondary)
+            }
+            if player.status != .active {
+                Text(player.status.label)
+                    .font(.caption)
+                    .foregroundStyle(player.status == .winner ? V2Theme.accent : V2Theme.danger)
+            }
+        }
+        .padding(10)
+        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
     }
 }

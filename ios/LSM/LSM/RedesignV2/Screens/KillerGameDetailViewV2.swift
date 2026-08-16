@@ -17,6 +17,9 @@ private enum KillerSheetV2: String, Identifiable {
 /// bell (`AppHeader`) reaches every game's submissions already.
 struct KillerGameDetailViewV2: View {
     @Environment(\.modelContext) private var context
+    @Environment(Entitlements.self) private var entitlements
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @Query private var allMembers: [RosterMember]
 
     @Bindable var game: Game
     @State private var showingAddPlayers = false
@@ -31,6 +34,16 @@ struct KillerGameDetailViewV2: View {
 
     private var sortedPlayers: [Player] {
         game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
+
+    /// `Player` (per-game) -> `RosterMember` (roster-level identity, where the
+    /// submission link actually lives) — nil for the manager's own entry or a
+    /// player typed directly with no roster member.
+    private func rosterMember(for player: Player) -> RosterMember? {
+        guard let id = player.rosterMemberId else { return nil }
+        return allMembers.first { $0.id == id }
     }
 
     private var currentRound: Round? { game.currentRound }
@@ -236,28 +249,55 @@ struct KillerGameDetailViewV2: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(sortedPlayers) { player in
-                            HStack {
-                                Text(player.name)
-                                    .font(V2Theme.Typography.rowTitle)
-                                    .foregroundStyle(V2Theme.textPrimary)
-                                if player.isManager {
-                                    V2StatusBadge(label: "you", tint: V2Theme.Mode.killer)
+                            playerRow(player)
+                                .contextMenu {
+                                    Button(role: .destructive) { pendingRemovePlayer = player } label: {
+                                        Label("Remove", systemImage: "person.fill.xmark")
+                                    }
                                 }
-                                Spacer()
-                            }
-                            .padding(10)
-                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                            .contextMenu {
-                                Button(role: .destructive) { pendingRemovePlayer = player } label: {
-                                    Label("Remove", systemImage: "person.fill.xmark")
-                                }
-                            }
                         }
                     }
                 }
                 ActionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
             }
         }
+    }
+
+    /// Tapping a roster-linked player opens `PlayerDetailViewV2` — same
+    /// screen `PlayersViewV2` links to — so link mint/regenerate/remove
+    /// queries can be handled right from the game without a trip to the
+    /// Players tab. Players with no roster member render the same row inert.
+    @ViewBuilder
+    private func playerRow(_ player: Player) -> some View {
+        if let member = rosterMember(for: player) {
+            NavigationLink {
+                PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
+            } label: {
+                playerRowContent(player, member: member)
+            }
+            .buttonStyle(.plain)
+        } else {
+            playerRowContent(player, member: nil)
+        }
+    }
+
+    private func playerRowContent(_ player: Player, member: RosterMember?) -> some View {
+        HStack {
+            Text(player.name)
+                .font(V2Theme.Typography.rowTitle)
+                .foregroundStyle(V2Theme.textPrimary)
+            if player.isManager {
+                V2StatusBadge(label: "you", tint: V2Theme.Mode.killer)
+            }
+            Spacer()
+            if pwaEnabled, let member {
+                Image(systemName: member.submissionTokenRaw != nil ? "link" : "plus.circle")
+                    .font(.caption)
+                    .foregroundStyle(V2Theme.textSecondary)
+            }
+        }
+        .padding(10)
+        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
     }
 
     private func removePlayer(_ player: Player) {
