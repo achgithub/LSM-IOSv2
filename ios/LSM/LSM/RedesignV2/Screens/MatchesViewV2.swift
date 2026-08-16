@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Card-based restyle of `MatchesView` ("Fixtures" in the V2 menu) with
@@ -125,7 +126,9 @@ struct MatchesViewV2: View {
             if selectedLeagueIds.isEmpty { selectedLeagueIds = validIds }
             await store.load(leagues: enabled.leagues)
         }
-        .task(id: store.freshUntil) { await store.armClock() }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
+            if store.isThrottled { store.now = tick }
+        }
         .onChange(of: filterKey) { recomputeFiltered() }
         .task { recomputeFiltered() }
     }

@@ -14,16 +14,13 @@ final class MatchesStoreV2 {
     var errorMessage: String?
     var lastRefreshed: Date?
     var freshUntil: Date?
-    private(set) var now = Date()
+    /// Ticked every second by the view's `Timer.publish` while throttled —
+    /// see `MatchesViewV2`'s `.onReceive`. Settable (not `private(set)`) for
+    /// exactly that; a one-shot sleep-then-set-once left the countdown
+    /// frozen on screen between arm and expiry.
+    var now = Date()
 
     var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
-
-    func armClock() async {
-        guard let freshUntil else { return }
-        let remaining = freshUntil.timeIntervalSinceNow
-        if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
-        now = Date()
-    }
 
     private func matchesThrottleUntil(leagues: [LeagueOption]) -> Date? {
         LeagueDataCache.sharedMatchesThrottleUntil(for: leagues.map(\.id))

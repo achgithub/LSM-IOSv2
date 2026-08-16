@@ -24,19 +24,13 @@ final class FootballDataStore {
     var errorMessage: String?
     var lastRefreshed: Date?
     var freshUntil: Date?
-    private(set) var now = Date()
+    /// Ticked every second by the view's `Timer.publish` while throttled —
+    /// see `FootballDataCard`'s `.onReceive`. Settable (not `private(set)`)
+    /// for exactly that; a one-shot sleep-then-set-once left the countdown
+    /// frozen on screen between arm and expiry.
+    var now = Date()
 
     var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
-
-    /// Sleeps until `freshUntil` lapses, then flips `isThrottled` off via
-    /// `now`. Re-run as `.task(id: freshUntil)` so it re-arms whenever the
-    /// deadline changes (and fires immediately if it already passed).
-    func armClock() async {
-        guard let freshUntil else { return }
-        let remaining = freshUntil.timeIntervalSinceNow
-        if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
-        now = Date()
-    }
 
     /// Ad-gated for free users (skipped entirely for subscribers via
     /// `AdGate`); the 2-minute cooldown applies to everyone regardless of

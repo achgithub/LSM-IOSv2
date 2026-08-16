@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import SwiftData
 
@@ -150,24 +151,34 @@ private struct FootballDataCard: View {
                 }
             }
         }
-        .task(id: store.freshUntil) { await store.armClock() }
+        // Only advance the clock while throttled, matching MatchesView's
+        // rationale — no re-render churn once the button is already live.
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
+            if store.isThrottled { store.now = tick }
+        }
     }
 
     @ViewBuilder
     private var statusLine: some View {
-        if store.isThrottled, let freshUntil = store.freshUntil {
-            let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
-            Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
+        VStack(spacing: 4) {
+            if store.isThrottled, let freshUntil = store.freshUntil {
+                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
+                Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.textSecondary)
+            } else if let lastRefreshed = store.lastRefreshed {
+                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.textSecondary)
+            } else if let errorMessage = store.errorMessage {
+                Text(errorMessage)
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.danger)
+            }
+            Text(DataDisclaimer.text)
                 .font(.caption2)
-                .foregroundStyle(V2Theme.textSecondary)
-        } else if let lastRefreshed = store.lastRefreshed {
-            Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
-                .font(.caption2)
-                .foregroundStyle(V2Theme.textSecondary)
-        } else if let errorMessage = store.errorMessage {
-            Text(errorMessage)
-                .font(.caption2)
-                .foregroundStyle(V2Theme.danger)
+                .foregroundStyle(V2Theme.textTertiary)
+                .multilineTextAlignment(.center)
         }
     }
 }

@@ -151,12 +151,6 @@ struct ResultsEntryViewV2: View {
                 Text("Refresh available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
                     .font(.caption2).foregroundStyle(V2Theme.textTertiary)
             }
-            Text("Not affiliated with, licensed by or endorsed by any football club, league or federation. An independent tool — team names and fixtures are factual data shown for reference only.")
-                .font(.caption2)
-                .foregroundStyle(V2Theme.textTertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 16)
-
             Button { attemptClose() } label: {
                 Text("Close Round").frame(maxWidth: .infinity).padding(.vertical, 12)
             }
