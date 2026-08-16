@@ -43,18 +43,15 @@ struct SettingsViewV2: View {
                     }
                     .buttonStyle(.plain)
                     if entitlements.canUseCloud {
-                        // Not yet restyled — pushes the same v1 screens
-                        // SettingsView (v1) uses, matching the precedent set
-                        // elsewhere in this branch for screens not yet ported.
                         NavigationLink {
-                            AccountSettingsView()
+                            AccountSettingsViewV2()
                         } label: {
                             MenuRow(systemImage: "envelope.badge.shield.half.filled", title: "Account",
                                     value: linkedAccountEmail.isEmpty ? nil : linkedAccountEmail)
                         }
                         .buttonStyle(.plain)
                         NavigationLink {
-                            GameSyncPickerView()
+                            GameSyncPickerViewV2()
                         } label: {
                             MenuRow(systemImage: "arrow.triangle.2.circlepath", title: "Sync Games")
                         }
