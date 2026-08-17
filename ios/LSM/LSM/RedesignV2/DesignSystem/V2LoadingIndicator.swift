@@ -1,13 +1,16 @@
 import SwiftUI
 import Lottie
 
-/// Small looping football animation used for V2 loading states, recolored to
-/// the design system's accent so it matches light/dark automatically. Falls
-/// back to the platform spinner under Reduce Motion.
+/// Small looping football animation used for V2 loading states. Colored at
+/// export time (a fixed teal, `DribblingSoccer.json` is pre-baked) rather
+/// than via Lottie's runtime `ColorValueProvider` — this file nests the man
+/// silhouette two precomps deep, and a value provider only reached the
+/// single-nested ball, leaving the man stuck at its original black
+/// regardless of keypath wildcarding or rendering engine. Falls back to the
+/// platform spinner under Reduce Motion.
 struct V2LoadingIndicator: View {
     var size: CGFloat = 44
 
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -18,10 +21,6 @@ struct V2LoadingIndicator: View {
             LottieView(animation: .named("DribblingSoccer"))
                 .playing(loopMode: .loop)
                 .resizable()
-                .valueProvider(
-                    ColorValueProvider(V2Theme.accent.resolvedLottieColor(scheme: colorScheme)),
-                    for: AnimationKeypath(keypath: "**")
-                )
                 .frame(width: size, height: size)
         }
     }
@@ -74,19 +73,5 @@ extension View {
     /// look different.
     func v2LoadingOverlay(_ isLoading: Bool, label: LocalizedStringKey) -> some View {
         modifier(V2LoadingOverlayModifier(isLoading: isLoading, label: label))
-    }
-}
-
-private extension Color {
-    /// Resolves a dynamic `Color` against an explicit color scheme (rather
-    /// than the current UITraitCollection) so the Lottie recolor always
-    /// matches the SwiftUI environment even if it differs from the system
-    /// appearance (e.g. a forced `.preferredColorScheme`).
-    func resolvedLottieColor(scheme: ColorScheme) -> LottieColor {
-        let traits = UITraitCollection(userInterfaceStyle: scheme == .dark ? .dark : .light)
-        let uiColor = UIColor(self).resolvedColor(with: traits)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return LottieColor(r: Double(r), g: Double(g), b: Double(b), a: Double(a))
     }
 }
