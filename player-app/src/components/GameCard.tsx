@@ -24,7 +24,7 @@ function Kickoff({ value }: { value?: string | null }) {
   );
 }
 
-function StatusPill({ game }: { game: Game }) {
+function StatusPill({ game, deadlinePassed }: { game: Game; deadlinePassed: boolean }) {
   const t = useT();
   const prior = game.priorSubmission;
   const base = 'whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.03em]';
@@ -33,6 +33,9 @@ function StatusPill({ game }: { game: Game }) {
   }
   if (prior?.status === 'approved') {
     return <span className={`${base} border-success/30 bg-success/12 text-emerald-300`}>{t('status.approved')}</span>;
+  }
+  if (deadlinePassed) {
+    return <span className={`${base} border-white/15 bg-white/[0.06] text-slate-400`}>{t('status.missed')}</span>;
   }
   return <span className={`${base} border-lms/45 bg-lms/20 text-orange-200`}>{t('status.needsAttention')}</span>;
 }
@@ -194,6 +197,11 @@ export function GameCard({
   }, [prior?.status]);
 
   const submitted = localSubmitted || prior?.status === 'pending' || prior?.status === 'approved';
+  // Server already rejects a late submit (DeadlinePassedError) — this just
+  // stops the form from being offered as a live option in the first place,
+  // rather than letting the player fill it in and only finding out it was
+  // pointless when the submit call fails.
+  const deadlinePassed = !submitted && Boolean(game.deadline) && new Date(game.deadline as string).getTime() < Date.now();
 
   return (
     <article className="animate-card-in overflow-hidden rounded-[20px] border border-white/10 bg-surface shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
@@ -205,7 +213,7 @@ export function GameCard({
             <p className="m-0 mt-0.5 text-xs text-slate-400">{t('game.cutoff', { date: formatDate(game.deadline) ?? '' })}</p>
           )}
         </div>
-        <StatusPill game={game} />
+        <StatusPill game={game} deadlinePassed={deadlinePassed} />
       </header>
 
       <div>
@@ -227,6 +235,8 @@ export function GameCard({
                   : t('game.pickReviewPending')}
             </p>
           )
+        ) : deadlinePassed ? (
+          <p className="m-0 p-3.5 text-slate-400">{t('game.missedDeadline')}</p>
         ) : (
           <>
             {prior?.status === 'rejected' && (

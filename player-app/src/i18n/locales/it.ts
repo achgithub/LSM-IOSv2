@@ -55,11 +55,13 @@ const it: Translations = {
     submitted: 'Submitted',
     approved: 'Approved',
     needsAttention: 'Needs attention',
+    missed: 'Missed',
   },
   game: {
     round: 'Round {n}',
     matchday: 'Matchday {n}',
     cutoff: 'Cutoff {date}',
+    missedDeadline: 'Missed deadline — no pick was submitted for this round.',
     rejected: 'Rejected — pick again.',
     pickReviewPending: 'Your manager will review it before it goes live.',
     picked: 'Picked {team}.',
