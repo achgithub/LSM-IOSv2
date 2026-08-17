@@ -59,31 +59,4 @@ final class MatchesStoreV2 {
         freshUntil = matchesThrottleUntil(leagues: leagues)
         isLoading = false
     }
-
-    /// Refresh button — mirrors `MatchesView.refresh()` verbatim (same TTL/
-    /// corruption rules, same shared per-league cache) so this V2 screen
-    /// throttles identically to the classic one rather than drifting.
-    @MainActor
-    func refresh(leagues: [LeagueOption]) {
-        var anyCorrupt = false
-        var allFresh = true
-        for league in leagues {
-            switch LeagueDataCache.read(LeagueDataCache.Matches.self, key: LeagueDataCache.matchesKey(league.id)) {
-            case .hit(let cached):
-                if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.matches) { allFresh = false }
-            case .empty:
-                allFresh = false
-            case .corrupt:
-                allFresh = false
-                anyCorrupt = true
-            }
-        }
-        if allFresh {
-            Task { await load(leagues: leagues) }            // re-show cache, no ad, no network
-        } else if anyCorrupt {
-            Task { await load(leagues: leagues, force: true) } // recover free
-        } else {
-            AdGate.run { [weak self] in Task { await self?.load(leagues: leagues, force: true) } }
-        }
-    }
 }

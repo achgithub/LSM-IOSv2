@@ -19,6 +19,12 @@ struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @Environment(SubmissionBadgeStore.self) private var badgeStore
     @State private var wizardGame: Game?
+    /// Owned here (not inside `FootballDataCard`) so the loading pill can be
+    /// anchored to the bottom of the whole screen via `.v2LoadingOverlay`,
+    /// same as every other V2 screen — anchoring it to just the card would
+    /// place it wherever that card happens to be scrolled to, not the
+    /// screen's visible bottom edge.
+    @State private var footballStore = FootballDataStore()
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
@@ -49,7 +55,7 @@ struct V2PreviewMenuView: View {
                     MenuRow(systemImage: "person.2", title: "Players")
                 }
                 .buttonStyle(.plain)
-                FootballDataCard()
+                FootballDataCard(store: footballStore)
                 NavigationLink {
                     SettingsViewV2()
                 } label: {
@@ -61,6 +67,7 @@ struct V2PreviewMenuView: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
+        .v2LoadingOverlay(footballStore.isLoading, label: "Updating football data…")
         .v2Header("Home", trailingBadgeCount: badgeStore.pendingCount)
         // No .refreshable here — this is a static navigation menu, not a
         // live list, and the badge already refreshes on every appearance via
@@ -83,33 +90,12 @@ struct V2PreviewMenuView: View {
 private struct FootballDataCard: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var isExpanded = false
-    @State private var store = FootballDataStore()
+    /// Owned by the parent screen — see `V2PreviewMenuView` for why — so the
+    /// bottom pill is the sole animated "something is happening" signal for
+    /// this action; this row only needs the plain text/disabled state.
+    let store: FootballDataStore
 
-    /// Debounced view of `store.isLoading` — a cache-hit refresh can resolve
-    /// in a single frame, which would otherwise flash the animated icon
-    /// (and "Updating…" label) for an imperceptible instant.
-    @State private var displayedIsLoading = false
-    @State private var loadingShownAt: Date?
-    @State private var loadingHideToken = UUID()
-    private static let minimumVisible: TimeInterval = 0.6
-
-    private var updateLabel: String { displayedIsLoading ? "Updating…" : "Update football data" }
-
-    private func onIsLoadingChange(_ newValue: Bool) {
-        if newValue {
-            loadingShownAt = Date()
-            displayedIsLoading = true
-        } else {
-            let elapsed = loadingShownAt.map { Date().timeIntervalSince($0) } ?? Self.minimumVisible
-            let remaining = Self.minimumVisible - elapsed
-            let token = UUID()
-            loadingHideToken = token
-            Task {
-                if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
-                if loadingHideToken == token { displayedIsLoading = false }
-            }
-        }
-    }
+    private var updateLabel: String { store.isLoading ? "Updating…" : "Update football data" }
 
     var body: some View {
         Card {
@@ -154,11 +140,7 @@ private struct FootballDataCard: View {
                             store.refresh(leagues: enabled.leagues)
                         } label: {
                             HStack(spacing: 8) {
-                                if displayedIsLoading {
-                                    V2LoadingIndicator(size: 20)
-                                } else {
-                                    Image(systemName: "arrow.clockwise")
-                                }
+                                Image(systemName: "arrow.clockwise")
                                 Text(updateLabel)
                                     .font(V2Theme.Typography.rowTitle.weight(.semibold))
                             }
@@ -169,7 +151,6 @@ private struct FootballDataCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(store.isLoading || store.isThrottled)
-                        .onChange(of: store.isLoading, initial: false) { _, newValue in onIsLoadingChange(newValue) }
 
                         statusLine
                     }
