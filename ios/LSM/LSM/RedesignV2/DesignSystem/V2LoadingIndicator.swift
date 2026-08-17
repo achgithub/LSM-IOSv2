@@ -2,23 +2,51 @@ import SwiftUI
 import Lottie
 
 /// Small looping football animation used for V2 loading states. Colored at
-/// export time (a fixed teal, `DribblingSoccer.json` is pre-baked) rather
-/// than via Lottie's runtime `ColorValueProvider` — this file nests the man
-/// silhouette two precomps deep, and a value provider only reached the
-/// single-nested ball, leaving the man stuck at its original black
+/// export time (a fixed teal, each file is pre-baked) rather than via
+/// Lottie's runtime `ColorValueProvider` — the figure-based files nest the
+/// man silhouette two precomps deep, and a value provider only reached the
+/// single-nested pieces, leaving the man stuck at its original black
 /// regardless of keypath wildcarding or rendering engine. Falls back to the
 /// platform spinner under Reduce Motion.
+///
+/// Picks one animation at random per appearance — purely decorative variety
+/// for loading/syncing waits, not tied to any real event (the card/goal/cup
+/// files also exist as one-off "moment" animations elsewhere, but here
+/// they're just part of the loading rotation, no semantic meaning attached).
 struct V2LoadingIndicator: View {
     var size: CGFloat = 44
 
+    /// One entry is intentionally repeated — the plain dribble is the
+    /// "home" animation, so it shows roughly twice as often as any single
+    /// alternate rather than all six being equally likely.
+    static let fullPool = [
+        "DribblingSoccer", "DribblingSoccer",
+        "GoalScored", "RefCardRed", "RefCardYellow", "CupCelebration", "CelebratePoint",
+    ]
+    /// `GoalScored` and `CupCelebration` are busier compositions (a goal
+    /// frame + net grid, or confetti particles) that turn into an
+    /// unreadable smudge at the ~20pt size used for inline action-row
+    /// icons — confirmed by screenshotting both pools at 20pt and 56pt side
+    /// by side. Below `compactPoolThreshold`, draw from this smaller,
+    /// simple-silhouette-only pool instead.
+    static let compactPool = ["DribblingSoccer", "DribblingSoccer", "RefCardRed", "RefCardYellow", "CelebratePoint"]
+    static let compactPoolThreshold: CGFloat = 32
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var animationName: String
+
+    init(size: CGFloat = 44) {
+        self.size = size
+        let pool = size < Self.compactPoolThreshold ? Self.compactPool : Self.fullPool
+        _animationName = State(initialValue: pool.randomElement() ?? "DribblingSoccer")
+    }
 
     var body: some View {
         if reduceMotion {
             ProgressView()
                 .frame(width: size, height: size)
         } else {
-            LottieView(animation: .named("DribblingSoccer"))
+            LottieView(animation: .named(animationName))
                 .playing(loopMode: .loop)
                 .resizable()
                 .frame(width: size, height: size)
