@@ -98,16 +98,9 @@ struct MatchesViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
+        .v2LoadingOverlay(store.isLoading, label: store.items.isEmpty ? "Loading matches…" : "Refreshing…")
         .safeAreaInset(edge: .top) {
-            if store.isLoading && !store.items.isEmpty {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
-                    Text("Refreshing…").font(.caption).foregroundStyle(V2Theme.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(V2Theme.background)
-            } else if let errorMessage = store.errorMessage, !store.items.isEmpty {
+            if let errorMessage = store.errorMessage, !store.items.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "wifi.slash")
                     Text("Refresh failed: \(errorMessage)").font(.caption).lineLimit(1)
@@ -136,7 +129,7 @@ struct MatchesViewV2: View {
     @ViewBuilder
     private var results: some View {
         if store.isLoading && store.items.isEmpty {
-            ProgressView("Loading matches…").padding(.top, 40)
+            Color.clear.frame(height: 200)
         } else if let errorMessage = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView("Couldn't load matches", systemImage: "wifi.slash", description: Text(errorMessage))
         } else if filteredItems.isEmpty {

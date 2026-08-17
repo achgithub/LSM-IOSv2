@@ -26,8 +26,7 @@ struct StandingsViewV2: View {
                     }
                 }
                 if store.isLoading && store.standings.isEmpty {
-                    ProgressView("Loading standings…")
-                        .padding(.top, 60)
+                    Color.clear.frame(height: 200)
                 } else if let errorMessage = store.errorMessage, store.standings.isEmpty {
                     ContentUnavailableView(
                         "Couldn't load standings",
@@ -56,6 +55,7 @@ struct StandingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
+        .v2LoadingOverlay(store.isLoading, label: store.standings.isEmpty ? "Loading standings…" : "Refreshing…")
         .v2Header("Standings")
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
