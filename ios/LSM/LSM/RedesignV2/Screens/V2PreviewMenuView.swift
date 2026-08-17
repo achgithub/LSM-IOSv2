@@ -131,7 +131,7 @@ private struct FootballDataCard: View {
                         } label: {
                             HStack(spacing: 8) {
                                 if store.isLoading {
-                                    ProgressView().controlSize(.small)
+                                    V2LoadingIndicator(size: 20)
                                 } else {
                                     Image(systemName: "arrow.clockwise")
                                 }
