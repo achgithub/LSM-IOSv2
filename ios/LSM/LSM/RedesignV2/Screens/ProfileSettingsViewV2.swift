@@ -46,6 +46,7 @@ struct ProfileSettingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .background(V2Theme.background.ignoresSafeArea())
+        .v2LoadingOverlay(syncModel.isLoading, label: "Loading games…")
         .v2Header("Profile")
         .task { await syncModel.load(context: context) }
         .alert("Couldn't Complete That", isPresented: Binding(
@@ -182,7 +183,7 @@ struct ProfileSettingsViewV2: View {
                 }
             }
         } else if syncModel.isLoading {
-            Card { ProgressView() }
+            Color.clear.frame(height: 200)
         } else if !syncModel.games.isEmpty {
             Card {
                 VStack(alignment: .leading, spacing: 10) {

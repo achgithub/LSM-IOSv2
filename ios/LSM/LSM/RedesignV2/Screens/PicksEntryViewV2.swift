@@ -66,6 +66,7 @@ struct PicksEntryViewV2: View {
                 .padding(.vertical, V2Theme.Spacing.section)
             }
             .background(V2Theme.background.ignoresSafeArea())
+            .v2LoadingOverlay(isLoading && data == nil, label: "Loading fixtures…")
             .v2Header("Picks · Round \(round.roundNumber)")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

@@ -85,7 +85,31 @@ private struct FootballDataCard: View {
     @State private var isExpanded = false
     @State private var store = FootballDataStore()
 
-    private var updateLabel: String { store.isLoading ? "Updating…" : "Update football data" }
+    /// Debounced view of `store.isLoading` — a cache-hit refresh can resolve
+    /// in a single frame, which would otherwise flash the animated icon
+    /// (and "Updating…" label) for an imperceptible instant.
+    @State private var displayedIsLoading = false
+    @State private var loadingShownAt: Date?
+    @State private var loadingHideToken = UUID()
+    private static let minimumVisible: TimeInterval = 0.6
+
+    private var updateLabel: String { displayedIsLoading ? "Updating…" : "Update football data" }
+
+    private func onIsLoadingChange(_ newValue: Bool) {
+        if newValue {
+            loadingShownAt = Date()
+            displayedIsLoading = true
+        } else {
+            let elapsed = loadingShownAt.map { Date().timeIntervalSince($0) } ?? Self.minimumVisible
+            let remaining = Self.minimumVisible - elapsed
+            let token = UUID()
+            loadingHideToken = token
+            Task {
+                if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
+                if loadingHideToken == token { displayedIsLoading = false }
+            }
+        }
+    }
 
     var body: some View {
         Card {
@@ -130,7 +154,7 @@ private struct FootballDataCard: View {
                             store.refresh(leagues: enabled.leagues)
                         } label: {
                             HStack(spacing: 8) {
-                                if store.isLoading {
+                                if displayedIsLoading {
                                     V2LoadingIndicator(size: 20)
                                 } else {
                                     Image(systemName: "arrow.clockwise")
@@ -145,6 +169,7 @@ private struct FootballDataCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(store.isLoading || store.isThrottled)
+                        .onChange(of: store.isLoading, initial: false) { _, newValue in onIsLoadingChange(newValue) }
 
                         statusLine
                     }

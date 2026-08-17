@@ -119,7 +119,7 @@ struct PredictionsEntryViewV2: View {
         NavigationStack {
             Group {
                 if store.isLoading && store.data == nil {
-                    ProgressView("Loading fixtures…")
+                    Color.clear.frame(height: 200)
                 } else if let errorMessage = store.errorMessage, store.data == nil {
                     ContentUnavailableView("Couldn't load fixtures", systemImage: "wifi.slash", description: Text(errorMessage))
                 } else if activePlayers.isEmpty {
@@ -169,6 +169,7 @@ struct PredictionsEntryViewV2: View {
                 }
             }
             .background(V2Theme.background.ignoresSafeArea())
+            .v2LoadingOverlay(store.isLoading, label: "Loading fixtures…")
             .v2Header("Round \(round.roundNumber)")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

@@ -105,7 +105,7 @@ struct OpenRoundViewV2: View {
         NavigationStack {
             Group {
                 if isLoading && data == nil {
-                    ProgressView("Loading fixtures…")
+                    Color.clear.frame(height: 200)
                 } else if let errorMessage, data == nil {
                     ContentUnavailableView("Couldn't load fixtures", systemImage: "wifi.slash", description: Text(errorMessage))
                 } else {
@@ -113,6 +113,7 @@ struct OpenRoundViewV2: View {
                 }
             }
             .background(V2Theme.background.ignoresSafeArea())
+            .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
             .v2Header("Open \(roundType.openTitle) \(GameLogicService.nextRoundNumber(for: game))")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

@@ -132,7 +132,7 @@ struct GamesPortalViewV2: View {
                     showingSyncPicker = true
                 } label: {
                     if syncCoordinator.isSyncing {
-                        ProgressView()
+                        V2LoadingIndicator(size: 20)
                     } else {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .foregroundStyle(V2Theme.accent)

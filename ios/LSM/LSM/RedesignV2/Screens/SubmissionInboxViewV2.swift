@@ -57,7 +57,7 @@ struct SubmissionInboxViewV2: View {
     var body: some View {
         List {
             if isLoading && items.isEmpty {
-                ProgressView("Loading submissions…")
+                Color.clear.frame(height: 200)
             } else if let errorMessage {
                 Section {
                     Text(errorMessage).foregroundStyle(V2Theme.textSecondary)
@@ -89,6 +89,7 @@ struct SubmissionInboxViewV2: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(V2Theme.background.ignoresSafeArea())
+        .v2LoadingOverlay(isLoading && items.isEmpty, label: "Loading submissions…")
         .v2Header(filterGameToken != nil ? "Submission Queue" : "Submissions")
         .refreshable { await load() }
         .task { await load() }

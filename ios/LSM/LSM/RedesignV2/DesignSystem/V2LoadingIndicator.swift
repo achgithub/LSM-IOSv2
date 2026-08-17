@@ -35,7 +35,7 @@ struct V2LoadingBadge: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            V2LoadingIndicator(size: 28)
+            V2LoadingIndicator(size: 56)
             Text(label)
                 .font(V2Theme.Typography.metadata)
                 .foregroundStyle(V2Theme.textSecondary)
@@ -52,16 +52,43 @@ private struct V2LoadingOverlayModifier: ViewModifier {
     let isLoading: Bool
     let label: LocalizedStringKey
 
+    /// How long the badge stays up once shown, even if `isLoading` flips
+    /// back to false almost immediately (a fast cache-hit "refresh" would
+    /// otherwise flash for a single frame and read as a glitch).
+    private static let minimumVisible: TimeInterval = 0.6
+
+    @State private var displayedIsLoading = false
+    @State private var shownAt: Date?
+    /// Invalidates a pending hide-after-minimum task if `isLoading` flips
+    /// true again before it fires, so a fresh load isn't cut short by the
+    /// previous one's minimum-visible timer.
+    @State private var hideToken = UUID()
+
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) {
-                if isLoading {
+                if displayedIsLoading {
                     V2LoadingBadge(label: label)
                         .padding(.bottom, 12)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: isLoading)
+            .animation(.easeInOut(duration: 0.2), value: displayedIsLoading)
+            .onChange(of: isLoading) { _, newValue in
+                if newValue {
+                    shownAt = Date()
+                    displayedIsLoading = true
+                } else {
+                    let elapsed = shownAt.map { Date().timeIntervalSince($0) } ?? Self.minimumVisible
+                    let remaining = Self.minimumVisible - elapsed
+                    let token = UUID()
+                    hideToken = token
+                    Task {
+                        if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
+                        if hideToken == token { displayedIsLoading = false }
+                    }
+                }
+            }
     }
 }
 

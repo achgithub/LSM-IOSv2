@@ -58,7 +58,7 @@ struct KillerResultsEntryViewV2: View {
         NavigationStack {
             Group {
                 if isLoading && data == nil {
-                    ProgressView("Loading fixtures…")
+                    Color.clear.frame(height: 200)
                 } else if let errorMessage, data == nil {
                     ContentUnavailableView("Couldn't load fixtures", systemImage: "wifi.slash", description: Text(errorMessage))
                 } else {
@@ -66,6 +66,7 @@ struct KillerResultsEntryViewV2: View {
                 }
             }
             .background(V2Theme.background.ignoresSafeArea())
+            .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
             .v2Header("Results · Round \(round.roundNumber)")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

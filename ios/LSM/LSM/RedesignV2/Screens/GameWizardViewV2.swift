@@ -250,13 +250,26 @@ struct GameWizardViewV2: View {
     /// `FootballDataStore.refresh` is already ad-gated internally (skipped
     /// for subscribers via `AdGate`), so this doesn't need its own gate.
     private var footballUpdateRow: some View {
-        ActionRow(
-            title: footballStore.isLoading ? "Updating football data…" : "Update football data",
-            icon: "sportscourt",
-            isEnabled: !footballStore.isLoading && !footballStore.isThrottled
-        ) {
+        Button {
             footballStore.refresh(leagues: enabledLeagues.leagues)
+        } label: {
+            HStack {
+                Label {
+                    Text(footballStore.isLoading ? "Updating football data…" : "Update football data")
+                } icon: {
+                    if footballStore.isLoading {
+                        V2LoadingIndicator(size: 20)
+                    } else {
+                        Image(systemName: "sportscourt")
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption)
+            }
         }
+        .foregroundStyle(V2Theme.accent)
+        .opacity(!footballStore.isLoading && !footballStore.isThrottled ? 1 : 0.4)
+        .disabled(footballStore.isLoading || footballStore.isThrottled)
     }
 
     /// A short "Round N" / status line above the card, so a resumed wizard makes
