@@ -113,6 +113,18 @@ struct MatchesViewV2: View {
         }
         .safeAreaInset(edge: .bottom) { footer }
         .v2Header("Fixtures")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { store.refresh(leagues: enabled.leagues) } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(V2Theme.textPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(V2Theme.cardBackground, in: Circle())
+                }
+                .accessibilityLabel("Refresh")
+            }
+        }
         .task(id: enabled.leagues.map(\.id)) {
             let validIds = Set(enabled.leagues.map(\.id))
             selectedLeagueIds.formIntersection(validIds)
