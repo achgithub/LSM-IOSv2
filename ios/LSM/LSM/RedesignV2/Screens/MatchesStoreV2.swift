@@ -32,23 +32,38 @@ final class MatchesStoreV2 {
     func load(leagues: [LeagueOption], force: Bool = false) async {
         isLoading = true
         errorMessage = nil
-        var allItems: [MatchDTO] = []
-        var dates: [Date] = []
         do {
-            for league in leagues {
-                let key = LeagueDataCache.matchesKey(league.id)
-                if !force, let cached = LeagueDataCache.load(LeagueDataCache.Matches.self, key: key) {
-                    allItems += cached.items
-                    dates.append(cached.date)
-                } else if force {
-                    let leagueItems = try await LeagueData.pullLiveMatches(for: league)
-                    allItems += leagueItems
-                    dates.append(Date())
+            // Team-name resolution doesn't depend on the matches loop below,
+            // so kick it off in parallel rather than after.
+            async let teamsLoad = LeagueData.load(for: leagues)
+            // Leagues are independent, so resolve them concurrently rather
+            // than one at a time — a sequential loop summed every league's
+            // network latency; see LeagueData.load's own comment for the
+            // same fix applied there.
+            let (allItems, dates) = try await withThrowingTaskGroup(of: ([MatchDTO], Date?).self) { group in
+                for league in leagues {
+                    group.addTask {
+                        let key = LeagueDataCache.matchesKey(league.id)
+                        if !force, let cached = LeagueDataCache.load(LeagueDataCache.Matches.self, key: key) {
+                            return (cached.items, cached.date)
+                        } else if force {
+                            let leagueItems = try await LeagueData.pullLiveMatches(for: league)
+                            return (leagueItems, Date())
+                        }
+                        return ([], nil)
+                    }
                 }
+                var allItems: [MatchDTO] = []
+                var dates: [Date] = []
+                for try await (leagueItems, date) in group {
+                    allItems += leagueItems
+                    if let date { dates.append(date) }
+                }
+                return (allItems, dates)
             }
             // Fetch team names before publishing `items` — same ordering
             // rationale as MatchesView.load: avoids a "Team <id>" flash.
-            let teams = (try? await LeagueData.load(for: leagues))?.teamsById ?? teamsById
+            let teams = (try? await teamsLoad)?.teamsById ?? teamsById
             items = allItems
             teamsById = teams
             lastRefreshed = dates.max()
