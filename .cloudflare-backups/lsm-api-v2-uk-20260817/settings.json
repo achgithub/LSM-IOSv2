@@ -1,0 +1,59 @@
+{
+  "result": {
+    "placement": {},
+    "compatibility_date": "2026-06-14",
+    "compatibility_flags": [
+      "nodejs_compat"
+    ],
+    "usage_model": "standard",
+    "tags": [
+      "cf:service=lsm-api-v2",
+      "cf:environment=uk"
+    ],
+    "tail_consumers": [],
+    "logpush": false,
+    "observability": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "persist": true,
+        "invocation_logs": true
+      },
+      "traces": {
+        "enabled": false,
+        "persist": true,
+        "head_sampling_rate": 1
+      }
+    },
+    "annotations": {
+      "workers/triggered_by": "upload"
+    },
+    "bindings": [
+      {
+        "name": "JWT_KID",
+        "text": "uk-2026-01",
+        "type": "plain_text"
+      },
+      {
+        "name": "JWT_PUBLIC_KEYS",
+        "text": "{\"uk-2026-01\": \"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEreBcUI2zrxwU0tbhW6MyUcuGa/LlH9eW77tje7Wh/rpV03oCkfXGiYQY7CTzxZErnTLpBARh9dXWdZHKTXep3A==\"}",
+        "type": "plain_text"
+      },
+      {
+        "name": "REGION",
+        "text": "uk",
+        "type": "plain_text"
+      },
+      {
+        "name": "SUBMISSIONS_KV",
+        "namespace_id": "5fd6aee1be624c679b16a82de43ae477",
+        "type": "kv_namespace"
+      }
+    ]
+  },
+  "success": true,
+  "errors": [],
+  "messages": []
+}

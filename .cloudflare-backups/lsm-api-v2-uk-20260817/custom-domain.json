@@ -1,0 +1,11 @@
+{
+  "id": "74bf70f16fed3660e3347e6196e10eaa48236434",
+  "zone_id": "62b1c5e3bfbf3b05a677eb31baa87b66",
+  "zone_name": "sportsmanager.site",
+  "hostname": "api-v2.uk.sportsmanager.site",
+  "service": "lsm-api-v2-uk",
+  "environment": "production",
+  "cert_id": "48f625a2-7ed2-49c6-9ffe-80cf87769737",
+  "previews_enabled": false,
+  "enabled": true
+}
