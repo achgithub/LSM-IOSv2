@@ -15,11 +15,10 @@ function submitErrorMessage(e: unknown, t: ReturnType<typeof useT>): string {
 
 function Kickoff({ value }: { value?: string | null }) {
   const parts = kickoffParts(value);
-  if (!parts) return <span className="w-14 shrink-0" />;
+  if (!parts) return null;
   return (
-    <span className="grid w-14 shrink-0 text-center text-[0.68rem] font-extrabold leading-none text-slate-400">
-      <span>{parts[0]}</span>
-      <span>{parts[1]}</span>
+    <span className="text-[0.68rem] font-extrabold leading-none text-slate-400">
+      {parts[0]} · {parts[1]}
     </span>
   );
 }
@@ -340,7 +339,7 @@ function LMSSection({
         disabled={!eligible}
         aria-pressed={selected}
         onClick={() => setSelection({ teamId: id!, teamName: name, fixtureId, opponentName })}
-        className={`flex min-h-[2.9rem] items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5 text-sm font-bold transition-colors ${
+        className={`flex min-h-[2.9rem] items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5 text-[0.78rem] font-bold transition-colors ${
           selected
             ? 'border-lms bg-gradient-to-br from-lms to-lms-deep text-lms-text shadow-[0_4px_16px_-4px_rgba(249,115,22,0.44)]'
             : 'border-white/10 bg-bg/50 text-slate-200 disabled:opacity-40'
@@ -364,7 +363,7 @@ function LMSSection({
           ? fixtures.map((fixture: Fixture) => (
               <div
                 key={fixture.fixtureId}
-                className="grid grid-cols-[3.45rem_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-white/10 bg-panel p-2.5"
+                className="grid gap-1.5 rounded-2xl border border-white/10 bg-panel p-2.5"
               >
                 <Kickoff value={fixture.kickoff} />
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
