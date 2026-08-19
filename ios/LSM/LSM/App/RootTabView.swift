@@ -17,7 +17,6 @@ struct RootTabView: View {
     /// Owned by `AppRootView` so it persists across the language re-key.
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-    @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
     @State private var entitlements = Entitlements.shared
     @State private var lockoutState = DeviceLockoutState.shared
     @State private var submissionBadgeStore = SubmissionBadgeStore.shared
@@ -81,12 +80,12 @@ struct RootTabView: View {
         .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {
             ManagerOnboardingView(managerName: $managerName)
         }
-        // Only a device that once linked an email can ever trip this (see
-        // AttestError.deviceLockedOut) — guarding on linkedEmail as well
-        // means an empty-email edge case just falls back to today's silent
-        // 401s instead of presenting a sheet with nothing to show.
+        // ReauthorizeDeviceView asks for the email itself when linkedEmail
+        // isn't cached locally (the server-side account link can exist even
+        // when this device never recorded that success — see its header
+        // comment), so this doesn't need to gate on linkedEmail being set.
         .sheet(isPresented: Binding(
-            get: { !splashActive && !managerName.isEmpty && !linkedEmail.isEmpty && lockoutState.isLockedOut },
+            get: { !splashActive && !managerName.isEmpty && lockoutState.isLockedOut },
             set: { if !$0 { lockoutState.clear() } }
         )) {
             ReauthorizeDeviceView()
