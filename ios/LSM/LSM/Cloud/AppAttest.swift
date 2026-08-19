@@ -6,6 +6,20 @@ import StoreKit
 import DeviceCheck
 #endif
 
+/// Thrown when the authority rejects re-registration because this
+/// manager_token already has a linked account pointing at a different
+/// active_key_id (worker-api's account-transfer guard) — the device's own
+/// Secure Enclave key died and needs proving via email before it can become
+/// the active device again. See `DeviceLockoutState` for how this surfaces.
+enum AttestError: LocalizedError {
+    case deviceLockedOut
+    var errorDescription: String? {
+        switch self {
+        case .deviceLockedOut: return "This device needs to be re-linked to your account."
+        }
+    }
+}
+
 /// Apple App Attest client — regional JWT edition.
 ///
 /// On first launch the manager's regional authority is resolved once from the
@@ -75,11 +89,30 @@ actor AppAttestService {
             // fallback path covers that gap.
             if let shardId = ShardID.current { headers["X-Shard-Id"] = shardId }
             return headers
+        } catch AttestError.deviceLockedOut {
+            // This device's key died (Apple invalidates it on some reinstalls,
+            // e.g. App Store → TestFlight over the top) and the account it was
+            // linked to now needs fresh proof via email — see the account-
+            // transfer guard in worker-api's routes/attest.ts. Surface it so
+            // RootTabView can prompt for the OTP instead of every call in the
+            // app silently 401ing forever.
+            await DeviceLockoutState.shared.markLockedOut()
+            return [:]
         } catch {
             return [:]
         }
         #else
         return [:]
+        #endif
+    }
+
+    /// Called after `/account/link-device/verify` opens a pending-bind window
+    /// for this device's manager_token — forces one more fresh register
+    /// attempt so it's readopted as the account's active device immediately,
+    /// rather than waiting for the next incidental network call to retry.
+    func completeReauthorization() async throws {
+        #if canImport(DeviceCheck)
+        _ = try await attemptJWT(freshAttest: true)
         #endif
     }
 
@@ -261,12 +294,22 @@ actor AppAttestService {
         }
     }
 
+    /// The exact text worker-api's account-transfer guard returns (see
+    /// routes/attest.ts) — matched precisely rather than on status code alone
+    /// since a plain 403 also covers unrelated attestation-rejected failures.
+    private static let lockoutMessage = "device not authorized — link via email first"
+    private struct ServerErrorBody: Decodable { let error: String }
+
     private static func check(_ response: URLResponse, data: Data) async throws {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             try await MaintenanceCheck.check(status: status, data: data)
             let body = String(data: data, encoding: .utf8)
             await DiagnosticLog.shared.log("attest \(status) for \(response.url?.absoluteString ?? ""): \(body ?? "")", category: "attest")
+            if let parsed = try? JSONDecoder().decode(ServerErrorBody.self, from: data),
+               parsed.error == lockoutMessage {
+                throw AttestError.deviceLockedOut
+            }
             throw APIError.badStatus(status, body: body)
         }
         await MaintenanceState.shared.clear()

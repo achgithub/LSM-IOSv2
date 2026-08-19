@@ -1,4 +1,22 @@
+import Observation
 import SwiftUI
+
+/// Set by `AppAttestService` when this device's key has died and the account
+/// it was linked to needs fresh proof via email (see `AttestError.deviceLockedOut`).
+/// Observed by `RootTabView` to present `ReauthorizeDeviceView` automatically —
+/// the first network call anywhere in the app after a key loss trips this,
+/// rather than waiting for the user to stumble into Settings.
+@Observable @MainActor
+final class DeviceLockoutState {
+    static let shared = DeviceLockoutState()
+
+    private(set) var isLockedOut = false
+
+    private init() {}
+
+    func markLockedOut() { isLockedOut = true }
+    func clear() { isLockedOut = false }
+}
 
 /// The app owner's identity, stored in user defaults. Used to add "you" to games
 /// you create and to flag your pick on shared summaries (spec §13b.2).
