@@ -40,6 +40,19 @@ struct PredictorResultsEntryViewV2: View {
         f.status == "POSTPONED" || f.status == "CANCELLED"
     }
 
+    /// Fixtures with a score entered but not yet confirmed final by the
+    /// provider — either seeded before full time, or manually keyed in by
+    /// the manager while the match is still live/scheduled. Voided fixtures
+    /// are excluded. Surfaced in `CloseRoundWarningSheetV2`, never a hard
+    /// block, since manual override is sometimes the only way to close a
+    /// round the provider never updates.
+    private var unfinishedFixtures: [MatchDTO] {
+        roundFixtures.filter { fixture in
+            scores[fixture.id] != nil && !voided.contains(fixture.id)
+                && !fixture.isFinished && !Self.isPostponedOrCancelled(fixture)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -207,7 +220,8 @@ struct PredictorResultsEntryViewV2: View {
             CloseRoundWarningSheetV2(
                 dontShowAgain: $suppressCloseWarning,
                 pendingSubmissionCount: pendingSubmissionCount,
-                incompletePlayerNames: PredictorScoringService.incompletePlayers(round: round, game: game).map(\.name)
+                incompletePlayerNames: PredictorScoringService.incompletePlayers(round: round, game: game).map(\.name),
+                unfinishedFixtureCount: unfinishedFixtures.count
             ) {
                 if suppressCloseWarning { closeWarningSuppressed = true }
                 showingCloseWarning = false
@@ -225,7 +239,7 @@ struct PredictorResultsEntryViewV2: View {
             await MainActor.run {
                 pendingSubmissionCount = count
                 let hasIncompletePlayers = !PredictorScoringService.incompletePlayers(round: round, game: game).isEmpty
-                if closeWarningSuppressed && count == 0 && !hasIncompletePlayers {
+                if closeWarningSuppressed && count == 0 && !hasIncompletePlayers && unfinishedFixtures.isEmpty {
                     close()
                 } else {
                     suppressCloseWarning = false
@@ -281,8 +295,11 @@ struct PredictorResultsEntryViewV2: View {
                 voided.insert(fixture.id)
             }
         }
+        // `homeScore`/`awayScore` tick live during a match, so this must gate
+        // on `isFinished` — otherwise an in-progress scoreline gets seeded and
+        // treated as final.
         for fixture in roundFixtures where scores[fixture.id] == nil && !voided.contains(fixture.id) {
-            if let home = fixture.homeScore, let away = fixture.awayScore {
+            if fixture.isFinished, let home = fixture.homeScore, let away = fixture.awayScore {
                 scores[fixture.id] = (home: home, away: away)
             }
         }
@@ -306,6 +323,7 @@ private struct CloseRoundWarningSheetV2: View {
     @Binding var dontShowAgain: Bool
     let pendingSubmissionCount: Int
     let incompletePlayerNames: [String]
+    let unfinishedFixtureCount: Int
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -345,11 +363,20 @@ private struct CloseRoundWarningSheetV2: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if unfinishedFixtureCount > 0 {
+                    Text(unfinishedFixtureCount == 1
+                         ? "1 fixture's score hasn't been confirmed full-time by the provider yet."
+                         : "\(unfinishedFixtureCount) fixtures' scores haven't been confirmed full-time by the provider yet.")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(V2Theme.warning)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Toggle("Don't show this again", isOn: $dontShowAgain)
                     .font(.subheadline)
                     .tint(V2Theme.Mode.predictor)
-                    .disabled(pendingSubmissionCount > 0 || !incompletePlayerNames.isEmpty)
+                    .disabled(pendingSubmissionCount > 0 || !incompletePlayerNames.isEmpty || unfinishedFixtureCount > 0)
 
                 Spacer(minLength: 0)
 

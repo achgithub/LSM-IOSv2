@@ -30,6 +30,7 @@ struct KillerResultsEntryView: View {
     @State private var showingIncompleteWarning = false
     @State private var pendingSubmissionCount = 0
     @State private var showingPendingSubmissionsWarning = false
+    @State private var showingUnfinishedFixturesWarning = false
     /// Guards the async gap in `attemptClose()` (awaiting the PWA pending-
     /// submissions check) during which the button would otherwise stay
     /// tappable — a second tap in that window reaches `close()` again before
@@ -45,6 +46,19 @@ struct KillerResultsEntryView: View {
 
     private var allResultsSet: Bool {
         !roundFixtures.isEmpty && roundFixtures.allSatisfy { outcomes[$0.id] != nil || voided.contains($0.id) }
+    }
+
+    /// Fixtures with an outcome entered but not yet confirmed final by the
+    /// provider — either seeded before full time, or manually overridden by
+    /// the manager. Voided fixtures are excluded — those are deliberately
+    /// not being scored off live data. Surfaced as a soft warning before
+    /// close, never a hard block (manual override is sometimes the only way
+    /// to close a round the provider never updates).
+    private var unfinishedFixtures: [MatchDTO] {
+        roundFixtures.filter { fixture in
+            outcomes[fixture.id] != nil && !voided.contains(fixture.id)
+                && !fixture.isFinished && fixture.status != "POSTPONED" && fixture.status != "CANCELLED"
+        }
     }
 
     /// Every active player must have a complete slate (predictions, plus a
@@ -179,6 +193,16 @@ struct KillerResultsEntryView: View {
         } message: {
             Text("Closing this round leaves them unresolved in the Submission Queue. Review them first, or close anyway.")
         }
+        .confirmationDialog(
+            "Not all fixtures are confirmed full-time",
+            isPresented: $showingUnfinishedFixturesWarning,
+            titleVisibility: .visible
+        ) {
+            Button("Close Anyway", role: .destructive) { checkPendingSubmissions() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("At least one result was entered before the provider confirmed the match had finished. Double-check the score before closing.")
+        }
         .alert("Split win", isPresented: Binding(
             get: { splitMessage != nil },
             set: { if !$0 { splitMessage = nil } }
@@ -207,7 +231,7 @@ struct KillerResultsEntryView: View {
             if fixture.status == "POSTPONED" {
                 guard !manuallyUnvoided.contains(fixture.id) else { continue }
                 voided.insert(fixture.id)
-            } else if let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
+            } else if fixture.isFinished, let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
                 outcomes[fixture.id] = outcome
             }
         }
@@ -224,6 +248,14 @@ struct KillerResultsEntryView: View {
     /// ResultsEntryView — issue #9 hadn't been extended to Killer yet).
     /// Skips the check entirely when PWA submissions aren't in use.
     private func attemptClose() {
+        guard unfinishedFixtures.isEmpty else {
+            showingUnfinishedFixturesWarning = true
+            return
+        }
+        checkPendingSubmissions()
+    }
+
+    private func checkPendingSubmissions() {
         guard entitlements.canUseCloud, pwaSubmissionsEnabled, let gameToken = game.cloudGameToken else {
             checkIncompleteThenClose()
             return

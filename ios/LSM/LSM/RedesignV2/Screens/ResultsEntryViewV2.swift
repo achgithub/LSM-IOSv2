@@ -28,6 +28,7 @@ struct ResultsEntryViewV2: View {
     @State private var refresh = LiveMatchRefreshState()
     @State private var pendingSubmissionCount = 0
     @State private var showingPendingSubmissionsWarning = false
+    @State private var showingUnfinishedFixturesWarning = false
     @State private var closeError: String?
 
     private var roundFixtures: [MatchDTO] {
@@ -38,6 +39,18 @@ struct ResultsEntryViewV2: View {
 
     private var allResultsSet: Bool {
         !roundFixtures.isEmpty && roundFixtures.allSatisfy { outcomes[$0.id] != nil }
+    }
+
+    /// Fixtures with an outcome entered but not yet confirmed final by the
+    /// provider — either seeded before full time, or manually overridden by
+    /// the manager. Surfaced as a soft warning before close, never a hard
+    /// block, since manual override is sometimes the only way to close a
+    /// round the provider never updates (§ round-close gating: never hard-
+    /// block on external data).
+    private var unfinishedFixtures: [MatchDTO] {
+        roundFixtures.filter { fixture in
+            outcomes[fixture.id] != nil && !fixture.isFinished && fixture.status != "POSTPONED" && fixture.status != "CANCELLED"
+        }
     }
 
     var body: some View {
@@ -84,6 +97,16 @@ struct ResultsEntryViewV2: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Closing this round leaves them unresolved in the Submission Queue. Review them first, or close anyway.")
+            }
+            .confirmationDialog(
+                "Not all fixtures are confirmed full-time",
+                isPresented: $showingUnfinishedFixturesWarning,
+                titleVisibility: .visible
+            ) {
+                Button("Close Anyway", role: .destructive) { checkPendingSubmissions() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("At least one result was entered before the provider confirmed the match had finished. Double-check the score before closing.")
             }
             .alert("Cannot close round", isPresented: Binding(
                 get: { closeError != nil },
@@ -184,7 +207,7 @@ struct ResultsEntryViewV2: View {
         for fixture in roundFixtures where outcomes[fixture.id] == nil {
             if fixture.status == "POSTPONED" {
                 outcomes[fixture.id] = .postponed
-            } else if let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
+            } else if fixture.isFinished, let outcome = GameLogicService.outcome(fromWinner: fixture.winner) {
                 outcomes[fixture.id] = outcome
             }
         }
@@ -196,6 +219,14 @@ struct ResultsEntryViewV2: View {
     }
 
     private func attemptClose() {
+        guard unfinishedFixtures.isEmpty else {
+            showingUnfinishedFixturesWarning = true
+            return
+        }
+        checkPendingSubmissions()
+    }
+
+    private func checkPendingSubmissions() {
         guard entitlements.canUseCloud, pwaSubmissionsEnabled, let gameToken = game.cloudGameToken else {
             close()
             return

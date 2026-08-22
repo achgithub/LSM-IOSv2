@@ -47,6 +47,12 @@ struct MatchDTO: Codable, Identifiable {
     /// league it actually belongs to.
     var leagueId: String?
 
+    /// True once the provider has confirmed full time. Distinct from having a
+    /// non-nil `winner` — that field is copied through from upstream without
+    /// status gating (see `football.ts`), so it must not be trusted alone to
+    /// mean the match is over.
+    var isFinished: Bool { status == "FINISHED" }
+
     /// Undated matches (no parseable kickoff) sort last; otherwise by kickoff
     /// then id.
     nonisolated static func byKickoffThenId(_ a: MatchDTO, _ b: MatchDTO) -> Bool {
