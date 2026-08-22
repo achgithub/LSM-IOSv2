@@ -65,7 +65,6 @@ data.get("/leagues/:leagueId/standings", async (c) => {
     await withFreshness(
       c.env.SCORES, keys.standings, league.standings_ttl_seconds * 1000,
       async () => refreshStandings(c.env.DB, provider, await currentSeasonYear(c.env.DB, league.id), league.id),
-      c.executionCtx,
     );
   }
   return c.json(await getStandingsByLeague(c.env.DB, league.id));
@@ -81,7 +80,6 @@ data.get("/leagues/:leagueId/scores", async (c) => {
     await withFreshness(
       c.env.SCORES, keys.scores, league.score_ttl_seconds * 1000,
       async () => refreshMatchData(c.env.DB, c.env.SCORES, provider, await currentSeasonYear(c.env.DB, league.id), league.id),
-      c.executionCtx,
     );
   }
   const cached = await c.env.SCORES.get(keys.scoresData);
@@ -100,7 +98,6 @@ data.get("/leagues/:leagueId/fixtures", async (c) => {
     await withFreshness(
       c.env.SCORES, keys.fixtures, league.fixtures_ttl_seconds * 1000,
       async () => refreshMatchData(c.env.DB, c.env.SCORES, provider, await currentSeasonYear(c.env.DB, league.id), league.id),
-      c.executionCtx,
     );
   }
   const q: FixtureQuery = {};

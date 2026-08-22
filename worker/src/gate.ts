@@ -9,15 +9,25 @@
 //
 // State machine (per resource):
 //   call == refresh, fresh  -> serve current store, no upstream call
-//   call == refresh, stale  -> bump call, serve current store now, refresh in bg
-//   call >  refresh         -> refresh in flight; serve current store now, poll
+//   call == refresh, stale  -> bump call, await upstream refresh, then serve
+//   call >  refresh         -> refresh in flight; await it (capped poll), then serve
 //
 // The gate only governs *when* to re-pull upstream. WHERE the data lives is the
 // caller's business: scores cache their payload in KV, fixtures/standings serve
-// straight from D1. Either way the current (possibly stale) data is served
-// immediately — the user never blocks on upstream — and the next request inside
-// the window is served from the warmed store. Result: ~1 upstream call per TTL
-// window per resource regardless of concurrent users.
+// straight from D1. The triggering request (and any that land while a refresh is
+// in flight) blocks on the upstream write landing — low single-digit seconds —
+// so the response it gets back is current, not the pre-refresh snapshot. This
+// was previously fire-and-forget (`ctx.waitUntil`), serving stale immediately;
+// that shape meant whichever request tripped staleness always saw stale data,
+// with the fresh write only visible to the *next* request in the window —
+// compounding badly for a client with its own TTL close to this one, since a
+// poll cadence aligned with the server TTL could keep landing on the stale
+// window over and over (confirmed in production 2026-08-22: a manager
+// refreshing LMS results for live 3pm kickoffs needed 3 taps / ~6 minutes to
+// see a finished result that was already sitting in D1). Blocking trades a
+// few seconds of latency on the rare stale hit for that never happening again.
+// Result: still ~1 upstream call per TTL window per resource regardless of
+// concurrent users — just synchronous instead of background.
 
 // Minimal structural type — we only need waitUntil, so we don't couple to the
 // exact ExecutionContext shape (which differs between Hono and the workerd
@@ -72,10 +82,10 @@ function parseInt0(v: string | null): number {
 
 /**
  * Run a resource's freshness check. If the window is stale this Worker claims the
- * refresh (bumps `call`, stamps `ts`) and runs `refresh` in the background; if a
- * refresh is already in flight it just polls in the background. Returns
- * immediately either way — the caller then serves whatever the store currently
- * holds (stale-while-revalidate).
+ * refresh (bumps `call`, stamps `ts`) and awaits `refresh` before returning; if a
+ * refresh is already in flight elsewhere it awaits that instead (capped poll).
+ * Either way, by the time this resolves the data store holds current data —
+ * the caller can serve it straight, no stale-then-fresh gap.
  *
  * `refresh` must fetch upstream and write the data store(s); it must NOT touch
  * this gate's counters — that's handled here once it resolves.
@@ -89,7 +99,6 @@ export async function withFreshness(
   keys: GateKeys,
   ttlMs: number,
   refresh: () => Promise<unknown>,
-  ctx: BackgroundCtx,
 ): Promise<void> {
 
   const [callStr, refreshStr, tsStr] = await Promise.all([
@@ -106,7 +115,8 @@ export async function withFreshness(
   const abandoned = call > refresh_ && age >= ABANDONED_CLAIM_MS;
 
   if ((call === refresh_ && stale) || abandoned) {
-    // This Worker claims the refresh — bump call, then refresh in background.
+    // This Worker claims the refresh — bump call, then await it so the
+    // response this request serves reflects the write.
     // (Residual race per spec §10.2: two Workers can both claim; worst case is
     // one duplicate upstream call. Correctness is unaffected. The `abandoned`
     // case adds one more residual race, same accepted class: if the original
@@ -116,11 +126,11 @@ export async function withFreshness(
     // response since reads always come from the data store, not the gate.)
     await kv.put(keys.call, String(call + 1));
     await kv.put(keys.ts, new Date().toISOString());
-    ctx.waitUntil(runRefresh(kv, keys, call + 1, refresh));
+    await runRefresh(kv, keys, call + 1, refresh);
   } else if (call > refresh_) {
-    // Refresh already in flight elsewhere (and recent) — background
-    // housekeeping only.
-    ctx.waitUntil(pollUntilFresh(kv, keys, call));
+    // Refresh already in flight elsewhere (and recent) — await its landing
+    // instead of re-claiming it ourselves.
+    await pollUntilFresh(kv, keys, call);
   }
   // call === refresh && !stale -> store fresh, serve directly.
 }
