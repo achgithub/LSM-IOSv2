@@ -31,7 +31,7 @@ struct RosterSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         SectionHeader(title: "PWA Submissions")
                         if entitlements.canUseCloud {
@@ -49,7 +49,7 @@ struct RosterSettingsViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionHeader(title: "Groups (\(groups.count))")
                         HStack(spacing: 8) {
@@ -92,7 +92,7 @@ struct RosterSettingsViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionHeader(title: "Import / Export Players")
                         if !groups.isEmpty {
@@ -119,8 +119,9 @@ struct RosterSettingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Roster")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TeamRoomScene()
+        .v2FloatingHeader("Roster")
         .alert("Rename group", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
             TextField("Group name", text: $renameText)
             Button("Rename") { commitRename() }

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// Card-based restyle of `PlayersView` — same roster data/filtering, pushed
 /// into an existing NavigationStack (no `List`, no embedded NavigationStack).
@@ -8,6 +9,7 @@ import SwiftData
 struct PlayersViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \RosterMember.name) private var members: [RosterMember]
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
 
@@ -19,6 +21,13 @@ struct PlayersViewV2: View {
     @State private var showAddPlayerAlert = false
     @State private var newPlayerName = ""
     @State private var pendingRemove: RosterMember?
+    /// SEARCH reveals this inline instead of navigating away — it was
+    /// always-visible content before; now tucked behind a tap so the
+    /// default view is just the roster.
+    @State private var showSearch = false
+    @State private var importing = false
+    @State private var exporting = false
+    @State private var importExportMessage: String?
 
     private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
 
@@ -33,27 +42,66 @@ struct PlayersViewV2: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: V2Theme.Spacing.section) {
+            LazyVStack(spacing: 14) {
+                if showSearch {
+                    TextField("Search players...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .padding(12)
+                        .v2FloatingCard()
+                }
                 filterCard
-                TextField("Search players...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .padding(12)
-                    .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                playersCard
+                playersList
+                if let importExportMessage {
+                    Text(importExportMessage)
+                        .font(.caption)
+                        .foregroundStyle(V2Theme.textSecondary)
+                        .padding(14)
+                        .v2FloatingCard()
+                }
                 infoCard
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Players")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showAddPlayerAlert = true } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(V2Theme.accent)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TeamRoomScene()
+        .v2FloatingHeaderWithTiles("Players") {
+            V2TileGrid {
+                Button {
+                    dismiss()
+                } label: {
+                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
                 }
-                .accessibilityLabel("Add player")
+                .buttonStyle(.plain)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
+                } label: {
+                    V2Tile(icon: "magnifyingglass", label: "SEARCH", color: V2Theme.Mode.predictor)
+                }
+                .buttonStyle(.plain)
+                Button { showAddPlayerAlert = true } label: {
+                    V2Tile(icon: "plus", label: "ADD", color: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+            } row2: {
+                Button { importing = true } label: {
+                    V2Tile(icon: "square.and.arrow.down", label: "IMPORT", color: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+                Button { exporting = true } label: {
+                    V2Tile(icon: "square.and.arrow.up", label: "EXPORT", color: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .disabled(members.isEmpty)
+                // Roster moved here from the old dedicated Settings screen —
+                // group create/rename/delete, not just the filter pills
+                // below (those stay inline; this is management).
+                NavigationLink {
+                    RosterSettingsViewV2()
+                } label: {
+                    V2Tile(icon: "person.3", label: "ROSTER", color: V2Theme.Mode.lms)
+                }
+                .buttonStyle(.plain)
             }
         }
         .alert("Add player", isPresented: $showAddPlayerAlert) {
@@ -77,67 +125,153 @@ struct PlayersViewV2: View {
         } message: {
             Text("This also deactivates their submission link, if they have one.")
         }
+        .fileImporter(
+            isPresented: $importing,
+            allowedContentTypes: [.commaSeparatedText, .plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result)
+        }
+        .fileExporter(
+            isPresented: $exporting,
+            document: RosterCSVDocument(text: RosterCSV.serialize(members)),
+            contentType: .commaSeparatedText,
+            defaultFilename: "players"
+        ) { result in
+            switch result {
+            case .success:
+                importExportMessage = members.count == 1
+                    ? AppString("Exported 1 player.")
+                    : AppString("Exported \(members.count) players.")
+            case .failure(let error):
+                importExportMessage = AppString("Export failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: CSV import (mirrors RosterSettingsViewV2.handleImport/importRows —
+    // no per-row group picker here, rows with a group column still resolve
+    // to/create that group; rows without one stay ungrouped)
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importExportMessage = AppString("Import failed: \(error.localizedDescription)")
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let text = try String(contentsOf: url, encoding: .utf8)
+                importRows(RosterCSV.parse(text))
+            } catch {
+                importExportMessage = AppString("Couldn't read file: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func importRows(_ rows: [RosterCSV.Row]) {
+        var membersByName = Dictionary(members.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
+        var groupsByName = Dictionary(groups.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
+
+        func resolveGroup(_ name: String) -> PlayerGroup {
+            let key = name.lowercased()
+            if let existing = groupsByName[key] { return existing }
+            let created = PlayerGroup(name: name)
+            context.insert(created)
+            groupsByName[key] = created
+            return created
+        }
+
+        var added = 0, skipped = 0
+        for row in rows {
+            let key = row.name.lowercased()
+            let member: RosterMember
+            if let existing = membersByName[key] {
+                member = existing
+                skipped += 1
+            } else {
+                member = RosterMember(name: row.name)
+                context.insert(member)
+                membersByName[key] = member
+                added += 1
+            }
+            if let groupName = row.group {
+                let group = resolveGroup(groupName)
+                if !member.groups.contains(where: { $0.id == group.id }) {
+                    member.groups.append(group)
+                }
+            }
+        }
+
+        var parts = [added == 1 ? AppString("Imported 1 new player") : AppString("Imported \(added) new players")]
+        if skipped > 0 {
+            parts.append(skipped == 1 ? AppString("1 already existed") : AppString("\(skipped) already existed"))
+        }
+        importExportMessage = parts.joined(separator: ", ") + "."
     }
 
     @ViewBuilder
     private var filterCard: some View {
         if !groups.isEmpty || pwaEnabled {
-            Card {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !groups.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                SelectablePill(title: "All Groups", isSelected: groupFilter == nil) { groupFilter = nil }
-                                ForEach(groups) { group in
-                                    SelectablePill(title: group.name, isSelected: groupFilter == group.id) {
-                                        groupFilter = group.id
-                                    }
+            VStack(alignment: .leading, spacing: 12) {
+                if !groups.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            SelectablePill(title: "All Groups", isSelected: groupFilter == nil) { groupFilter = nil }
+                            ForEach(groups) { group in
+                                SelectablePill(title: group.name, isSelected: groupFilter == group.id) {
+                                    groupFilter = group.id
                                 }
                             }
                         }
                     }
-                    if pwaEnabled {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(LinkFilterV2.allCases) { filter in
-                                    SelectablePill(title: filter.label, isSelected: linkFilter == filter) {
-                                        linkFilter = filter
-                                    }
+                }
+                if pwaEnabled {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(LinkFilterV2.allCases) { filter in
+                                SelectablePill(title: filter.label, isSelected: linkFilter == filter) {
+                                    linkFilter = filter
                                 }
                             }
                         }
                     }
                 }
             }
+            .padding(14)
+            .v2FloatingCard()
         }
     }
 
+    /// Same floating-card language as `GameSummaryRow` on Home/Games — each
+    /// player gets its own card over the locker-room photo, not a bare text
+    /// row, so this screen reads as part of the same system rather than a
+    /// different, more minimal style.
     @ViewBuilder
-    private var playersCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: filteredMembers.count == 1 ? "1 player" : "\(filteredMembers.count) players")
-                if members.isEmpty {
-                    Text("No saved players yet. Add people here, then add them to a game.")
-                        .font(.caption).foregroundStyle(V2Theme.textSecondary)
-                } else if filteredMembers.isEmpty {
-                    Text("No players match.")
-                        .font(.caption).foregroundStyle(V2Theme.textSecondary)
-                } else {
-                    VStack(spacing: 6) {
-                        ForEach(filteredMembers) { member in
-                            NavigationLink {
-                                PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
+    private var playersList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: filteredMembers.count == 1 ? "1 player" : "\(filteredMembers.count) players")
+            if members.isEmpty {
+                Text("No saved players yet. Add people here, then add them to a game.")
+                    .font(.caption).foregroundStyle(V2Theme.textSecondary)
+            } else if filteredMembers.isEmpty {
+                Text("No players match.")
+                    .font(.caption).foregroundStyle(V2Theme.textSecondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(filteredMembers) { member in
+                        NavigationLink {
+                            PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
+                        } label: {
+                            playerRow(member)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                pendingRemove = member
                             } label: {
-                                playerRow(member)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    pendingRemove = member
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
+                                Label("Remove", systemImage: "trash")
                             }
                         }
                     }
@@ -161,17 +295,17 @@ struct PlayersViewV2: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(V2Theme.textSecondary)
         }
-        .padding(12)
-        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+        .padding(14)
+        .v2FloatingCard()
     }
 
     private var infoCard: some View {
-        Card {
-            Text(pwaEnabled
-                 ? "Give each player a private link so they can submit picks themselves. You approve before it goes live."
-                 : "Turn on player links in Settings to share a personal submission link with each player.")
-                .font(.caption).foregroundStyle(V2Theme.textSecondary)
-        }
+        Text(pwaEnabled
+             ? "Give each player a private link so they can submit picks themselves. You approve before it goes live."
+             : "Turn on player links in Settings to share a personal submission link with each player.")
+            .font(.caption).foregroundStyle(V2Theme.textSecondary)
+            .padding(14)
+            .v2FloatingCard()
     }
 
     private var trimmedNewName: String { newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines) }

@@ -18,7 +18,7 @@ struct SubscriptionSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Plan").foregroundStyle(V2Theme.textSecondary)
@@ -44,7 +44,7 @@ struct SubscriptionSettingsViewV2: View {
                 }
 
                 #if DEBUG
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionHeader(title: "Developer (testing)")
                         Picker("Simulate tier", selection: tierBinding) {
@@ -78,8 +78,9 @@ struct SubscriptionSettingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Subscription")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2DataRoomScene()
+        .v2FloatingHeader("Subscription")
         .sheet(isPresented: $showPaywall) {
             PaywallView().environment(entitlements)
         }

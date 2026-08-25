@@ -23,7 +23,7 @@ struct DeclareWinnersViewV2: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: V2Theme.Spacing.section) {
-                    Card {
+                    Card(floating: true) {
                         VStack(alignment: .leading, spacing: 10) {
                             SectionHeader(title: "Select the winner(s)")
                             VStack(spacing: 6) {
@@ -59,13 +59,16 @@ struct DeclareWinnersViewV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("Declare Winner(s)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Declare") { apply() }.disabled(selection.isEmpty)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Declare Winner(s)", showBack: false) {
+                HStack(spacing: 14) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(V2Theme.textSecondary)
+                    Button("Declare") { apply() }
+                        .disabled(selection.isEmpty)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(selection.isEmpty ? V2Theme.textTertiary : V2Theme.accent)
                 }
             }
         }

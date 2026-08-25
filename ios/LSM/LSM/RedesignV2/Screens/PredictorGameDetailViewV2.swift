@@ -71,19 +71,10 @@ struct PredictorGameDetailViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header(game.name)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    renameText = game.name
-                    renaming = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(V2Theme.textPrimary)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TrophyRoomScene()
+        .v2FloatingHeader(game.name) {
+            HStack(spacing: 10) {
                 if isPreparingExport {
                     ProgressView()
                 } else {
@@ -96,8 +87,21 @@ struct PredictorGameDetailViewV2: View {
                         }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(V2Theme.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .background(V2Theme.cardBackground, in: Circle())
                     }
+                }
+                Button {
+                    renameText = game.name
+                    renaming = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(V2Theme.textPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(V2Theme.cardBackground, in: Circle())
                 }
             }
         }
@@ -179,7 +183,7 @@ struct PredictorGameDetailViewV2: View {
     // MARK: - Info
 
     private var infoCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     V2StatusBadge(gameStatus: game.status)
@@ -204,7 +208,7 @@ struct PredictorGameDetailViewV2: View {
 
     @ViewBuilder
     private var roundCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "This Round")
                 if let round = openRound {
@@ -240,7 +244,7 @@ struct PredictorGameDetailViewV2: View {
     // MARK: - Share
 
     private var shareCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Share")
                 ActionRow(title: "Share Weekly Results", icon: "square.and.arrow.up") { AdGate.run { sheet = .shareWeeklyResults } }
@@ -254,7 +258,7 @@ struct PredictorGameDetailViewV2: View {
     // MARK: - Players
 
     private var playersCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Players (\(game.players.count))")
                 if game.players.isEmpty {

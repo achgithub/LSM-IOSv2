@@ -9,7 +9,7 @@ struct LanguageSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         SectionHeader(title: "Language")
                         FlowPillGrid(items: AppLanguage.allCases) { language in
@@ -29,8 +29,9 @@ struct LanguageSettingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Language")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TacticsOfficeScene()
+        .v2FloatingHeader("Language")
     }
 }
 

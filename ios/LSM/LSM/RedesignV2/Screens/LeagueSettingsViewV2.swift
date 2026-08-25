@@ -25,7 +25,7 @@ struct LeagueSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(spacing: 10) {
                         ForEach(Leagues.all) { league in
                             leagueRow(league)
@@ -40,8 +40,9 @@ struct LeagueSettingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Leagues")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2DataRoomScene()
+        .v2FloatingHeader("Leagues")
         .confirmationDialog(
             "Disable \(pendingDisable?.name ?? "league")?",
             isPresented: Binding(get: { pendingDisable != nil }, set: { if !$0 { pendingDisable = nil } }),

@@ -15,6 +15,10 @@ struct AppRootView: View {
     @State private var selectedTab: RootTab = .games
     @StateObject private var maintenance = MaintenanceState.shared
     @StateObject private var versionGate = VersionGateState.shared
+    // V2 is the default root now (see docs/v1-to-v2-cutover-plan.md §3); v1
+    // stays reachable as a live fallback via the same toggle, now surfaced
+    // from V2's own Settings instead of only from v1's.
+    @AppStorage(V2PreviewFlag.key) private var v2Enabled = true
 
     var body: some View {
         // The banner is a VStack sibling ABOVE the tab content, not a top
@@ -37,6 +41,9 @@ struct AppRootView: View {
                     // no safe partial-use state to leave visible underneath.
                     VersionGateView()
                         .transition(.opacity)
+                } else if v2Enabled {
+                    V2RootView(splashActive: showSplash)
+                        .environment(EnabledLeagues.shared)
                 } else {
                     RootTabView(splashActive: showSplash, selection: $selectedTab)
                         .environment(EnabledLeagues.shared)

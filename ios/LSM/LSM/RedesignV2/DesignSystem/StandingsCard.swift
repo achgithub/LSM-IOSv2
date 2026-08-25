@@ -43,13 +43,15 @@ struct StandingsCard: View {
     let lost: Int
     let goalDifference: Int
     let points: Int
+    /// See `Card.floating` — pass true on a screen with a photo background.
+    var floating: Bool = false
 
     private var goalDifferenceText: String {
         goalDifference > 0 ? "+\(goalDifference)" : "\(goalDifference)"
     }
 
     var body: some View {
-        Card(padding: 16) {
+        Card(padding: 16, floating: floating) {
             HStack(spacing: 10) {
                 Text("\(rank)")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))

@@ -25,7 +25,7 @@ struct ProfileSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         SectionHeader(title: "Your Name")
                         TextField("Your name", text: $managerName)
@@ -45,9 +45,10 @@ struct ProfileSettingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TacticsOfficeScene()
         .v2LoadingOverlay(syncModel.isLoading, label: "Loading games…")
-        .v2Header("Profile")
+        .v2FloatingHeader("Profile")
         .task { await syncModel.load(context: context) }
         .alert("Couldn't Complete That", isPresented: Binding(
             get: { errorMessage != nil },
@@ -65,7 +66,7 @@ struct ProfileSettingsViewV2: View {
     private var emailCard: some View {
         if !linkedEmail.isEmpty {
             VStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         SectionHeader(title: "Registered Email")
                         Text(linkedEmail)
@@ -88,7 +89,7 @@ struct ProfileSettingsViewV2: View {
             switch emailStage {
             case .enterEmail:
                 VStack(spacing: V2Theme.Spacing.section) {
-                    Card {
+                    Card(floating: true) {
                         VStack(alignment: .leading, spacing: 10) {
                             SectionHeader(title: "Email (Optional)")
                             TextField("Email", text: $emailDraft)
@@ -109,7 +110,7 @@ struct ProfileSettingsViewV2: View {
 
             case .enterCode(let email):
                 VStack(spacing: V2Theme.Spacing.section) {
-                    Card {
+                    Card(floating: true) {
                         VStack(alignment: .leading, spacing: 10) {
                             SectionHeader(title: "Enter Code")
                             Text(email)
@@ -174,7 +175,7 @@ struct ProfileSettingsViewV2: View {
     @ViewBuilder
     private var gamesCard: some View {
         if let loadError = syncModel.loadError {
-            Card {
+            Card(floating: true) {
                 VStack(alignment: .leading, spacing: 10) {
                     SectionHeader(title: "Your Games")
                     Text(loadError).foregroundStyle(V2Theme.textSecondary)
@@ -185,7 +186,7 @@ struct ProfileSettingsViewV2: View {
         } else if syncModel.isLoading {
             Color.clear.frame(height: 200)
         } else if !syncModel.games.isEmpty {
-            Card {
+            Card(floating: true) {
                 VStack(alignment: .leading, spacing: 10) {
                     SectionHeader(title: "Your Games")
                     ForEach(syncModel.games) { game in

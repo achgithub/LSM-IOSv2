@@ -58,21 +58,21 @@ struct PicksEntryViewV2: View {
                         TextField("Search players", text: $searchText)
                             .textFieldStyle(.plain)
                             .padding(12)
-                            .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                            .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
                         playersCard
                     }
                 }
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2LMSFormScene()
             .v2LoadingOverlay(isLoading && data == nil, label: "Loading fixtures…")
-            .v2Header("Picks · Round \(round.roundNumber)")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Auto-Assign") { showAutoAssignConfirm = true }
-                        .disabled(teamRefs.isEmpty || unpickedCount == 0)
-                }
+            .v2FloatingHeader("Picks · Round \(round.roundNumber)") {
+                Button("Auto-Assign") { showAutoAssignConfirm = true }
+                    .disabled(teamRefs.isEmpty || unpickedCount == 0)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(teamRefs.isEmpty || unpickedCount == 0 ? V2Theme.textTertiary : V2Theme.Mode.lms)
             }
             .task { await load() }
             .safeAreaInset(edge: .top) {
@@ -125,7 +125,7 @@ struct PicksEntryViewV2: View {
     }
 
     private var playersCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 if filteredPlayers.isEmpty {
                     Text(unassignedOnly ? "Everyone's assigned." : "No players match.")
@@ -293,9 +293,9 @@ private struct TeamPickSheetV2: View {
                         }
                         .foregroundStyle(V2Theme.danger)
                         .padding(12)
-                        .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                        .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
                     }
-                    Card {
+                    Card(floating: true) {
                         VStack(spacing: 6) {
                             ForEach(eligible.sorted { $0.name < $1.name }, id: \.pickKey) { team in
                                 Button {
@@ -326,11 +326,11 @@ private struct TeamPickSheetV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle(playerName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2LMSFormScene()
+            .v2FloatingHeader(playerName, showBack: false) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
             }
         }
         .presentationDetents([.medium, .large])

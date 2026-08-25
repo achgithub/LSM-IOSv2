@@ -94,19 +94,10 @@ struct GameDetailViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header(game.name)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    renameText = game.name
-                    renaming = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(V2Theme.textPrimary)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TrophyRoomScene()
+        .v2FloatingHeader(game.name) {
+            HStack(spacing: 10) {
                 if isPreparingExport {
                     ProgressView()
                 } else {
@@ -119,8 +110,21 @@ struct GameDetailViewV2: View {
                         }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(V2Theme.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .background(V2Theme.cardBackground, in: Circle())
                     }
+                }
+                Button {
+                    renameText = game.name
+                    renaming = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(V2Theme.textPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(V2Theme.cardBackground, in: Circle())
                 }
             }
         }
@@ -214,7 +218,7 @@ struct GameDetailViewV2: View {
     // MARK: - Info
 
     private var infoCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     V2StatusBadge(gameStatus: game.status)
@@ -239,7 +243,7 @@ struct GameDetailViewV2: View {
 
     @ViewBuilder
     private var roundCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: game.status == .complete ? "Result" : "This Round")
 
@@ -311,7 +315,7 @@ struct GameDetailViewV2: View {
     @ViewBuilder
     private var declareCard: some View {
         if game.status != .complete {
-            Card {
+            Card(floating: true) {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(title: "Manually declare winner(s)")
                     ActionRow(title: "Declare Winner(s)…", icon: "trophy", isEnabled: latestClosedRound != nil && !game.activePlayers.isEmpty) { sheet = .declare }
@@ -323,7 +327,7 @@ struct GameDetailViewV2: View {
     // MARK: - Players
 
     private var playersCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Players (\(game.players.count))")
                 if game.players.isEmpty {

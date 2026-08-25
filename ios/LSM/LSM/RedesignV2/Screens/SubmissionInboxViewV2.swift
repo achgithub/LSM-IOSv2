@@ -55,42 +55,51 @@ struct SubmissionInboxViewV2: View {
     }
 
     var body: some View {
-        List {
-            if isLoading && items.isEmpty {
-                Color.clear.frame(height: 200)
-            } else if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(V2Theme.textSecondary)
-                    Button("Retry") { Task { await load() } }
-                }
-            } else if visibleItems.isEmpty {
-                Section {
-                    Text("No pending submissions.").foregroundStyle(V2Theme.textSecondary)
-                }
-            } else if filterGameToken != nil {
-                Section {
-                    ForEach(visibleItems) { item in row(for: item) }
-                }
-            } else {
-                ForEach(groupedByGame, id: \.gameToken) { bucket in
-                    Section {
-                        ForEach(bucket.items) { item in row(for: item) }
-                    } header: {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(V2Theme.GameIdentity.color(for: bucket.gameToken))
-                                .frame(width: 8, height: 8)
-                            Text(bucket.items.first?.gameName ?? "Game")
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: V2Theme.Spacing.section) {
+                if isLoading && items.isEmpty {
+                    Color.clear.frame(height: 200)
+                } else if let errorMessage {
+                    Card(floating: true) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(errorMessage).foregroundStyle(V2Theme.textSecondary)
+                            Button("Retry") { Task { await load() } }
+                                .foregroundStyle(V2Theme.accent)
+                        }
+                    }
+                } else if visibleItems.isEmpty {
+                    Card(floating: true) {
+                        Text("No pending submissions.").foregroundStyle(V2Theme.textSecondary)
+                    }
+                } else if filterGameToken != nil {
+                    VStack(spacing: 10) {
+                        ForEach(visibleItems) { item in row(for: item) }
+                    }
+                } else {
+                    ForEach(groupedByGame, id: \.gameToken) { bucket in
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(V2Theme.GameIdentity.color(for: bucket.gameToken))
+                                    .frame(width: 8, height: 8)
+                                Text(bucket.items.first?.gameName ?? "Game")
+                                    .font(V2Theme.Typography.sectionHeading)
+                                    .foregroundStyle(V2Theme.textPrimary)
+                            }
+                            VStack(spacing: 10) {
+                                ForEach(bucket.items) { item in row(for: item) }
+                            }
                         }
                     }
                 }
             }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(V2Theme.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TrophyRoomScene()
         .v2LoadingOverlay(isLoading && items.isEmpty, label: "Loading submissions…")
-        .v2Header(filterGameToken != nil ? "Submission Queue" : "Submissions")
+        .v2FloatingHeader(filterGameToken != nil ? "Submission Queue" : "Submissions")
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $selection) { selected in
@@ -120,8 +129,12 @@ struct SubmissionInboxViewV2: View {
                         .font(.caption)
                         .foregroundStyle(V2Theme.danger)
                 }
+                .padding(16)
+                .v2FloatingCard()
             } else {
                 SubmissionRow(item: item, game: game)
+                    .padding(16)
+                    .v2FloatingCard()
             }
         }
         .buttonStyle(.plain)

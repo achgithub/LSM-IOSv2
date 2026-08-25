@@ -168,14 +168,13 @@ struct PredictionsEntryViewV2: View {
                     }
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2PredictorFormScene()
             .v2LoadingOverlay(store.isLoading, label: "Loading fixtures…")
-            .v2Header("Round \(round.roundNumber)")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(V2Theme.accent)
-                }
+            .v2FloatingHeader("Round \(round.roundNumber)") {
+                Button("Done") { dismiss() }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(V2Theme.accent)
             }
             .safeAreaInset(edge: .top) {
                 if game.isDemoData && TutorialManager.shared.isActive {
@@ -195,7 +194,7 @@ struct PredictionsEntryViewV2: View {
     /// to find one is the thing that made the pill row unusable at scale.
     private func playerRow(current: Player) -> some View {
         Button { showingPlayerPicker = true } label: {
-            Card(padding: 14) {
+            Card(padding: 14, floating: true) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         MicroLabel(text: "Player")
@@ -225,7 +224,7 @@ struct PredictionsEntryViewV2: View {
     /// the wrong fixture.
     private func jokerCard(player: Player) -> some View {
         let current = currentJokerFixture(for: player)
-        return Card(padding: 14) {
+        return Card(padding: 14, floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 MicroLabel(systemImage: "star.fill", text: "Joker", tint: V2Theme.warning)
                 if jokerExpanded {
@@ -340,30 +339,40 @@ private struct PlayerPickerSheetV2: View {
                 if filtered.isEmpty {
                     ContentUnavailableView("No players", systemImage: "person.slash")
                 } else {
-                    List(filtered) { player in
-                        Button {
-                            selectedId = player.id
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Text(player.name).foregroundStyle(V2Theme.textPrimary)
-                                Spacer()
-                                if isComplete(player) {
-                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(V2Theme.accent)
-                                } else if predictionCount(player) == 0 {
-                                    Text("Not started").font(.caption).foregroundStyle(V2Theme.textTertiary)
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(filtered) { player in
+                                Button {
+                                    selectedId = player.id
+                                    dismiss()
+                                } label: {
+                                    HStack {
+                                        Text(player.name).foregroundStyle(V2Theme.textPrimary)
+                                        Spacer()
+                                        if isComplete(player) {
+                                            Image(systemName: "checkmark.circle.fill").foregroundStyle(V2Theme.accent)
+                                        } else if predictionCount(player) == 0 {
+                                            Text("Not started").font(.caption).foregroundStyle(V2Theme.textTertiary)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .listRowBackground(V2Theme.cardBackground)
+                        .padding(.horizontal, V2Theme.Spacing.horizontal)
+                        .padding(.vertical, V2Theme.Spacing.section)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2PredictorFormScene()
             .searchable(text: $query, prompt: "Search players")
-            .v2Header("Choose Player")
+            .v2FloatingHeader("Choose Player", showBack: false) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
+            }
         }
     }
 }
@@ -412,7 +421,7 @@ private struct FixturePredictionRowV2: View {
     private var kickoff: Date? { FixtureFormat.kickoffDate(fixture.kickoff) }
 
     var body: some View {
-        Card(padding: 14) {
+        Card(padding: 14, floating: true) {
             VStack(spacing: 10) {
                 HStack {
                     if let kickoff {

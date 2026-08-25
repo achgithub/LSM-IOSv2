@@ -103,43 +103,52 @@ struct OpenRoundViewV2: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading && data == nil {
-                    Color.clear.frame(height: 200)
-                } else if let errorMessage, data == nil {
-                    ContentUnavailableView("Couldn't load fixtures", systemImage: "wifi.slash", description: Text(errorMessage))
-                } else {
-                    content
-                }
+            switch game.mode {
+            case .lms: scenedBody.v2LMSFormScene()
+            case .predictor: scenedBody.v2PredictorFormScene()
+            case .killer: scenedBody.v2KillerFormScene()
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2Header("Open \(roundType.openTitle) \(GameLogicService.nextRoundNumber(for: game))")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Open") { create() }
-                        .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty)
-                        .foregroundStyle(tint)
-                }
+        }
+    }
+
+    private var scenedBody: some View {
+        Group {
+            if isLoading && data == nil {
+                Color.clear.frame(height: 200)
+            } else if let errorMessage, data == nil {
+                ContentUnavailableView("Couldn't load fixtures", systemImage: "wifi.slash", description: Text(errorMessage))
+            } else {
+                content
             }
-            .task { await load() }
-            .safeAreaInset(edge: .top) {
-                if game.isDemoData && TutorialManager.shared.isActive {
-                    TutorialSheetBanner(
-                        title: "Tutorial fixtures loaded",
-                        detail: "All fixtures are pre-selected. Tap Open ↑ to continue."
-                    )
-                }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
+        .v2FloatingHeader("Open \(roundType.openTitle) \(GameLogicService.nextRoundNumber(for: game))", showBack: false) {
+            HStack(spacing: 14) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
+                Button("Open") { create() }
+                    .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(tint)
             }
-            .sheet(isPresented: $showAddManualFixture) {
-                AddManualFixtureSheet(
-                    game: game,
-                    realTeamNames: realTeamNames,
-                    existingManualTeams: ManualFixtureService.manualTeams(for: game)
-                ) { home, away, kickoff in
-                    addManualFixture(home: home, away: away, kickoff: kickoff)
-                }
+        }
+        .task { await load() }
+        .safeAreaInset(edge: .top) {
+            if game.isDemoData && TutorialManager.shared.isActive {
+                TutorialSheetBanner(
+                    title: "Tutorial fixtures loaded",
+                    detail: "All fixtures are pre-selected. Tap Open ↑ to continue."
+                )
+            }
+        }
+        .sheet(isPresented: $showAddManualFixture) {
+            AddManualFixtureSheet(
+                game: game,
+                realTeamNames: realTeamNames,
+                existingManualTeams: ManualFixtureService.manualTeams(for: game)
+            ) { home, away, kickoff in
+                addManualFixture(home: home, away: away, kickoff: kickoff)
             }
         }
     }
@@ -163,7 +172,7 @@ struct OpenRoundViewV2: View {
                     )
                 }
                 if matchesAreStale {
-                    Card {
+                    Card(floating: true) {
                         HStack {
                             Label("Fixture list is over 12 hours old", systemImage: "clock.arrow.circlepath")
                                 .font(.footnote)
@@ -180,7 +189,7 @@ struct OpenRoundViewV2: View {
                 fixturesCard
 
                 if !strandedPlayers.isEmpty {
-                    Card {
+                    Card(floating: true) {
                         VStack(alignment: .leading, spacing: 8) {
                             SectionHeader(title: "No team left to pick")
                             ForEach(strandedPlayers) { player in
@@ -194,7 +203,7 @@ struct OpenRoundViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 8) {
                         MicroLabel(text: "Deadline")
                         DatePicker("Picks due by", selection: $deadline)
@@ -210,7 +219,7 @@ struct OpenRoundViewV2: View {
     }
 
     private func warningCard(_ text: String, icon: String) -> some View {
-        Card {
+        Card(floating: true) {
             Label(text, systemImage: icon)
                 .font(.footnote)
                 .foregroundStyle(V2Theme.warning)
@@ -218,7 +227,7 @@ struct OpenRoundViewV2: View {
     }
 
     private var filtersCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 MicroLabel(text: "Filters")
                 if isBlended {
@@ -254,7 +263,7 @@ struct OpenRoundViewV2: View {
     }
 
     private var fixturesCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     MicroLabel(text: "Fixtures (\(selectedFixtureIds.count) selected)")

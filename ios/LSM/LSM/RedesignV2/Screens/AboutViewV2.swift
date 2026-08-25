@@ -12,13 +12,13 @@ struct AboutViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         infoRow("App", Leagues.app.name)
                         infoRow("Version", version)
                     }
                 }
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         // Attribution required by the football-data.org licence: a
                         // visible "Data provided by football-data.org" credit. Brand
@@ -41,8 +41,9 @@ struct AboutViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("About")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TacticsOfficeScene()
+        .v2FloatingHeader("About")
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {

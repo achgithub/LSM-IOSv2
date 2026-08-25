@@ -57,14 +57,16 @@ struct KillerOpenRoundViewV2: View {
                     content
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2KillerFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2Header("Open Round \(GameLogicService.nextRoundNumber(for: game))")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
+            .v2FloatingHeader("Open Round \(GameLogicService.nextRoundNumber(for: game))", showBack: false) {
+                HStack(spacing: 14) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(V2Theme.textSecondary)
                     Button("Open") { create() }
                         .disabled(selectedFixtureIds.count != requiredCount || !enoughPlayers)
+                        .fontWeight(.semibold)
                         .foregroundStyle(V2Theme.Mode.killer)
                 }
             }
@@ -76,14 +78,14 @@ struct KillerOpenRoundViewV2: View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
                 if !enoughPlayers {
-                    Card {
+                    Card(floating: true) {
                         Label("A game needs at least 2 players to start a round.", systemImage: "person.2.slash")
                             .font(.footnote)
                             .foregroundStyle(V2Theme.warning)
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         MicroLabel(text: "Filters")
                         if isBlended {
@@ -104,7 +106,7 @@ struct KillerOpenRoundViewV2: View {
                     .foregroundStyle(V2Theme.textPrimary)
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 12) {
                         MicroLabel(text: "Manager Picked Games (\(selectedFixtureIds.count)/\(requiredCount) selected)")
                         if visibleFixtures.isEmpty {
@@ -145,7 +147,7 @@ struct KillerOpenRoundViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 8) {
                         MicroLabel(text: "Deadline")
                         DatePicker("Predictions due by", selection: $deadline)

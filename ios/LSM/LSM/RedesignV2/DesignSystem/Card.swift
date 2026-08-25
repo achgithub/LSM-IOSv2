@@ -7,19 +7,31 @@ import SwiftUI
 struct Card<Content: View>: View {
     var padding: CGFloat = V2Theme.Spacing.cardPadding
     var isHighlighted: Bool = false
+    /// True on a screen with a `.v2*Scene()` photo background — swaps the
+    /// solid `V2Theme.cardBackground` fill for `.v2FloatingCard()`'s
+    /// translucent one, so the photo shows through. False (default) is
+    /// unchanged for every other V2 screen still on a flat background.
+    var floating: Bool = false
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        content()
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isHighlighted ? V2Theme.highlightBackground : V2Theme.cardBackground,
-                in: RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)
-                    .strokeBorder(isHighlighted ? V2Theme.accent : V2Theme.cardBorder, lineWidth: isHighlighted ? 1.5 : 1)
-            )
+        if floating {
+            content()
+                .padding(padding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .v2FloatingCard()
+        } else {
+            content()
+                .padding(padding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    isHighlighted ? V2Theme.highlightBackground : V2Theme.cardBackground,
+                    in: RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)
+                        .strokeBorder(isHighlighted ? V2Theme.accent : V2Theme.cardBorder, lineWidth: isHighlighted ? 1.5 : 1)
+                )
+        }
     }
 }

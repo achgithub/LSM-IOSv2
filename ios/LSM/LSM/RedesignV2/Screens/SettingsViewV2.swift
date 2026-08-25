@@ -1,73 +1,73 @@
 import SwiftUI
 
-/// Card restyle of `SettingsView`'s row list — pushed into an existing
-/// NavigationStack (no `List`, no embedded NavigationStack). Every row now
-/// pushes its own restyled V2 detail screen (see `ProfileSettingsViewV2`
-/// etc.) — the v1 originals are untouched, reachable only from v1's own
-/// `SettingsView`.
+/// Home's HELP tile destination — absorbed the old dedicated Settings
+/// screen entirely (Subscription moved to `FootballDataViewV2`, Roster moved
+/// to `PlayersViewV2` — see those files) rather than keeping a separate
+/// Settings section, per the 2026-08-25 restructure. What's left (Profile,
+/// Language, About, Report a Bug) plus the "New design" v1 fallback toggle
+/// didn't have anywhere more specific to live, so this is the catch-all.
+/// Still named `SettingsViewV2` as a file/struct — only its role and header
+/// title changed — to avoid an unrelated rename churning the diff.
 struct SettingsViewV2: View {
-    @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-    @Environment(Entitlements.self) private var entitlements
-    @Environment(EnabledLeagues.self) private var enabled
-    @Environment(LocalizationManager.self) private var localization
+    @AppStorage(V2PreviewFlag.key) private var v2Enabled = true
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                VStack(spacing: 10) {
-                    NavigationLink {
-                        ProfileSettingsViewV2()
-                    } label: {
-                        MenuRow(systemImage: "person.crop.circle.fill", title: "Profile",
-                                value: managerName.isEmpty ? nil : managerName)
+                // Not in the tile grid — a live toggle doesn't fit a
+                // tap-to-navigate tile well, and it's a temporary v1
+                // fallback control that goes away entirely once v2 is the
+                // only design, not a permanent destination worth a slot.
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: $v2Enabled) {
+                        MenuRow(systemImage: "sparkles", title: "New design", floating: true)
                     }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        SubscriptionSettingsViewV2()
-                    } label: {
-                        MenuRow(systemImage: "star.fill", title: "Subscription", value: entitlements.tier.label)
-                    }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        LeagueSettingsViewV2()
-                    } label: {
-                        MenuRow(systemImage: "trophy.fill", title: "Leagues",
-                                value: "\(enabled.ids.count)/\(entitlements.leagueAllowance)")
-                    }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        RosterSettingsViewV2()
-                    } label: {
-                        MenuRow(systemImage: "person.2.fill", title: "Roster")
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                VStack(spacing: 10) {
-                    NavigationLink {
-                        LanguageSettingsViewV2()
-                    } label: {
-                        MenuRow(systemImage: "globe", title: "Language", value: localization.language.displayName)
-                    }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        AboutViewV2()
-                    } label: {
-                        MenuRow(systemImage: "info.circle.fill", title: "About")
-                    }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        ReportBugViewV2()
-                    } label: {
-                        MenuRow(systemImage: "ladybug.fill", title: "Report a Bug")
-                    }
-                    .buttonStyle(.plain)
+                    Text("Switch off to go back to the classic design.")
+                        .font(V2Theme.Typography.metadata)
+                        .foregroundStyle(V2Theme.textSecondary)
                 }
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Settings")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TacticsOfficeScene()
+        .v2FloatingHeaderWithTiles("Help") {
+            V2TileGrid {
+                Button {
+                    dismiss()
+                } label: {
+                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
+                }
+                .buttonStyle(.plain)
+                NavigationLink {
+                    ProfileSettingsViewV2()
+                } label: {
+                    V2Tile(icon: "person.crop.circle.fill", label: "PROFILE", color: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+                NavigationLink {
+                    LanguageSettingsViewV2()
+                } label: {
+                    V2Tile(icon: "globe", label: "LANGUAGE", color: V2Theme.Mode.predictor)
+                }
+                .buttonStyle(.plain)
+            } row2: {
+                NavigationLink {
+                    AboutViewV2()
+                } label: {
+                    V2Tile(icon: "info.circle.fill", label: "ABOUT", color: V2Theme.warning)
+                }
+                .buttonStyle(.plain)
+                NavigationLink {
+                    ReportBugViewV2()
+                } label: {
+                    V2Tile(icon: "ladybug.fill", label: "REPORT BUG", color: V2Theme.Mode.killer)
+                }
+                .buttonStyle(.plain)
+                V2TileBlank()
+            }
+        }
     }
 }

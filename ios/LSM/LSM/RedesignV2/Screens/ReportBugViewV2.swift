@@ -30,7 +30,7 @@ struct ReportBugViewV2: View {
                     .font(.footnote)
                     .foregroundStyle(V2Theme.textSecondary)
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         SectionHeader(title: "What happened?")
                         TextEditor(text: $whatHappened)
@@ -51,8 +51,9 @@ struct ReportBugViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Report a Bug")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TacticsOfficeScene()
+        .v2FloatingHeader("Report a Bug")
         .sheet(isPresented: $showingMailComposer) {
             if let reportFile {
                 MailComposeView(

@@ -11,6 +11,22 @@ Nothing here is connected to production navigation, `V2Theme`, or the app launch
 - `V2ExperienceThemePOC.swift` — interactive SwiftUI showroom containing Games, Matchday, Loading, and Winner scenes.
 - `Assets/V2POCStadiumDay.png` — the daylight master stadium artwork used by both appearances.
 - `Assets/V2POCStadium.png` — an earlier night-first exploration retained only as reference. It is not used by the current POC.
+- `Assets/V2POCTeamRoomDay.png` — daylight football team-room background concept for the Players tab.
+- `Assets/V2POCTeamRoomNight.png` — matched night-time team-room treatment with the same geometry and practical lights switched on.
+- `Assets/V2POCTunnelDay.png` — daylight stadium-tunnel background concept for the Games tab, with practical lights switched off.
+- `Assets/V2POCTunnelNight.png` — matched night-time tunnel treatment with identical geometry and practical lights switched on.
+- `Assets/V2POCTacticsOfficeDay.png` — daylight manager's tactics-office background concept for Settings, with practical lights switched off.
+- `Assets/V2POCTacticsOfficeNight.png` — matched night-time tactics-office treatment with identical geometry and shelf lighting switched on.
+- `Assets/V2POCTrophyRoomDay.png` — daylight trophy-room background concept for the Games tab, with display and ceiling lighting switched off.
+- `Assets/V2POCTrophyRoomNight.png` — matched night-time trophy-room treatment with identical geometry and restrained display lighting switched on.
+- `Assets/V2POCDataRoomDay.png` — daylight football analysis-room background for league and fixture data, with practical lighting off and subdued abstract displays.
+- `Assets/V2POCDataRoomNight.png` — matched night analysis-room treatment with identical geometry, active displays and restrained operational lighting.
+- `Assets/V2POCLMSTunnelDay.png` — dedicated daylight Last Man Standing tunnel: plain concrete, blue trim, shallow focus and practical lights off.
+- `Assets/V2POCLMSTunnelNight.png` — matched LMS night tunnel with the far exit dark and cool blue-white ceiling strips switched on.
+- `Assets/V2POCPredictorDeskDay.png` — dedicated daylight Predictor analyst desk with an abstract indigo display and extremely shallow focus.
+- `Assets/V2POCPredictorDeskNight.png` — matched Predictor night desk with identical geometry and a restrained indigo-violet display glow.
+- `Assets/V2POCKillerDugoutDay.png` — dedicated daylight Killer dugout with orange-red trim, practical lights off and a bright, softly blurred pitch beyond.
+- `Assets/V2POCKillerDugoutNight.png` — matched Killer night dugout with identical geometry, an orange-red under-bench glow and distant soft floodlight ambience.
 
 ## Agreed visual direction
 

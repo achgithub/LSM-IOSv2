@@ -5,7 +5,7 @@ import SwiftUI
 /// so scannability at a glance matters more than seeing every control at once.
 struct SettingsView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
-    @AppStorage(V2PreviewFlag.key) private var v2PreviewEnabled = false
+    @AppStorage(V2PreviewFlag.key) private var v2PreviewEnabled = true
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(LocalizationManager.self) private var localization
@@ -59,17 +59,10 @@ struct SettingsView: View {
 
                 Section {
                     Toggle(isOn: $v2PreviewEnabled) {
-                        SettingsRow(systemName: "sparkles", title: "Try the new design")
-                    }
-                    if v2PreviewEnabled {
-                        NavigationLink {
-                            V2PreviewMenuView()
-                        } label: {
-                            SettingsRow(systemName: "wand.and.stars", title: "V2 Preview")
-                        }
+                        SettingsRow(systemName: "sparkles", title: "New design")
                     }
                 } footer: {
-                    Text("An early look at the redesigned Games screen. Everything else stays the same.")
+                    Text("Switch on to use the redesigned app.")
                 }
             }
             .listSectionSpacing(.compact)

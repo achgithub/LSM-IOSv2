@@ -21,23 +21,31 @@ struct SyncGamePickerViewV2: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if eligibleGames.isEmpty {
-                    Section {
-                        Text("No games have an open round to push right now.")
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: V2Theme.Spacing.section) {
+                    if eligibleGames.isEmpty {
+                        Card(floating: true) {
+                            Text("No games have an open round to push right now.")
+                                .foregroundStyle(V2Theme.textSecondary)
+                        }
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(eligibleGames) { game in
+                                row(for: game)
+                            }
+                        }
+                        Text("Only games with an open round can be synced. Pick which ones to push — each sync is a network call, so nothing is pre-selected.")
+                            .font(.caption)
                             .foregroundStyle(V2Theme.textSecondary)
                     }
-                } else {
-                    Section {
-                        ForEach(eligibleGames) { game in
-                            row(for: game)
-                        }
-                    } footer: {
-                        Text("Only games with an open round can be synced. Pick which ones to push — each sync is a network call, so nothing is pre-selected.")
-                    }
                 }
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.vertical, V2Theme.Spacing.section)
+                .padding(.bottom, 60)
             }
-            .v2Header("Sync Games")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Sync Games")
             .safeAreaInset(edge: .bottom) {
                 Button {
                     onConfirm(selected)
@@ -50,7 +58,9 @@ struct SyncGamePickerViewV2: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(selected.isEmpty)
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.top, 8)
                 .padding(.bottom, 8)
+                .background(.ultraThinMaterial)
             }
         }
     }
@@ -76,6 +86,8 @@ struct SyncGamePickerViewV2: View {
                 }
                 Spacer()
             }
+            .padding(16)
+            .v2FloatingCard()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

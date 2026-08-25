@@ -79,15 +79,15 @@ struct KillerResultsEntryViewV2: View {
                     list
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2KillerFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2Header("Results · Round \(round.roundNumber)")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+            .v2FloatingHeader("Results · Round \(round.roundNumber)") {
+                HStack(spacing: 14) {
                     LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.foregroundStyle(V2Theme.Mode.killer)
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(V2Theme.Mode.killer)
                 }
             }
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
@@ -102,7 +102,7 @@ struct KillerResultsEntryViewV2: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(spacing: 14) {
                         ForEach(roundFixtures) { fixture in
                             VStack(alignment: .leading, spacing: 8) {
@@ -178,7 +178,7 @@ struct KillerResultsEntryViewV2: View {
         }
         .padding(.bottom, 6)
         .padding(.horizontal, V2Theme.Spacing.horizontal)
-        .background(V2Theme.background)
+        .background(.ultraThinMaterial)
         .alert("Cannot close round", isPresented: Binding(
             get: { closeError != nil },
             set: { if !$0 { closeError = nil } }

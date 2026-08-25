@@ -22,10 +22,11 @@ struct PredictorStandingsViewV2: View {
                         .padding(.horizontal, V2Theme.Spacing.horizontal)
                         .padding(.vertical, V2Theme.Spacing.section)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .v2Header("Standings")
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Standings")
         }
     }
 }
@@ -34,7 +35,7 @@ private struct PredictorStandingRowV2: View {
     let row: PredictorStandingRow
 
     var body: some View {
-        Card(padding: 16) {
+        Card(padding: 16, floating: true) {
             HStack(spacing: 14) {
                 Text("\(row.position)")
                     .font(.system(.title3, design: .rounded).weight(.semibold))

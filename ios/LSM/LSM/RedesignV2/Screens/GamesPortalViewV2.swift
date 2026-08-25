@@ -17,6 +17,7 @@ struct GamesPortalViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(SubmissionBadgeStore.self) private var badgeStore
     @Environment(SyncCoordinator.self) private var syncCoordinator
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNewGame = false
@@ -35,6 +36,13 @@ struct GamesPortalViewV2: View {
     /// explanatory alert instead of a silent no-op inside `NewGameViewV2`.
     private var atGameLimit: Bool {
         games.filter { $0.status != .complete }.count >= entitlements.maxActiveGames
+    }
+
+    /// Same two stats that used to live on Home's tile bar before Games got
+    /// its own — reused here now that Games has tiles of its own to fill.
+    private var activeCount: Int { games.filter { $0.status != .complete }.count }
+    private var dueCount: Int {
+        games.filter { ManagerRoundStatus.make(for: $0)?.tint == V2Theme.warning }.count
     }
 
     /// Brief post-sync summary ("3 games synced, 2 pending submissions"),
@@ -93,8 +101,58 @@ struct GamesPortalViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header("Games", trailingBadgeCount: badgeStore.pendingCount)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TrophyRoomScene()
+        // Every action/stat this screen needs is one of the six tiles now
+        // (Add/Sync/Guided Setup/Submissions/Active/Due) — no separate
+        // header icons, matching Home's tile grid instead of the old
+        // four-icon toolbar.
+        .v2FloatingHeaderWithTiles("Games") {
+            V2TileGrid {
+                Button {
+                    dismiss()
+                } label: {
+                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    showingSyncPicker = true
+                } label: {
+                    V2Tile(
+                        icon: "arrow.triangle.2.circlepath",
+                        label: syncCoordinator.isSyncing ? "SYNCING…" : "SYNC",
+                        color: V2Theme.accent
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(syncCoordinator.isSyncing)
+                Button {
+                    if atGameLimit { showingGameLimit = true } else { showingNewGame = true }
+                } label: {
+                    V2Tile(icon: "plus", label: "ADD", color: V2Theme.accent)
+                }
+                .buttonStyle(.plain)
+            } row2: {
+                NavigationLink {
+                    SubmissionInboxViewV2()
+                } label: {
+                    V2Tile(
+                        value: badgeStore.pendingCount > 0 ? "\(badgeStore.pendingCount)" : nil,
+                        icon: badgeStore.pendingCount > 0 ? nil : "bell",
+                        label: "SUBMISSIONS",
+                        color: badgeStore.pendingCount > 0 ? V2Theme.danger : V2Theme.textSecondary
+                    )
+                }
+                .buttonStyle(.plain)
+                V2Tile(value: "\(activeCount)", label: "ACTIVE", color: V2Theme.accent)
+                Button {
+                    showingWizard = true
+                } label: {
+                    V2Tile(icon: "wand.and.stars", label: "SETUP", color: V2Theme.Mode.predictor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
         .task { await badgeStore.refresh() }
         // Pull-to-refresh opens the same game picker as the toolbar button —
         // both routes into Sync go through an explicit per-game choice, so
@@ -115,40 +173,6 @@ struct GamesPortalViewV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    if atGameLimit { showingGameLimit = true } else { showingNewGame = true }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(V2Theme.accent)
-                }
-                .accessibilityLabel("New Game")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingSyncPicker = true
-                } label: {
-                    if syncCoordinator.isSyncing {
-                        V2LoadingIndicator(size: 20)
-                    } else {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .foregroundStyle(V2Theme.accent)
-                    }
-                }
-                .disabled(syncCoordinator.isSyncing)
-                .accessibilityLabel("Sync")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingWizard = true
-                } label: {
-                    Image(systemName: "wand.and.stars")
-                        .foregroundStyle(V2Theme.accent)
-                }
-                .accessibilityLabel("Guided Setup")
             }
         }
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
@@ -173,56 +197,48 @@ private struct ModeSectionCard: View {
     let games: [Game]
     var onResume: (Game) -> Void = { _ in }
 
-    private var title: String {
-        switch mode {
-        case .lms: return "Last Man Standing"
-        case .predictor: return "Predictor"
-        case .killer: return "Killer"
-        }
-    }
-
-    private var icon: String {
-        switch mode {
-        case .lms: return "figure.walk"
-        case .predictor: return "chart.bar.fill"
-        case .killer: return "bolt.fill"
-        }
-    }
-
+    private var title: String { V2Theme.Mode.displayName(for: mode) }
+    private var icon: String { V2Theme.Mode.icon(for: mode) }
     private var modeColor: Color { V2Theme.Mode.color(for: mode) }
     @State private var isExpanded = true
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: icon)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(modeColor)
-                        Text(title)
-                            .font(.system(.title3, design: V2Theme.Mode.fontDesign(for: mode)).weight(.heavy))
-                            .foregroundStyle(modeColor)
-                        Spacer()
-                        Text("\(games.count)")
-                            .font(V2Theme.Typography.metadata)
-                            .foregroundStyle(V2Theme.textTertiary)
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(V2Theme.textTertiary)
-                            .rotationEffect(.degrees(isExpanded ? 0 : -90))
-                    }
-                    .contentShape(Rectangle())
+        // Each GameSummaryRow already carries its own floating card
+        // background, so the section is its header (now its own compact
+        // surface, not drawn straight over the photo — see the heading
+        // critique this addressed) plus gapped rows over the stadium.
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(modeColor)
+                    Text(title)
+                        .font(.system(size: 23, design: V2Theme.Mode.fontDesign(for: mode)).weight(.bold))
+                        .foregroundStyle(modeColor)
+                    Spacer()
+                    Text("\(games.count)")
+                        .font(V2Theme.Typography.metadata)
+                        .foregroundStyle(V2Theme.textSecondary)
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(V2Theme.textSecondary)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(V2Theme.cardBackground.opacity(0.9), in: Capsule())
+                .overlay(Capsule().stroke(V2Theme.cardBorder.opacity(0.7)))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
 
-                if isExpanded {
-                    VStack(spacing: 10) {
-                        ForEach(games) { game in
-                            GameSummaryRow(game: game) { onResume(game) }
-                        }
+            if isExpanded {
+                VStack(spacing: 14) {
+                    ForEach(games) { game in
+                        GameSummaryRow(game: game) { onResume(game) }
                     }
                 }
             }

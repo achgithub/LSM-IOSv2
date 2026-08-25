@@ -11,18 +11,26 @@ struct GameSummaryRow: View {
     /// up by both the Games portal and Home's Favourites card; default
     /// no-op only as a safety net for any future caller that doesn't need it.
     var onResume: () -> Void = {}
-    @State private var expanded = false
 
     private var managerStatus: ManagerRoundStatus? { ManagerRoundStatus.make(for: game) }
-    private var collapsedLimit: Int { 2 }
+    private var modeColor: Color { V2Theme.Mode.color(for: game.mode) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(game.name)
-                    .font(V2Theme.Typography.rowTitle)
-                    .foregroundStyle(V2Theme.textPrimary)
-                    .lineLimit(1)
+            HStack(spacing: 12) {
+                Image(systemName: V2Theme.Mode.icon(for: game.mode))
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(modeColor)
+                    .frame(width: 42, height: 42)
+                    .background(modeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
+                    Text(game.name)
+                        .font(.system(.headline, design: V2Theme.Mode.fontDesign(for: game.mode)).weight(.bold))
+                        .foregroundStyle(V2Theme.textPrimary)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 8)
                 Button {
                     onResume()
@@ -66,49 +74,21 @@ struct GameSummaryRow: View {
                             .foregroundStyle(V2Theme.textSecondary)
                     }
                 }
+                if let progress = managerStatus.submissionProgress {
+                    ProgressView(value: progress)
+                        .tint(modeColor)
+                        .padding(.top, 2)
+                }
             } else {
                 V2StatusBadge(label: "Complete", tint: V2Theme.textSecondary)
             }
 
-            let entries = standingEntries
-            if !entries.isEmpty {
-                VStack(alignment: .leading, spacing: 5) {
-                    ForEach(expanded ? entries : Array(entries.prefix(collapsedLimit))) { entry in
-                        HStack(spacing: 6) {
-                            Image(systemName: entry.icon)
-                                .font(.system(size: 11))
-                                .foregroundStyle(entry.iconTint)
-                            Text(entry.text)
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(entry.isMuted ? V2Theme.textTertiary : V2Theme.textPrimary)
-                                .strikethrough(entry.isMuted)
-                            if let hasSubmitted = entry.hasSubmitted {
-                                Image(systemName: hasSubmitted ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(hasSubmitted ? V2Theme.accent : V2Theme.textTertiary)
-                            }
-                            if !entry.trailing.isEmpty {
-                                Spacer(minLength: 4)
-                                Text(entry.trailing)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(entry.isMuted ? V2Theme.textTertiary : V2Theme.accent)
-                            }
-                        }
-                    }
-                }
-                if entries.count > collapsedLimit {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
-                    } label: {
-                        Text(expanded ? "Show less" : "+\(entries.count - collapsedLimit) more")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(V2Theme.accent)
-                    }
-                }
-            }
+            Text(detailLine)
+                .font(.caption)
+                .foregroundStyle(V2Theme.textSecondary)
         }
-        .padding(12)
-        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+        .padding(14)
+        .v2FloatingCard()
     }
 
     @ViewBuilder
@@ -120,64 +100,24 @@ struct GameSummaryRow: View {
         }
     }
 
-    /// Mode-appropriate standing, one entry per line — full list available
-    /// via the row's own "+more" expand, no separate navigation needed.
-    private var standingEntries: [StandingEntry] {
+    /// One compact line summarizing the game's current standing — full
+    /// per-player breakdown lives one tap away on `destination`, matching
+    /// the slimmer POC card (icon/name/detail, no inline mini-leaderboard).
+    private var detailLine: String {
+        let round = game.currentRound
         switch game.mode {
         case .lms:
-            let round = game.currentRound
-            let submittedIds = Set((round?.picks ?? []).compactMap { $0.player?.id })
-            let sorted = game.players.sorted { lhs, rhs in
-                if (lhs.status == .eliminated) != (rhs.status == .eliminated) { return lhs.status != .eliminated }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
-            return sorted.map { player in
-                let out = player.status == .eliminated
-                return StandingEntry(
-                    id: player.id.uuidString,
-                    icon: out ? "xmark" : "flame.fill",
-                    iconTint: out ? V2Theme.danger : V2Theme.accent,
-                    text: player.name,
-                    trailing: out ? "OUT" : "",
-                    isMuted: out,
-                    hasSubmitted: (out || round == nil) ? nil : submittedIds.contains(player.id)
-                )
-            }
+            let roundPart = round.map { "Round \($0.roundNumber) · " } ?? ""
+            return "\(roundPart)\(game.activePlayers.count) still standing"
         case .predictor:
-            let round = game.currentRound
-            let rows = PredictorStandings.rows(for: game)
-            return rows.map { row in
-                StandingEntry(
-                    id: row.id.uuidString,
-                    icon: "number",
-                    iconTint: V2Theme.accent,
-                    text: "\(row.position). \(row.player.name)",
-                    trailing: "\(row.points)pts",
-                    isMuted: false,
-                    // A full slate, not just "has any prediction row" — a
-                    // player with 1 of 10 fixtures done isn't submitted yet.
-                    hasSubmitted: round.map { PredictorScoringService.slateComplete(for: row.player, round: $0) }
-                )
+            let roundPart = round.map { "Matchday \($0.roundNumber) · " } ?? ""
+            if let leader = PredictorStandings.leaderName(for: game) {
+                return "\(roundPart)Leading: \(leader)"
             }
+            return "\(roundPart)\(game.players.count) players"
         case .killer:
-            let round = game.currentRound
-            let standings = KillerCardData.makeStandings(game: game)
-            return standings.map { entry in
-                let hasSubmitted: Bool? = (entry.isEliminated || round == nil) ? nil : round.flatMap { r in
-                    game.players.first(where: { $0.id == entry.id }).map {
-                        KillerScoringService.slateComplete(for: $0, round: r, game: game)
-                    }
-                }
-                return StandingEntry(
-                    id: entry.id.uuidString,
-                    icon: entry.isEliminated ? "xmark" : "heart.fill",
-                    iconTint: entry.isEliminated ? V2Theme.danger : V2Theme.accent,
-                    text: entry.playerName,
-                    trailing: entry.isEliminated ? "OUT" : "\(entry.lives)",
-                    isMuted: entry.isEliminated,
-                    hasSubmitted: hasSubmitted
-                )
-            }
+            let roundPart = round.map { "Round \($0.roundNumber) · " } ?? ""
+            return "\(roundPart)\(game.activePlayers.count) players remain"
         }
     }
 }
@@ -189,11 +129,15 @@ struct ManagerRoundStatus {
     let label: String
     let detail: String
     let tint: Color
+    /// Submitted/eligible for the current round's open submission window —
+    /// nil once the window has closed (results/closed) or there's nothing
+    /// to submit, so a finished round doesn't show a stale progress bar.
+    let submissionProgress: Double?
 
     static func make(for game: Game) -> ManagerRoundStatus? {
         guard game.status != .complete else { return nil }
         guard let round = game.currentRound else {
-            return ManagerRoundStatus(label: "Not started", detail: "", tint: V2Theme.textSecondary)
+            return ManagerRoundStatus(label: "Not started", detail: "", tint: V2Theme.textSecondary, submissionProgress: nil)
         }
 
         let eligible: Int
@@ -223,12 +167,13 @@ struct ManagerRoundStatus {
             return ManagerRoundStatus(
                 label: "\(submitted)/\(eligible) submitted",
                 detail: due,
-                tint: allIn ? V2Theme.accent : V2Theme.warning
+                tint: allIn ? V2Theme.accent : V2Theme.warning,
+                submissionProgress: eligible > 0 ? Double(submitted) / Double(eligible) : nil
             )
         case .results:
-            return ManagerRoundStatus(label: "Results due", detail: "Round \(round.roundNumber)", tint: V2Theme.danger)
+            return ManagerRoundStatus(label: "Results due", detail: "Round \(round.roundNumber)", tint: V2Theme.danger, submissionProgress: nil)
         case .closed:
-            return ManagerRoundStatus(label: "Round \(round.roundNumber) closed", detail: "", tint: V2Theme.textTertiary)
+            return ManagerRoundStatus(label: "Round \(round.roundNumber) closed", detail: "", tint: V2Theme.textTertiary, submissionProgress: nil)
         }
     }
 
@@ -238,19 +183,4 @@ struct ManagerRoundStatus {
         formatter.setLocalizedDateFormatFromTemplate("EEE d MMM HH:mm")
         return formatter
     }()
-}
-
-/// One line in a game's standing preview — icon + name (+ optional trailing
-/// value), styled per the reference's alive/out treatment.
-struct StandingEntry: Identifiable {
-    let id: String
-    let icon: String
-    let iconTint: Color
-    let text: String
-    let trailing: String
-    let isMuted: Bool
-    /// Whether this (still-in) player has submitted for the current round —
-    /// nil when not applicable (eliminated, or no open round). Read from the
-    /// round's own Pick/Prediction/KillerPrediction records, not mocked.
-    let hasSubmitted: Bool?
 }

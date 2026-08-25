@@ -70,10 +70,11 @@ struct LMSStandingsViewV2: View {
                         .padding(.horizontal, V2Theme.Spacing.horizontal)
                         .padding(.vertical, V2Theme.Spacing.section)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .v2Header("Standings")
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Standings")
         }
     }
 }
@@ -83,7 +84,7 @@ private struct LMSStandingsRowV2: View {
     let roundOut: Int?
 
     var body: some View {
-        Card(padding: 16) {
+        Card(padding: 16, floating: true) {
             HStack(spacing: 14) {
                 Text(player.name)
                     .font(V2Theme.Typography.rowTitle)

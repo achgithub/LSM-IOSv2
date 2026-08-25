@@ -97,7 +97,8 @@ struct MatchesViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2DataRoomScene()
         .v2LoadingOverlay(store.isLoading, label: store.items.isEmpty ? "Loading matches…" : "Refreshing…")
         .safeAreaInset(edge: .top) {
             if let errorMessage = store.errorMessage, !store.items.isEmpty {
@@ -108,11 +109,11 @@ struct MatchesViewV2: View {
                 .foregroundStyle(V2Theme.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
-                .background(V2Theme.background)
+                .background(.ultraThinMaterial)
             }
         }
         .safeAreaInset(edge: .bottom) { footer }
-        .v2Header("Fixtures")
+        .v2FloatingHeader("Fixtures")
         .task(id: enabled.leagues.map(\.id)) {
             let validIds = Set(enabled.leagues.map(\.id))
             selectedLeagueIds.formIntersection(validIds)
@@ -162,14 +163,14 @@ struct MatchesViewV2: View {
             }
         }
         .padding(.bottom, 6)
-        .background(V2Theme.background)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Filter card
 
     @ViewBuilder
     private var filterCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 14) {
                 if enabled.leagues.count > 1 {
                     pillRow(title: "League") {
@@ -336,7 +337,7 @@ private struct MatchRowV2: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+        .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
         .contentShape(Rectangle())
         .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() } }
     }

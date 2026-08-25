@@ -136,36 +136,44 @@ struct GameWizardViewV2: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: V2Theme.Spacing.section) {
-                    heroCard
-                    actionsCard
-                }
-                .padding(.horizontal, V2Theme.Spacing.horizontal)
-                .padding(.vertical, V2Theme.Spacing.section)
+            switch game?.mode {
+            case .lms: scenedBody.v2LMSFormScene()
+            case .predictor: scenedBody.v2PredictorFormScene()
+            case .killer: scenedBody.v2KillerFormScene()
+            case nil: scenedBody.v2TrophyRoomScene()
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("Guided Setup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Exit") { dismiss() } }
+        }
+    }
+
+    private var scenedBody: some View {
+        ScrollView {
+            LazyVStack(spacing: V2Theme.Spacing.section) {
+                heroCard
+                actionsCard
             }
-            .sheet(item: $activeSheet, onDismiss: afterSheet) { which in
-                sheetContent(which)
-            }
-            // Follow-up round after a reinstating resolution — presented at the top
-            // level (never stacked on the resolution sheet).
-            .sheet(item: $autoOpenType) { type in
-                if let game {
-                    OpenRoundViewV2(game: game, roundType: type)
-                }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2FloatingHeader("Guided Setup", showBack: false) {
+            Button("Exit") { dismiss() }
+                .foregroundStyle(V2Theme.textSecondary)
+        }
+        .sheet(item: $activeSheet, onDismiss: afterSheet) { which in
+            sheetContent(which)
+        }
+        // Follow-up round after a reinstating resolution — presented at the top
+        // level (never stacked on the resolution sheet).
+        .sheet(item: $autoOpenType) { type in
+            if let game {
+                OpenRoundViewV2(game: game, roundType: type)
             }
         }
     }
 
     private var heroCard: some View {
         let card = card(for: phase)
-        return Card {
+        return Card(floating: true) {
             VStack(spacing: 14) {
                 Image(systemName: card.icon)
                     .font(.system(size: 44))
@@ -199,7 +207,7 @@ struct GameWizardViewV2: View {
     @ViewBuilder
     private var actionsCard: some View {
         let card = card(for: phase)
-        Card {
+        Card(floating: true) {
             VStack(spacing: 10) {
                 if let primary = card.primary {
                     PrimaryButton(title: primary.label) { open(primary.sheet) }

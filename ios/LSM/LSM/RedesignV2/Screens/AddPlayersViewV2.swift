@@ -28,7 +28,7 @@ struct AddPlayersViewV2: View {
                     TextField("Search players...", text: $searchText)
                         .textFieldStyle(.plain)
                         .padding(12)
-                        .background(V2Theme.cardBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                        .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
                     if !managerTrimmed.isEmpty {
                         youCard
                     }
@@ -38,11 +38,12 @@ struct AddPlayersViewV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("Add Players")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Add Players", showBack: false) {
+                Button("Done") { dismiss() }
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(V2Theme.textPrimary)
             }
         }
     }
@@ -50,7 +51,7 @@ struct AddPlayersViewV2: View {
     // MARK: Cards
 
     private var filterCard: some View {
-        Card {
+        Card(floating: true) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     SelectablePill(title: "All players", isSelected: filterGroupId == nil) { filterGroupId = nil }
@@ -65,7 +66,7 @@ struct AddPlayersViewV2: View {
     }
 
     private var youCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "You")
                 Button {
@@ -92,7 +93,7 @@ struct AddPlayersViewV2: View {
     }
 
     private var addableCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Add from your players")
                 if roster.isEmpty {
@@ -136,7 +137,7 @@ struct AddPlayersViewV2: View {
     }
 
     private var inGameCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "In this game (\(game.players.count))")
                 if game.players.isEmpty {

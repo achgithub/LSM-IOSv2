@@ -46,7 +46,8 @@ struct StandingsViewV2: View {
                             drawn: row.drawn,
                             lost: row.lost,
                             goalDifference: row.goalDifference,
-                            points: row.points
+                            points: row.points,
+                            floating: true
                         )
                     }
                 }
@@ -54,9 +55,10 @@ struct StandingsViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2DataRoomScene()
         .v2LoadingOverlay(store.isLoading, label: store.standings.isEmpty ? "Loading standings…" : "Refreshing…")
-        .v2Header("Standings")
+        .v2FloatingHeader("Standings")
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
     }

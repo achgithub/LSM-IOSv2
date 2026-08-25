@@ -72,13 +72,13 @@ struct KillerPredictionsEntryViewV2: View {
                     }
                 }
             }
-            .background(V2Theme.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2KillerFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2Header("Round \(round.roundNumber)")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }.foregroundStyle(V2Theme.Mode.killer)
-                }
+            .v2FloatingHeader("Round \(round.roundNumber)") {
+                Button("Done") { dismiss() }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(V2Theme.Mode.killer)
             }
             .task { await load() }
         }
@@ -86,7 +86,7 @@ struct KillerPredictionsEntryViewV2: View {
 
     private func playerRow(current: Player) -> some View {
         Button { showingPlayerPicker = true } label: {
-            Card(padding: 14) {
+            Card(padding: 14, floating: true) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         MicroLabel(text: "Player")
@@ -142,7 +142,7 @@ private struct KillerPlayerPickerSheetV2: View {
                                 Spacer()
                             }
                             .padding(12)
-                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+                            .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
                         }
                         .buttonStyle(.plain)
                     }
@@ -150,11 +150,11 @@ private struct KillerPlayerPickerSheetV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("Players")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2KillerFormScene()
+            .v2FloatingHeader("Players", showBack: false) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
             }
         }
     }
@@ -174,7 +174,7 @@ private struct KillerFixturePredictionRowV2: View {
     }
 
     var body: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
                 FixtureLabelV2(fixture: fixture, teamsById: teamsById)
                     .foregroundStyle(V2Theme.textPrimary)

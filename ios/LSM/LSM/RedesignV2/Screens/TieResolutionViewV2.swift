@@ -23,13 +23,13 @@ struct TieResolutionViewV2: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: V2Theme.Spacing.section) {
-                    Card {
+                    Card(floating: true) {
                         Text("Everyone still in was eliminated this round — no clear winner. How should it resolve?")
                             .font(.subheadline)
                             .foregroundStyle(V2Theme.textPrimary)
                     }
 
-                    Card {
+                    Card(floating: true) {
                         VStack(spacing: 10) {
                             resolutionButton(
                                 title: "Split the win",
@@ -49,11 +49,11 @@ struct TieResolutionViewV2: View {
                 .padding(.horizontal, V2Theme.Spacing.horizontal)
                 .padding(.vertical, V2Theme.Spacing.section)
             }
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("No Clear Winner")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Later") { dismiss() } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("No Clear Winner", showBack: false) {
+                Button("Later") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
             }
         }
         .interactiveDismissDisabled()

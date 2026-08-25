@@ -2,189 +2,133 @@ import Combine
 import SwiftUI
 import SwiftData
 
-/// Home — entry point into the V2 redesign. Reached via a row at the bottom
-/// of Settings (see `SettingsView`), shown only when the user opts in via
-/// `V2PreviewFlag` — off by default, works in every build, not `#if DEBUG`.
-/// Leads with a Favourites shortcut (a game's star toggle lives on
-/// `GameSummaryRow`, shared with the Games screen's per-mode sections —
-/// favouriting here doesn't remove it from its normal section there, it's a
-/// shortcut, not a move), then a menu of links to each restyled screen.
+/// Home — the root screen of the V2 experience, hosted inside its own
+/// `NavigationStack` by `V2RootView` (see `AppRootView`, which picks V2RootView
+/// vs. `RootTabView` per `V2PreviewFlag` — on by default, works in every
+/// build, not `#if DEBUG`, since v1 needs to stay a real, live fallback).
+/// Leads with the games overview summary, then a Favourites shortcut (a
+/// game's star toggle lives on `GameSummaryRow`, shared with the Games
+/// screen's per-mode sections — favouriting here doesn't remove it from its
+/// normal section there, it's a shortcut, not a move), an "All games"
+/// overview, then a menu of links to each restyled screen.
 ///
-/// Pushed into Settings' own `NavigationStack` rather than owning one itself
-/// — an embedded `NavigationStack` here, combined with `.v2Header`'s custom
-/// back button, used to produce a stray extra back arrow (this view wrapped
-/// its own root in `.v2Header`, which draws a back button even with nothing
-/// to dismiss) on top of the real one Settings already provides.
+/// `.v2Header` is called with `showBack: false` — as the stack root there's
+/// nothing to dismiss to, so the back chevron is omitted rather than shown
+/// as a dead control.
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
-    @Environment(SubmissionBadgeStore.self) private var badgeStore
     @State private var wizardGame: Game?
-    /// Owned here (not inside `FootballDataCard`) so the loading pill can be
-    /// anchored to the bottom of the whole screen via `.v2LoadingOverlay`,
-    /// same as every other V2 screen — anchoring it to just the card would
-    /// place it wherever that card happens to be scrolled to, not the
-    /// screen's visible bottom edge.
-    @State private var footballStore = FootballDataStore()
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
+    /// Approximate rendered height of `stickyHeader`, used to (a) push
+    /// scrolled content down clear of it and (b) size the fade zone content
+    /// scrolls through as it passes underneath. Fixed rather than measured
+    /// (e.g. via a `GeometryReader` + `PreferenceKey`) — a reasonable
+    /// tradeoff for now; revisit if Dynamic Type ever visibly misaligns it.
+    private static let headerHeight: CGFloat = 220
+    // The header has no background panel (free-floating title/bell/metrics,
+    // see `stickyHeader`), so content scrolling underneath must already be
+    // fully invisible for that entire span — not fading somewhere inside
+    // it — or it shows through the gaps between the floating elements.
+    // The actual fade ramp is a short zone just *below* that, so content
+    // is already gone by the time it would reach the header at all, and
+    // only reappears once genuinely clear of it.
+    private static let fadeRampHeight: CGFloat = 40
+
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 14) {
-                if !favouriteGames.isEmpty {
-                    Card {
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    if !favouriteGames.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             SectionHeader(title: "Favourites")
-                            VStack(spacing: 10) {
+                            VStack(spacing: 14) {
                                 ForEach(favouriteGames) { game in
                                     GameSummaryRow(game: game) { wizardGame = game }
                                 }
                             }
                         }
                     }
+                    if !games.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SectionHeader(title: "All games", subtitle: "Drill into Games for the full per-mode view")
+                            VStack(spacing: 14) {
+                                ForEach(games) { game in
+                                    GameSummaryRow(game: game) { wizardGame = game }
+                                }
+                            }
+                        }
+                    }
+                    // No menu list at all below the tiles anymore — all six
+                    // (Games/Leagues/Players/Sync/Help/Settings) are the
+                    // header's tile grid now (see `GamesOverviewSummary`).
                 }
-                NavigationLink {
-                    GamesPortalViewV2()
-                } label: {
-                    MenuRow(systemImage: "trophy", title: "Games")
-                }
-                .buttonStyle(.plain)
-                NavigationLink {
-                    PlayersViewV2()
-                } label: {
-                    MenuRow(systemImage: "person.2", title: "Players")
-                }
-                .buttonStyle(.plain)
-                FootballDataCard(store: footballStore)
-                NavigationLink {
-                    SettingsViewV2()
-                } label: {
-                    MenuRow(systemImage: "gearshape", title: "Settings")
-                }
-                .buttonStyle(.plain)
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                // Clears the mask's fully-invisible zone *and* the fade
+                // ramp below it — otherwise the first section starts
+                // partway into the ramp and reads as already fading at
+                // rest, before any scrolling has happened.
+                .padding(.top, Self.headerHeight + Self.fadeRampHeight)
+                .padding(.bottom, V2Theme.Spacing.section)
             }
-            .padding(.horizontal, V2Theme.Spacing.horizontal)
-            .padding(.vertical, V2Theme.Spacing.section)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Fully hidden for the header's whole footprint, then ramps
+            // back in just below it — see the constants' doc comments —
+            // applied only to this ScrollView (not the background) so the
+            // stadium image itself stays put.
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: Self.headerHeight)
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: Self.fadeRampHeight)
+                    Color.black
+                }
+            }
+            .v2StadiumScene()
+
+            // Floating header, not scrolled content — sits above the masked
+            // ScrollView in z-order, unaffected by its fade mask, and
+            // (having no `.ignoresSafeArea()` of its own) sits below the
+            // status bar automatically like any ordinary view.
+            stickyHeader
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2LoadingOverlay(footballStore.isLoading, label: "Updating football data…")
-        .v2Header("Home", trailingBadgeCount: badgeStore.pendingCount)
+        // No `.v2Header`/system nav bar at all here, not even a transparent
+        // one — a real `UINavigationController` nav bar still paints a
+        // solid strip across the true top safe area regardless of
+        // `.toolbarBackground(.hidden, ...)`, which cut the stadium image
+        // off right under the status bar instead of letting it read as one
+        // continuous scene. `stickyHeader` (a floating overlay, not a nav
+        // bar) supplies the title/bell instead.
+        .toolbar(.hidden, for: .navigationBar)
         // No .refreshable here — this is a static navigation menu, not a
-        // live list, and the badge already refreshes on every appearance via
-        // .task below. Pairing .refreshable with a .task that fires (and
-        // finishes) on first appearance made the refresh control's reserved
-        // space flash briefly at the top of the screen on load, not just on
-        // an actual pull gesture. Games portal and the inbox itself both
-        // already have their own .refreshable for the screens where it's
-        // actually live data.
-        .task { await badgeStore.refresh() }
+        // live list. Games portal and the inbox itself both have their own
+        // .refreshable/.task for the screens where it's actually live data.
         .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
     }
-}
 
-/// Expandable Home-screen card grouping "Leagues" and "Fixtures" under one
-/// disclosure, plus an "Update football data" action refreshing both at
-/// once — distinct from `SyncCoordinator`'s "Sync" (that pushes/pulls game
-/// rounds and player submissions, not football provider data). See
-/// `FootballDataStore` for the throttle/ad-gate rationale.
-private struct FootballDataCard: View {
-    @Environment(EnabledLeagues.self) private var enabled
-    @State private var isExpanded = false
-    /// Owned by the parent screen — see `V2PreviewMenuView` for why — so the
-    /// bottom pill is the sole animated "something is happening" signal for
-    /// this action; this row only needs the plain text/disabled state.
-    let store: FootballDataStore
-
-    private var updateLabel: String { store.isLoading ? "Updating…" : "Update football data" }
-
-    var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "sportscourt.fill")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(V2Theme.accent)
-                            .frame(width: 22)
-                        Text("Football Data")
-                            .font(V2Theme.Typography.rowTitle)
-                            .foregroundStyle(V2Theme.textPrimary)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(V2Theme.textSecondary)
-                            .rotationEffect(.degrees(isExpanded ? 0 : -90))
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                if isExpanded {
-                    VStack(spacing: 10) {
-                        NavigationLink {
-                            StandingsViewV2()
-                        } label: {
-                            MenuRow(systemImage: "list.number", title: "Leagues")
-                        }
-                        .buttonStyle(.plain)
-                        NavigationLink {
-                            MatchesViewV2()
-                        } label: {
-                            MenuRow(systemImage: "sportscourt", title: "Fixtures")
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            store.refresh(leagues: enabled.leagues)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.clockwise")
-                                Text(updateLabel)
-                                    .font(V2Theme.Typography.rowTitle.weight(.semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
-                            .foregroundStyle(store.isThrottled ? V2Theme.textTertiary : V2Theme.textPrimary)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(store.isLoading || store.isThrottled)
-
-                        statusLine
-                    }
-                }
+    /// Floating title/metrics header — fixed at the top of the screen
+    /// (a `ZStack` sibling of the `ScrollView`, not part of its scrolled
+    /// content), free over the stadium with no enclosing panel. The
+    /// submission bell that used to sit here was dropped — Games' own
+    /// SUBMISSIONS tile (see `GamesPortalViewV2`) already covers it, so this
+    /// was a duplicate entry point.
+    private var stickyHeader: some View {
+        VStack(spacing: 14) {
+            Text("Last Stand Manager")
+                .font(V2Theme.Typography.pageTitle)
+                .foregroundStyle(V2Theme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .center)
+            if !games.isEmpty {
+                GamesOverviewSummary(games: games)
             }
         }
-        // Only advance the clock while throttled, matching MatchesView's
-        // rationale — no re-render churn once the button is already live.
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-            if store.isThrottled { store.now = tick }
-        }
-    }
-
-    @ViewBuilder
-    private var statusLine: some View {
-        VStack(spacing: 4) {
-            if store.isThrottled, let freshUntil = store.freshUntil {
-                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
-                Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let lastRefreshed = store.lastRefreshed {
-                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let errorMessage = store.errorMessage {
-                Text(errorMessage)
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.danger)
-            }
-            Text(DataDisclaimer.text)
-                .font(.caption2)
-                .foregroundStyle(V2Theme.textTertiary)
-                .multilineTextAlignment(.center)
-        }
+        .padding(.horizontal, V2Theme.Spacing.horizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 14)
+        // No enclosing panel — title/bell/metrics float free over the
+        // stadium the same way they did before this became a pinned
+        // section header; only the metric tiles carry their own individual
+        // card backing (see `GamesOverviewSummary`).
     }
 }

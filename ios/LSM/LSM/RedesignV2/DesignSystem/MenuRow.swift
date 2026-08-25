@@ -13,9 +13,11 @@ struct MenuRow: View {
     /// so it reads consistently with how the mode is colored elsewhere
     /// (e.g. the games portal's section headers).
     var tint: Color = V2Theme.accent
+    /// See `Card.floating` — pass true on a screen with a photo background.
+    var floating: Bool = false
 
     var body: some View {
-        Card(padding: 16) {
+        Card(padding: 16, floating: floating) {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
                     .font(.body.weight(.semibold))

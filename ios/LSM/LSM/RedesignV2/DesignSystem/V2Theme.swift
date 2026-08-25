@@ -39,7 +39,10 @@ enum V2Theme {
     static let danger = Color.v2(light: 0xC72E3B, dark: 0xE63946)
 
     static let textPrimary = Color.v2(light: 0x121A22, dark: 0xF5F7FA)
-    static let textSecondary = Color.v2(light: 0x5C6B78, dark: 0x8B9AAE)
+    /// Darkened from the original 0x5C6B78 — over a floating card on a
+    /// photo background (not just a flat surface), the lighter value read
+    /// as too pale ("Due Fri 28 Aug", "Matchday 5", etc. were hard to read).
+    static let textSecondary = Color.v2(light: 0x43566A, dark: 0x8B9AAE)
     static let textTertiary = Color.v2(light: 0x8B95A1, dark: 0x5C6B80)
 
     /// Per-mode identity — distinct color + font design for LMS/Predictor/
@@ -64,6 +67,22 @@ enum V2Theme {
             case .lms: return .rounded
             case .predictor: return .monospaced
             case .killer: return .serif
+            }
+        }
+
+        static func icon(for mode: GameMode) -> String {
+            switch mode {
+            case .lms: return "shield.lefthalf.filled"
+            case .predictor: return "chart.line.uptrend.xyaxis"
+            case .killer: return "scope"
+            }
+        }
+
+        static func displayName(for mode: GameMode) -> String {
+            switch mode {
+            case .lms: return "Last Man Standing"
+            case .predictor: return "Predictor"
+            case .killer: return "Killer"
             }
         }
     }
@@ -110,6 +129,60 @@ enum V2Theme {
         static let section: CGFloat = 20
         static let cardPadding: CGFloat = 18
         static let horizontal: CGFloat = 16
+    }
+
+    /// Tokens for the stadium-atmosphere chrome behind V2 scenes (see
+    /// `V2StadiumBackground`). One shared daylight image is graded, not
+    /// swapped, to produce the dark appearance — see `RedesignV2/POC/
+    /// V2-THEME-HANDOFF.md` for the agreed direction this formalizes.
+    enum Atmosphere {
+        /// Image adjustments applied only in dark mode; light mode shows the
+        /// source artwork unmodified (floodlights "off").
+        static let darkSaturation: Double = 0.62
+        static let darkContrast: Double = 1.10
+        static let darkBrightness: Double = -0.26
+        static let darkMultiplyGrade = Color.v2(light: 0xFFFFFF, dark: 0x071426)
+        static let darkMultiplyOpacity: Double = 0.54
+
+        /// Mild grading applied in light mode too (see `V2PhotoBackground`)
+        /// — the raw interior photos (Trophy/Team/Data Room, Tactics
+        /// Office) at full saturation/contrast competed with card content
+        /// instead of reading as scenery. Kept small enough to preserve the
+        /// bright sky/warm wood, not a grey wash.
+        static let lightSaturation: Double = 0.94
+        static let lightContrast: Double = 0.90
+
+        /// Central readability scrim (see `.v2*Scene()`) — a soft, roughly
+        /// elliptical wash behind the scrolling content column, strongest
+        /// in the middle where cards/headings sit, fading out before the
+        /// edges and before the bottom so the richer photo detail (and the
+        /// pitch/floor) stays visible at the sides and bottom. Uses
+        /// `V2Theme.background` (not a fixed white) so it's a light wash in
+        /// light mode and a dark wash in dark mode — same adaptive
+        /// approach as `V2FloatingHeader`'s scrim.
+        static let contentScrimOpacity: Double = 0.26
+
+        /// Floodlight housing/beam color — fixed blue-white, not mode-tinted,
+        /// so the lamps read the same regardless of which screen/mode accent
+        /// is passed to `V2StadiumBackground`.
+        static let lampGlow = Color(UIColor(v2Hex: 0x3DA8FF))
+
+        /// Legibility knob between the image and card content. Start low and
+        /// raise per-screen only if content over the busier parts of the
+        /// image (e.g. long standings lists) proves hard to read — see the
+        /// handoff doc's "manageable risk, mitigate with translucency" call.
+        static let contentOverlayOpacity: Double = 0.05
+        /// Used instead of `contentOverlayOpacity` when Reduce Transparency
+        /// is on — the image stays but content gets a solid-enough backing
+        /// that translucency isn't relied on for legibility.
+        static let reduceTransparencyOverlayOpacity: Double = 0.9
+
+        /// Ambient particle field: kept deliberately sparse/slow — this is
+        /// continuous background motion, not a one-off celebration effect
+        /// (see `V2LoadingIndicator`/Lottie for those), so it needs to stay
+        /// cheap to run behind every V2 screen.
+        static let particleCount = 10
+        static let particleRefreshInterval: Double = 1.0 / 12.0
     }
 
     enum Typography {

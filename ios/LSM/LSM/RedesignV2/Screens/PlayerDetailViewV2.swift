@@ -62,24 +62,25 @@ struct PlayerDetailViewV2: View {
                     qrCard(image: qrImage)
                 }
                 groupsCard
-                Card {
+                Card(floating: true) {
                     ActionRow(title: "Remove Player", icon: "trash", tint: V2Theme.danger) { pendingRemove = true }
                 }
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .background(V2Theme.background.ignoresSafeArea())
-        .v2Header(member.name)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    renameText = member.name
-                    renaming = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(V2Theme.textPrimary)
-                }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TeamRoomScene()
+        .v2FloatingHeader(member.name) {
+            Button {
+                renameText = member.name
+                renaming = true
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(V2Theme.textPrimary)
+                    .frame(width: 36, height: 36)
+                    .background(V2Theme.cardBackground, in: Circle())
             }
         }
         .alert("Rename player", isPresented: $renaming) {
@@ -128,7 +129,7 @@ struct PlayerDetailViewV2: View {
     // MARK: - Cards
 
     private var infoCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 6) {
                 if pwaEnabled {
                     if linkURL != nil {
@@ -149,7 +150,7 @@ struct PlayerDetailViewV2: View {
     }
 
     private var linkCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Submission Link")
                 if let url = linkURL {
@@ -215,7 +216,7 @@ struct PlayerDetailViewV2: View {
     }
 
     private func qrCard(image: UIImage) -> some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Show In Person", subtitle: "Face to face with this player? Show them this screen and let them scan it with their own camera.")
                 HStack {
@@ -235,7 +236,7 @@ struct PlayerDetailViewV2: View {
     }
 
     private var groupsCard: some View {
-        Card {
+        Card(floating: true) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     SectionHeader(title: "Groups")

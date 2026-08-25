@@ -66,15 +66,12 @@ struct NewGameViewV2: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch mode {
-                case .lms: lmsForm
-                case .predictor: predictorForm
-                case .killer: killerForm
-                case nil: modePicker
-                }
+            switch mode {
+            case .lms: lmsForm
+            case .predictor: predictorForm
+            case .killer: killerForm
+            case nil: modePicker
             }
-            .background(V2Theme.background.ignoresSafeArea())
         }
         .fileImporter(
             isPresented: $showingImport,
@@ -124,11 +121,11 @@ struct NewGameViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .v2Header("New Game")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TrophyRoomScene()
+        .v2FloatingHeader("New Game", showBack: false) {
+            Button("Cancel") { dismiss() }
+                .foregroundStyle(V2Theme.textSecondary)
         }
     }
 
@@ -143,7 +140,7 @@ struct NewGameViewV2: View {
     private var predictorForm: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Game name")
                         TextField("e.g. Friday Predictor", text: $name)
@@ -153,7 +150,7 @@ struct NewGameViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Leagues")
                         FlowPills {
@@ -175,7 +172,7 @@ struct NewGameViewV2: View {
                 }
 
                 if !managerTrimmed.isEmpty {
-                    Card {
+                    Card(floating: true) {
                         Toggle(isOn: $managerPlaying) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(managerTrimmed) (you)")
@@ -189,7 +186,7 @@ struct NewGameViewV2: View {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         MicroLabel(text: "Scoring")
                         Stepper("Exact score: \(predictorExactPoints) pts", value: $predictorExactPoints, in: 1...10)
@@ -217,11 +214,11 @@ struct NewGameViewV2: View {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .v2Header("New Predictor Game")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Back") { mode = nil }
-            }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2PredictorFormScene()
+        .v2FloatingHeader("New Predictor Game", showBack: false) {
+            Button("Back") { mode = nil }
+                .foregroundStyle(V2Theme.textSecondary)
         }
     }
 
@@ -345,7 +342,7 @@ extension NewGameViewV2 {
     var lmsForm: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Game name")
                         TextField("e.g. Friday LMS", text: $name)
@@ -355,7 +352,7 @@ extension NewGameViewV2 {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Leagues")
                         FlowPills {
@@ -377,7 +374,7 @@ extension NewGameViewV2 {
                 }
 
                 if !managerTrimmed.isEmpty {
-                    Card {
+                    Card(floating: true) {
                         Toggle(isOn: $managerPlaying) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(managerTrimmed) (you)")
@@ -391,7 +388,7 @@ extension NewGameViewV2 {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         MicroLabel(text: "Result rules")
                         Toggle(isOn: $postponedEliminates) {
@@ -410,7 +407,7 @@ extension NewGameViewV2 {
                     .foregroundStyle(V2Theme.textPrimary)
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Summaries")
                         HStack(spacing: 8) {
@@ -428,11 +425,11 @@ extension NewGameViewV2 {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .v2Header("New LMS Game")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Back") { mode = nil }
-            }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2LMSFormScene()
+        .v2FloatingHeader("New LMS Game", showBack: false) {
+            Button("Back") { mode = nil }
+                .foregroundStyle(V2Theme.textSecondary)
         }
     }
 
@@ -447,7 +444,7 @@ extension NewGameViewV2 {
     var killerForm: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Game name")
                         TextField("e.g. Friday Killer", text: $name)
@@ -457,7 +454,7 @@ extension NewGameViewV2 {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
                         MicroLabel(text: "Leagues")
                         FlowPills {
@@ -479,7 +476,7 @@ extension NewGameViewV2 {
                 }
 
                 if !managerTrimmed.isEmpty {
-                    Card {
+                    Card(floating: true) {
                         Toggle(isOn: $managerPlaying) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(managerTrimmed) (you)")
@@ -493,7 +490,7 @@ extension NewGameViewV2 {
                     }
                 }
 
-                Card {
+                Card(floating: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         MicroLabel(text: "Killer settings")
                         Stepper(killerBuildPhaseRounds == 1
@@ -518,11 +515,11 @@ extension NewGameViewV2 {
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
-        .v2Header("New Killer Game")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Back") { mode = nil }
-            }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2KillerFormScene()
+        .v2FloatingHeader("New Killer Game", showBack: false) {
+            Button("Back") { mode = nil }
+                .foregroundStyle(V2Theme.textSecondary)
         }
     }
 
