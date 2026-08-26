@@ -9,10 +9,11 @@ import SwiftData
 /// Leads with the games overview summary, then a Favourites shortcut (a
 /// game's star toggle lives on `GameSummaryRow`, shared with the Games
 /// screen's per-mode sections — favouriting here doesn't remove it from its
-/// normal section there, it's a shortcut, not a move), then an "All games"
-/// overview. No menu list below that — every other destination is one of
-/// the header's own tiles (see `GamesOverviewSummary`) or HELP's inline
-/// panel (see `HomeHelpPanel` below).
+/// normal section there, it's a shortcut, not a move). No full games list
+/// here — that's the Games portal's job (its own GAMES tile above), so
+/// Home doesn't repeat it. No menu list either — every other destination is
+/// one of the header's own tiles (see `GamesOverviewSummary`) or HELP's
+/// inline panel (see `HomeHelpPanel` below).
 ///
 /// Its floating header + fade is `.v2FloatingHeaderWithTiles`, the same
 /// modifier every other tile-grid screen uses (Games/Leagues/Players) — this
@@ -54,16 +55,10 @@ struct V2PreviewMenuView: View {
                         }
                     }
                 }
-                if !games.isEmpty {
-                    VStack(alignment: .leading, spacing: 14) {
-                        SectionHeader(title: "All games", subtitle: "Drill into Games for the full per-mode view")
-                        VStack(spacing: 14) {
-                            ForEach(games) { game in
-                                GameSummaryRow(game: game) { wizardGame = game }
-                            }
-                        }
-                    }
-                }
+                // No "All games" list here — that's what the Games portal
+                // itself is for (its own GAMES tile above); duplicating the
+                // full list on Home just repeated it a scroll away.
+                //
                 // No menu list at all below the tiles anymore — all six
                 // (Games/Leagues/Players/Sync/Help/Settings) are the
                 // header's tile grid now (see `GamesOverviewSummary`).
