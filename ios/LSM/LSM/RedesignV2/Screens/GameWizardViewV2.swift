@@ -24,6 +24,14 @@ import SwiftData
 ///   wizard utility step uses, not a free side door). Once results are due,
 ///   it offers the football-data update (`FootballDataStore.refresh`,
 ///   already self-ad-gates internally) before pulling scores.
+/// - New front door when opened game-less from the Games portal's WIZARD
+///   tile (`introCard`/`entryChoiceCard`/`continueGameCard`, all in the
+///   `private extension` below): a one-time explainer, then New Game vs.
+///   Continue an Existing Game — the latter a radio-button pick that sets
+///   `resumedGame` and drops into that game's phase exactly like
+///   `explicitGame` always has. This replaced the old per-row "resume
+///   wizard" button on `GameSummaryRow` as the way to jump into a specific
+///   game's wizard.
 struct GameWizardViewV2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -32,13 +40,33 @@ struct GameWizardViewV2: View {
     @Environment(EnabledLeagues.self) private var enabledLeagues
     @AppStorage("hasCompletedFirstRun") private var hasCompletedFirstRun = false
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    /// The "Don't show this again" checkbox on `introCard` writes here —
+    /// separate from `hasCompletedFirstRun` (the app-wide onboarding flag),
+    /// since this is specifically about the Wizard's own front door and a
+    /// manager should be able to suppress just this without it meaning
+    /// anything about first-run onboarding generally.
+    @AppStorage("wizardIntroDismissed") private var wizardIntroDismissed = false
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @Query private var roster: [RosterMember]
     @State private var footballStore = FootballDataStore()
 
-    /// The game this wizard is driving. `nil` = first-run: there is no game yet,
-    /// so it falls back to the newest game once one is created mid-flow.
+    /// The game this wizard is driving. `nil` = opened from the Games
+    /// portal's WIZARD tile — the front door (`introCard`/`entryChoiceCard`/
+    /// `continueGameCard`) decides whether that becomes a brand new game or
+    /// an existing one (`resumedGame`) before the phase machine below ever
+    /// sees a non-nil `game`.
     private let explicitGame: Game?
+
+    @State private var showIntro: Bool
+    @State private var dontShowIntroAgain = false
+    @State private var entryChoice: WizardEntryChoice?
+    @State private var selectedContinueGameID: UUID?
+    /// Set once "Continue an Existing Game" → a selection → Next resolves —
+    /// from here on `game` reads this exactly like `explicitGame`, so the
+    /// rest of the file (phase machine, sheets, push/share prompts) can't
+    /// tell the difference between this and having been opened directly on
+    /// a specific game.
+    @State private var resumedGame: Game?
 
     @State private var activeSheet: WizardSheetV2?
     /// Closing a round with everyone eliminated sets this (ResultsEntryViewV2
@@ -59,7 +87,13 @@ struct GameWizardViewV2: View {
     /// game is the one not in this set (read live, after the @Query refreshes).
     @State private var gameIDsBeforeCreate: Set<UUID> = []
 
-    init(game: Game? = nil) { self.explicitGame = game }
+    init(game: Game? = nil) {
+        self.explicitGame = game
+        // Read the flag directly (not via `@AppStorage`, which isn't wired
+        // up yet at this point in init) — only ever relevant when opened
+        // game-less; a per-game entry always skips the front door entirely.
+        _showIntro = State(initialValue: game == nil && !UserDefaults.standard.bool(forKey: "wizardIntroDismissed"))
+    }
 
     // MARK: Live state
 
@@ -69,6 +103,7 @@ struct GameWizardViewV2: View {
     /// `@Query` refreshes) as the newest game absent from the pre-create snapshot.
     private var game: Game? {
         if let explicitGame { return explicitGame }
+        if let resumedGame { return resumedGame }
         guard didStartCreate else { return nil }
         return games.first { !gameIDsBeforeCreate.contains($0.id) }
     }
@@ -148,8 +183,16 @@ struct GameWizardViewV2: View {
     private var scenedBody: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                heroCard
-                actionsCard
+                if showIntro {
+                    introCard
+                } else if explicitGame == nil && entryChoice == nil {
+                    entryChoiceCard
+                } else if entryChoice == .continueGame && resumedGame == nil {
+                    continueGameCard
+                } else {
+                    heroCard
+                    actionsCard
+                }
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
@@ -278,16 +321,6 @@ struct GameWizardViewV2: View {
         .foregroundStyle(V2Theme.accent)
         .opacity(!footballStore.isLoading && !footballStore.isThrottled ? 1 : 0.4)
         .disabled(footballStore.isLoading || footballStore.isThrottled)
-    }
-
-    /// A short "Round N" / status line above the card, so a resumed wizard makes
-    /// clear where in the game it picked up.
-    private var contextLabel: String? {
-        guard let game else { return nil }
-        let prefix = game.mode == .predictor ? "Matchday" : "Round"
-        if let round = openRound { return "\(prefix) \(round.roundNumber)" }
-        if let last = latestClosedRound, game.status != .complete { return "\(prefix) \(last.roundNumber)" }
-        return nil
     }
 
     // MARK: Cards
@@ -600,6 +633,134 @@ struct GameWizardViewV2: View {
     private func finish() {
         if explicitGame == nil { hasCompletedFirstRun = true }
         dismiss()
+    }
+}
+
+private enum WizardEntryChoice {
+    case new, continueGame
+}
+
+/// Front door — split into its own extension purely to keep the main
+/// struct's body under SwiftLint's `type_body_length`, not for any
+/// access-boundary reason (still reaches the struct's own `@State`
+/// directly).
+private extension GameWizardViewV2 {
+    /// A short "Round N" / status line above the card, so a resumed wizard makes
+    /// clear where in the game it picked up.
+    var contextLabel: String? {
+        guard let game else { return nil }
+        let prefix = game.mode == .predictor ? "Matchday" : "Round"
+        if let round = openRound { return "\(prefix) \(round.roundNumber)" }
+        if let last = latestClosedRound, game.status != .complete { return "\(prefix) \(last.roundNumber)" }
+        return nil
+    }
+
+    /// Shown once ever (per `wizardIntroDismissed`, unless the checkbox is
+    /// left unchecked) before the very first game-less open — never shown
+    /// when opened directly on a game, since there's nothing to explain
+    /// there that the phase cards below don't already say in context.
+    var introCard: some View {
+        Card(floating: true) {
+            VStack(spacing: 14) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 44))
+                    .foregroundStyle(V2Theme.accent)
+                Text("The Wizard")
+                    .font(V2Theme.Typography.pageTitle)
+                    .foregroundStyle(V2Theme.textPrimary)
+                Text("One step at a time: start a new game, or pick up an existing one right where you left off. Each screen tells you where you are and what's next, and does it for you.")
+                    .font(.subheadline)
+                    .foregroundStyle(V2Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    dontShowIntroAgain.toggle()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: dontShowIntroAgain ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(dontShowIntroAgain ? V2Theme.accent : V2Theme.textTertiary)
+                        Text("Don't show this again")
+                            .font(.footnote)
+                            .foregroundStyle(V2Theme.textSecondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                PrimaryButton(title: "Continue") {
+                    if dontShowIntroAgain { wizardIntroDismissed = true }
+                    showIntro = false
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// The only fork in the front door — everything past this point (New
+    /// Game's setup prefix, or an existing game's own phase) is the same
+    /// flow the wizard always had.
+    var entryChoiceCard: some View {
+        Card(floating: true) {
+            VStack(spacing: 14) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 44))
+                    .foregroundStyle(V2Theme.accent)
+                Text("New game, or continue one?")
+                    .font(V2Theme.Typography.pageTitle)
+                    .foregroundStyle(V2Theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                PrimaryButton(title: "New Game") { entryChoice = .new }
+                if !games.isEmpty {
+                    Button("Continue an Existing Game") { entryChoice = .continueGame }
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(V2Theme.textSecondary)
+                        .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Radio-button game list — picking one and tapping Next sets
+    /// `resumedGame`, after which this screen behaves exactly like being
+    /// opened directly on that game (see `game`'s doc comment).
+    var continueGameCard: some View {
+        Card(floating: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Continue which game?")
+                    .font(V2Theme.Typography.pageTitle)
+                    .foregroundStyle(V2Theme.textPrimary)
+                VStack(spacing: 4) {
+                    ForEach(games) { candidate in
+                        Button {
+                            selectedContinueGameID = candidate.id
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: selectedContinueGameID == candidate.id ? "largecircle.fill.circle" : "circle")
+                                    .foregroundStyle(selectedContinueGameID == candidate.id ? V2Theme.accent : V2Theme.textTertiary)
+                                Image(systemName: V2Theme.Mode.icon(for: candidate.mode))
+                                    .foregroundStyle(V2Theme.Mode.color(for: candidate.mode))
+                                    .frame(width: 20)
+                                Text(candidate.name)
+                                    .foregroundStyle(V2Theme.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                PrimaryButton(title: "Next", isEnabled: selectedContinueGameID != nil) {
+                    resumedGame = games.first { $0.id == selectedContinueGameID }
+                }
+                Button("Back") {
+                    entryChoice = nil
+                    selectedContinueGameID = nil
+                }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(V2Theme.textSecondary)
+            }
+        }
     }
 }
 

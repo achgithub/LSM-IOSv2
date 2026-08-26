@@ -27,7 +27,6 @@ struct GamesPortalViewV2: View {
     @State private var showingGameLimit = false
     @State private var showingPushPicker = false
     @State private var showingWizard = false
-    @State private var wizardGame: Game?
     @State private var highlightedGameID: UUID?
 
     private var modesInPlay: [GameMode] {
@@ -62,9 +61,7 @@ struct GamesPortalViewV2: View {
                             mode: mode,
                             games: games.filter { $0.mode == mode },
                             highlightedGameID: highlightedGameID
-                        ) { game in
-                            wizardGame = game
-                        }
+                        )
                     }
                 }
             }
@@ -112,7 +109,7 @@ struct GamesPortalViewV2: View {
                 Button {
                     showingWizard = true
                 } label: {
-                    V2Tile(icon: "wand.and.stars", label: "SETUP", color: V2Theme.Mode.predictor)
+                    V2Tile(icon: "wand.and.stars", label: "WIZARD", color: V2Theme.Mode.predictor)
                 }
                 .buttonStyle(.plain)
             }
@@ -149,7 +146,6 @@ struct GamesPortalViewV2: View {
             }
         }
         .fullScreenCover(isPresented: $showingWizard) { GameWizardViewV2() }
-        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
         .alert("Game limit reached", isPresented: $showingGameLimit) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -164,7 +160,6 @@ private struct ModeSectionCard: View {
     let mode: GameMode
     let games: [Game]
     var highlightedGameID: UUID?
-    var onResume: (Game) -> Void = { _ in }
 
     private var title: String { V2Theme.Mode.displayName(for: mode) }
     private var icon: String { V2Theme.Mode.icon(for: mode) }
@@ -207,7 +202,7 @@ private struct ModeSectionCard: View {
             if isExpanded {
                 VStack(spacing: 14) {
                     ForEach(games) { game in
-                        GameSummaryRow(game: game) { onResume(game) }
+                        GameSummaryRow(game: game)
                             .id(game.id)
                             .overlay(
                                 RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)

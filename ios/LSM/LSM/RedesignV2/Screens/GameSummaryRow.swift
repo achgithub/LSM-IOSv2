@@ -11,13 +11,12 @@ import SwiftUI
 /// engine, so Next Up is a best-guess nudge read off the clock and cached
 /// fixture data, not a hard gate; the manager can always ignore it and drill
 /// into the game name instead, which is its own separate tap target into
-/// the full detail screen.
+/// the full detail screen. No per-row "resume wizard" button any more —
+/// the Games portal's WIZARD tile's own Continue Game step (see
+/// `GameWizardViewV2`) covers jumping into a specific game's wizard now, so
+/// this row doesn't need a second entry point into it.
 struct GameSummaryRow: View {
     let game: Game
-    /// Resumes this game's Guided Setup wizard at its current phase. Wired
-    /// up by both the Games portal and Home's Favourites card; default
-    /// no-op only as a safety net for any future caller that doesn't need it.
-    var onResume: () -> Void = {}
 
     @Environment(Entitlements.self) private var entitlements
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
@@ -62,20 +61,6 @@ struct GameSummaryRow: View {
                 .buttonStyle(.plain)
 
                 Spacer(minLength: 8)
-                Button {
-                    onResume()
-                } label: {
-                    Image(systemName: "wand.and.stars")
-                        .font(.body)
-                        .foregroundStyle(V2Theme.accent)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Resume Guided Setup")
-                // Fixed extra gap (beyond the row's base 8pt spacing), not
-                // another flexible Spacer — this needs to stay a constant
-                // distance from the favourite toggle, not compete with the
-                // leading Spacer for the row's slack space.
-                Spacer().frame(width: 16)
                 Button {
                     game.isFavourite.toggle()
                 } label: {
