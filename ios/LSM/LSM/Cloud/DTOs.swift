@@ -53,6 +53,12 @@ struct MatchDTO: Codable, Identifiable {
     /// mean the match is over.
     var isFinished: Bool { status == "FINISHED" }
 
+    /// Shared by every V2 results-entry screen's `unfinishedFixtures` check
+    /// (see V2 audit 3.2) — previously three separate copies of the same
+    /// `status == "POSTPONED" || status == "CANCELLED"` test, one of them
+    /// already its own private static func on `PredictorResultsEntryViewV2`.
+    var isPostponedOrCancelled: Bool { status == "POSTPONED" || status == "CANCELLED" }
+
     /// Undated matches (no parseable kickoff) sort last; otherwise by kickoff
     /// then id.
     nonisolated static func byKickoffThenId(_ a: MatchDTO, _ b: MatchDTO) -> Bool {

@@ -49,7 +49,7 @@ struct ResultsEntryViewV2: View {
     /// block on external data).
     private var unfinishedFixtures: [MatchDTO] {
         roundFixtures.filter { fixture in
-            outcomes[fixture.id] != nil && !fixture.isFinished && fixture.status != "POSTPONED" && fixture.status != "CANCELLED"
+            outcomes[fixture.id] != nil && !fixture.isFinished && !fixture.isPostponedOrCancelled
         }
     }
 
@@ -66,21 +66,16 @@ struct ResultsEntryViewV2: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2LMSFormScene()
-            .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Results · Round \(round.roundNumber)", showBack: false) {
-                HStack(spacing: 14) {
-                    LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(V2Theme.Mode.lms)
-                }
-            }
-            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-                if refresh.isThrottled { refresh.now = tick }
-            }
+            .v2ResultsEntryChrome(
+                title: "Results · Round \(round.roundNumber)",
+                tint: V2Theme.Mode.lms,
+                isLoading: isLoading,
+                leagues: game.leagues,
+                refresh: refresh,
+                onPullFromServer: pullFromServer,
+                onLoad: load
+            )
             .safeAreaInset(edge: .bottom) { bottomBar }
-            .task { await load() }
-            .task { refresh.rearm(for: game.leagues) }
             .safeAreaInset(edge: .top) {
                 if game.isDemoData && TutorialManager.shared.isActive {
                     TutorialSheetBanner(

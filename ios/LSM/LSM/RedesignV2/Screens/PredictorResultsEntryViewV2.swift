@@ -36,10 +36,6 @@ struct PredictorResultsEntryViewV2: View {
         !roundFixtures.isEmpty && roundFixtures.allSatisfy { scores[$0.id] != nil || voided.contains($0.id) }
     }
 
-    private static func isPostponedOrCancelled(_ f: MatchDTO) -> Bool {
-        f.status == "POSTPONED" || f.status == "CANCELLED"
-    }
-
     /// Fixtures with a score entered but not yet confirmed final by the
     /// provider — either seeded before full time, or manually keyed in by
     /// the manager while the match is still live/scheduled. Voided fixtures
@@ -49,7 +45,7 @@ struct PredictorResultsEntryViewV2: View {
     private var unfinishedFixtures: [MatchDTO] {
         roundFixtures.filter { fixture in
             scores[fixture.id] != nil && !voided.contains(fixture.id)
-                && !fixture.isFinished && !Self.isPostponedOrCancelled(fixture)
+                && !fixture.isFinished && !fixture.isPostponedOrCancelled
         }
     }
 
@@ -66,18 +62,15 @@ struct PredictorResultsEntryViewV2: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2PredictorFormScene()
-            .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Results · Round \(round.roundNumber)", showBack: false) {
-                HStack(spacing: 14) {
-                    LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(V2Theme.Mode.predictor)
-                }
-            }
-            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-                if refresh.isThrottled { refresh.now = tick }
-            }
+            .v2ResultsEntryChrome(
+                title: "Results · Round \(round.roundNumber)",
+                tint: V2Theme.Mode.predictor,
+                isLoading: isLoading,
+                leagues: game.leagues,
+                refresh: refresh,
+                onPullFromServer: pullFromServer,
+                onLoad: load
+            )
             .safeAreaInset(edge: .bottom) { bottomBar }
             .safeAreaInset(edge: .top) {
                 if game.isDemoData && TutorialManager.shared.isActive {
@@ -87,8 +80,6 @@ struct PredictorResultsEntryViewV2: View {
                     )
                 }
             }
-            .task { await load() }
-            .task { refresh.rearm(for: game.leagues) }
         }
     }
 
@@ -291,7 +282,7 @@ struct PredictorResultsEntryViewV2: View {
             }
         }
         for fixture in roundFixtures where scores[fixture.id] == nil && !voided.contains(fixture.id) {
-            if Self.isPostponedOrCancelled(fixture) {
+            if fixture.isPostponedOrCancelled {
                 voided.insert(fixture.id)
             }
         }
