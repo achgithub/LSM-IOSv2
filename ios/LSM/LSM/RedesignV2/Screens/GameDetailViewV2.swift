@@ -1,7 +1,10 @@
 import SwiftUI
 import SwiftData
 
-private enum LMSSheetV2: String, Identifiable {
+/// Internal, not private — `GameSummaryRow`'s Next Up button constructs this
+/// screen with `autoOpenSheet: .results` etc. from the Games portal, so the
+/// case names need to be visible outside this file.
+enum LMSSheetV2: String, Identifiable {
     case open, picks, results, declare, summaryFixtures, summaryPicks, summaryResults, summaryOutcome, standings
     var id: String { rawValue }
 }
@@ -22,6 +25,11 @@ struct GameDetailViewV2: View {
     @Query private var allMembers: [RosterMember]
 
     @Bindable var game: Game
+    /// Set when pushed from the Games portal's Next Up button (see
+    /// `GameSummaryRow`) — opens straight into that sheet instead of landing
+    /// on the plain detail screen, without duplicating this file's own
+    /// tie-resolution/auto-open-next-round state machine to do it.
+    var autoOpenSheet: LMSSheetV2?
     @State private var showingAddPlayers = false
     @State private var sheet: LMSSheetV2?
     /// The tie resolution is presented at the top level (never stacked on the
@@ -90,6 +98,10 @@ struct GameDetailViewV2: View {
             V2GameHeaderActions(game: game, model: headerActions)
         }
         .v2GameHeaderActions(game: game, model: headerActions)
+        .onAppear {
+            guard let autoOpenSheet else { return }
+            sheet = autoOpenSheet
+        }
         .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet, onDismiss: presentPendingResolve) { which in
             switch which {

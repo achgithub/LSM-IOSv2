@@ -1,7 +1,10 @@
 import SwiftUI
 import SwiftData
 
-private enum KillerSheetV2: String, Identifiable {
+/// Internal, not private — `GameSummaryRow`'s Next Up button constructs this
+/// screen with `autoOpenSheet: .results` etc. from the Games portal, so the
+/// case names need to be visible outside this file.
+enum KillerSheetV2: String, Identifiable {
     case open, predictions, results, lives
     case shareFixtures, sharePlayerKey, shareWeeklyResults, shareStandings, shareWinner
     var id: String { rawValue }
@@ -22,6 +25,10 @@ struct KillerGameDetailViewV2: View {
     @Query private var allMembers: [RosterMember]
 
     @Bindable var game: Game
+    /// Set when pushed from the Games portal's Next Up button (see
+    /// `GameSummaryRow`) — opens straight into that sheet instead of landing
+    /// on the plain detail screen.
+    var autoOpenSheet: KillerSheetV2?
     @State private var showingAddPlayers = false
     @State private var sheet: KillerSheetV2?
     @State private var pendingRemovePlayer: Player?
@@ -70,6 +77,10 @@ struct KillerGameDetailViewV2: View {
             V2GameHeaderActions(game: game, model: headerActions)
         }
         .v2GameHeaderActions(game: game, model: headerActions)
+        .onAppear {
+            guard let autoOpenSheet else { return }
+            sheet = autoOpenSheet
+        }
         .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet) { which in
             switch which {

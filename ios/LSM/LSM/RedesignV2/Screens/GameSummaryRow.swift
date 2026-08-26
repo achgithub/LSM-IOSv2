@@ -5,6 +5,13 @@ import SwiftUI
 /// per-mode sections. Mode-agnostic: computes its own manager-facing status
 /// and standing preview from the shared scoring services, so it can't drift
 /// from the real share-card numbers.
+///
+/// Leads with a Next Up action (see `NextUpStep`) rather than just status —
+/// this app is "appifying a spreadsheet," not running a strict workflow
+/// engine, so Next Up is a best-guess nudge read off the clock and cached
+/// fixture data, not a hard gate; the manager can always ignore it and drill
+/// into the game name instead, which is its own separate tap target into
+/// the full detail screen.
 struct GameSummaryRow: View {
     let game: Game
     /// Resumes this game's Guided Setup wizard at its current phase. Wired
@@ -12,8 +19,16 @@ struct GameSummaryRow: View {
     /// no-op only as a safety net for any future caller that doesn't need it.
     var onResume: () -> Void = {}
 
+    @Environment(Entitlements.self) private var entitlements
+    @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
+    @State private var leagueData: LeagueData?
+    @State private var sheet: RowSheet?
+
     private var managerStatus: ManagerRoundStatus? { ManagerRoundStatus.make(for: game) }
     private var modeColor: Color { V2Theme.Mode.color(for: game.mode) }
+    private var roundContext: V2GameRoundContext { V2GameRoundContext(game: game) }
+    private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled && game.cloudGameToken != nil }
+    private var nextUp: NextUpStep { NextUpStep.make(for: game, data: leagueData, pwaEnabled: pwaEnabled) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -24,13 +39,28 @@ struct GameSummaryRow: View {
                     .frame(width: 42, height: 42)
                     .background(modeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: V2Theme.Radius.pill, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
-                    Text(game.name)
-                        .font(.system(.headline, design: V2Theme.Mode.fontDesign(for: game.mode)).weight(.bold))
-                        .foregroundStyle(V2Theme.textPrimary)
-                        .lineLimit(1)
+                // The one tap target into the full detail screen (see this
+                // file's top doc comment) — everything else on the row
+                // either executes a Next Up step directly or toggles state
+                // in place.
+                NavigationLink {
+                    destination
+                } label: {
+                    HStack(spacing: 4) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
+                            Text(game.name)
+                                .font(.system(.headline, design: V2Theme.Mode.fontDesign(for: game.mode)).weight(.bold))
+                                .foregroundStyle(V2Theme.textPrimary)
+                                .lineLimit(1)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(V2Theme.textTertiary)
+                    }
                 }
+                .buttonStyle(.plain)
+
                 Spacer(minLength: 8)
                 Button {
                     onResume()
@@ -43,9 +73,8 @@ struct GameSummaryRow: View {
                 .accessibilityLabel("Resume Guided Setup")
                 // Fixed extra gap (beyond the row's base 8pt spacing), not
                 // another flexible Spacer — this needs to stay a constant
-                // distance from the favourite/chevron pair, not compete with
-                // the leading Spacer for the row's slack space. A mis-tap
-                // here launches a full-screen wizard, not a toggle.
+                // distance from the favourite toggle, not compete with the
+                // leading Spacer for the row's slack space.
                 Spacer().frame(width: 16)
                 Button {
                     game.isFavourite.toggle()
@@ -55,14 +84,6 @@ struct GameSummaryRow: View {
                         .foregroundStyle(game.isFavourite ? V2Theme.warning : V2Theme.textTertiary)
                 }
                 .buttonStyle(.plain)
-                NavigationLink {
-                    destination
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(V2Theme.textSecondary)
-                        .frame(width: 28, height: 28)
-                }
             }
 
             if let managerStatus {
@@ -86,9 +107,123 @@ struct GameSummaryRow: View {
             Text(detailLine)
                 .font(.caption)
                 .foregroundStyle(V2Theme.textSecondary)
+
+            nextUpRow
         }
         .padding(14)
         .v2FloatingCard()
+        // Only needed once the round's past its deadline (that's the only
+        // branch of `NextUpStep` that reads fixture status at all) — reading
+        // cache-only via `LeagueData.load` per `LeagueData`'s own policy, so
+        // this never spends a live fetch just because the portal's on
+        // screen.
+        .task(id: roundContext.currentRound?.id) {
+            guard let round = roundContext.currentRound, round.status != .closed, Date() >= round.deadline else { return }
+            leagueData = try? await LeagueData.load(for: game.leagues)
+        }
+        .sheet(item: $sheet) { which in
+            switch which {
+            case .picks:
+                if let round = roundContext.openRound { picksDestination(round: round) }
+            case .submissionQueue:
+                SubmissionInboxViewV2(filterGameToken: game.cloudGameToken)
+            case .shareLastRound:
+                if let round = roundContext.latestClosedRound { shareLastRoundDestination(round: round) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nextUpRow: some View {
+        switch nextUp {
+        case .none:
+            EmptyView()
+        case .enterPicks(let pwa):
+            nextUpButton(title: pwa ? "Check Submission Queue" : "Enter Picks", icon: "square.and.pencil") {
+                sheet = pwa ? .submissionQueue : .picks
+            }
+        case .confirmEntries(let pwa):
+            nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
+                sheet = pwa ? .submissionQueue : .picks
+            }
+        case .matchesInProgress(let finished, let total):
+            HStack(spacing: 8) {
+                Image(systemName: "sportscourt")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(V2Theme.textSecondary)
+                Text("Matches playing — \(finished) of \(total) in")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(V2Theme.textSecondary)
+                Spacer()
+                if roundContext.latestClosedRound != nil { shareButton }
+            }
+            .padding(.top, 2)
+        case .processResults:
+            HStack(spacing: 8) {
+                NavigationLink {
+                    resultsDestination
+                } label: {
+                    nextUpLabel(title: "Process Results", icon: "checkmark.circle.fill", tint: modeColor)
+                }
+                .buttonStyle(.plain)
+                if roundContext.latestClosedRound != nil { shareButton }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func nextUpButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Button(action: action) {
+                nextUpLabel(title: title, icon: icon, tint: modeColor)
+            }
+            .buttonStyle(.plain)
+            if roundContext.latestClosedRound != nil { shareButton }
+        }
+        .padding(.top, 2)
+    }
+
+    private func nextUpLabel(title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+            Text("Next: \(title)")
+        }
+        .font(.caption.weight(.bold))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.14), in: Capsule())
+    }
+
+    private var shareButton: some View {
+        Button { sheet = .shareLastRound } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(V2Theme.textTertiary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Share last round")
+    }
+
+    @ViewBuilder
+    private func picksDestination(round: Round) -> some View {
+        switch game.mode {
+        case .lms: PicksEntryViewV2(game: game, round: round)
+        case .predictor: PredictionsEntryViewV2(game: game, round: round)
+        case .killer: KillerPredictionsEntryViewV2(game: game, round: round)
+        }
+    }
+
+    /// Only ever the *previous* round's result — LMS/Predictor/Killer's own
+    /// "weekly results"/"results" card type, not a fixtures/entry-closed
+    /// card; those are still one tap away inside the full detail screen.
+    @ViewBuilder
+    private func shareLastRoundDestination(round: Round) -> some View {
+        switch game.mode {
+        case .lms: SummaryShareView(game: game, round: round, type: .results)
+        case .predictor: PredictorShareView(game: game, round: round, type: .weeklyResults)
+        case .killer: KillerShareView(game: game, round: round, type: .weeklyResults)
+        }
     }
 
     @ViewBuilder
@@ -97,6 +232,22 @@ struct GameSummaryRow: View {
         case .lms: GameDetailViewV2(game: game)
         case .predictor: PredictorGameDetailViewV2(game: game)
         case .killer: KillerGameDetailViewV2(game: game)
+        }
+    }
+
+    /// Same as `destination`, but lands with the results sheet already open
+    /// — Process Results goes through the full detail screen rather than
+    /// presenting `ResultsEntryViewV2` straight from this row, so closing a
+    /// round still runs through each mode's own completion/tie-resolution
+    /// handling (LMS especially — see `GameDetailViewV2`'s
+    /// `pendingResolve`/`showResolve` chain) instead of a second, thinner
+    /// copy of it living here.
+    @ViewBuilder
+    private var resultsDestination: some View {
+        switch game.mode {
+        case .lms: GameDetailViewV2(game: game, autoOpenSheet: .results)
+        case .predictor: PredictorGameDetailViewV2(game: game, autoOpenSheet: .results)
+        case .killer: KillerGameDetailViewV2(game: game, autoOpenSheet: .results)
         }
     }
 
@@ -118,6 +269,22 @@ struct GameSummaryRow: View {
         case .killer:
             let roundPart = round.map { "Round \($0.roundNumber) · " } ?? ""
             return "\(roundPart)\(game.activePlayers.count) players remain"
+        }
+    }
+}
+
+/// `GameSummaryRow`'s Next Up sheets — one row, one sheet at a time, so a
+/// single `Identifiable` enum rather than several competing `Bool`/`item`
+/// states.
+private enum RowSheet: Identifiable {
+    case picks
+    case submissionQueue
+    case shareLastRound
+    var id: String {
+        switch self {
+        case .picks: return "picks"
+        case .submissionQueue: return "queue"
+        case .shareLastRound: return "share"
         }
     }
 }
