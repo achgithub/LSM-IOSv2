@@ -63,16 +63,8 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                     HStack {
                         if showBack {
-                            Button {
-                                dismiss()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(V2Theme.textPrimary)
-                                    .frame(width: 36, height: 36)
-                                    .background(V2Theme.cardBackground, in: Circle())
-                            }
-                            .accessibilityLabel("Back")
+                            V2HeaderIconButton(systemImage: "chevron.left") { dismiss() }
+                                .accessibilityLabel("Back")
                         }
                         Spacer()
                         trailing()
@@ -84,6 +76,40 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
             .padding(.top, 10)
             .padding(.bottom, 14)
         }
+    }
+}
+
+/// The circular icon button seen throughout V2 floating headers — this
+/// header's own back chevron, plus each game-detail screen's export/rename
+/// pair, which had hand-rolled the same `.frame(width: 36, height: 36)
+/// .background(V2Theme.cardBackground, in: Circle())` look three times over
+/// (see V2 audit 3.6). For a `Menu`'s label, which supplies its own tap
+/// target, use `V2HeaderIconLabel` instead — this wraps that same label in
+/// a `Button`.
+struct V2HeaderIconButton: View {
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            V2HeaderIconLabel(systemImage: systemImage)
+        }
+    }
+}
+
+/// Just the circular icon, no `Button` wrapper — for a `Menu`'s `label:`,
+/// which already supplies its own tap target and can't nest another
+/// `Button` inside it. Plain tappable icons should use `V2HeaderIconButton`
+/// instead.
+struct V2HeaderIconLabel: View {
+    let systemImage: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(V2Theme.textPrimary)
+            .frame(width: 36, height: 36)
+            .background(V2Theme.cardBackground, in: Circle())
     }
 }
 

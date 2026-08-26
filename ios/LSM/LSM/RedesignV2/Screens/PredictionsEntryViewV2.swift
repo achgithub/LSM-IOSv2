@@ -171,10 +171,10 @@ struct PredictionsEntryViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2PredictorFormScene()
             .v2LoadingOverlay(store.isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Round \(round.roundNumber)") {
+            .v2FloatingHeader("Round \(round.roundNumber)", showBack: false) {
                 Button("Done") { dismiss() }
                     .fontWeight(.semibold)
-                    .foregroundStyle(V2Theme.accent)
+                    .foregroundStyle(V2Theme.Mode.predictor)
             }
             .safeAreaInset(edge: .top) {
                 if game.isDemoData && TutorialManager.shared.isActive {
@@ -193,26 +193,9 @@ struct PredictionsEntryViewV2: View {
     /// horizontally-scrolling pill list — scanning/scrolling past 100+ names
     /// to find one is the thing that made the pill row unusable at scale.
     private func playerRow(current: Player) -> some View {
-        Button { showingPlayerPicker = true } label: {
-            Card(padding: 14, floating: true) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        MicroLabel(text: "Player")
-                        Text(current.name)
-                            .font(V2Theme.Typography.rowTitle)
-                            .foregroundStyle(V2Theme.textPrimary)
-                    }
-                    Spacer()
-                    if isFullyComplete(current) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(V2Theme.accent)
-                    }
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(V2Theme.textSecondary)
-                }
-            }
+        V2EntryPlayerCard(name: current.name, isComplete: isFullyComplete(current)) {
+            showingPlayerPicker = true
         }
-        .buttonStyle(.plain)
     }
 
     /// The Joker "checkpoint" — a single card at the end of the list rather

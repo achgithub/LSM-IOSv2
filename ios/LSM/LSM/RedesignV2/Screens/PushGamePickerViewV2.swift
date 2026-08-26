@@ -1,15 +1,15 @@
 import SwiftUI
 import SwiftData
 
-/// Presented from `GamesPortalViewV2`'s Sync button and pull-to-refresh —
-/// every path into `SyncCoordinator.sync` goes through here. Lists only
+/// Presented from `GamesPortalViewV2`'s PUSH tile and pull-to-refresh —
+/// every path into `PushCoordinator.push` goes through here. Lists only
 /// games with a currently open round (anything else has nothing to push,
-/// same reasoning as `SyncCoordinator`'s `skippedNoOpenRound`), each with
+/// same reasoning as `PushCoordinator`'s `skippedNoOpenRound`), each with
 /// its own checkbox, none pre-ticked and no "Select all" — a manager picks
 /// games one at a time on purpose. Every push is a billed Worker
-/// invocation, so this trades one extra tap for never fanning a sync out
+/// invocation, so this trades one extra tap for never fanning a push out
 /// across every running game by accident.
-struct SyncGamePickerViewV2: View {
+struct PushGamePickerViewV2: View {
     let games: [Game]
     let onConfirm: (Set<UUID>) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -34,7 +34,7 @@ struct SyncGamePickerViewV2: View {
                                 row(for: game)
                             }
                         }
-                        Text("Only games with an open round can be synced. Pick which ones to push — each sync is a network call, so nothing is pre-selected.")
+                        Text("Only games with an open round can be pushed. Pick which ones — each push is a network call, so nothing is pre-selected.")
                             .font(.caption)
                             .foregroundStyle(V2Theme.textSecondary)
                     }
@@ -45,7 +45,7 @@ struct SyncGamePickerViewV2: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2TrophyRoomScene()
-            .v2FloatingHeader("Sync Games", showBack: false) {
+            .v2FloatingHeader("Push to Players", showBack: false) {
                 Button("Cancel") { dismiss() }
                     .foregroundStyle(V2Theme.textSecondary)
             }
@@ -54,7 +54,7 @@ struct SyncGamePickerViewV2: View {
                     onConfirm(selected)
                     dismiss()
                 } label: {
-                    Text(selected.isEmpty ? "Select games to sync" : "Sync \(selected.count) \(selected.count == 1 ? "Game" : "Games")")
+                    Text(selected.isEmpty ? "Select games to push" : "Push \(selected.count) \(selected.count == 1 ? "Game" : "Games")")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                 }

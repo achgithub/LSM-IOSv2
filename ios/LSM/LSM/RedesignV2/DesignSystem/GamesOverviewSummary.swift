@@ -9,6 +9,14 @@ import SwiftData
 /// `members.count`/`enabled.ids.count` are each their own `@Query`/
 /// environment count — none of this adds new O(players) work beyond what's
 /// already paid elsewhere.
+///
+/// The push-to-PWA action (`PushCoordinator`) used to have a tile here too,
+/// duplicating Games' own PUSH tile — and silently, since this call site
+/// never surfaced the post-push summary card Games' does (see V2 audit
+/// 1.1/2.6). Removed rather than fixed in place: push is a per-round action,
+/// and Games is where round state actually lives, so one entry point there
+/// beats two with drifting feedback. Row 2's third slot is blank until a
+/// real Home-level shortcut claims it (see V2 audit 2.3).
 struct GamesOverviewSummary: View {
     let games: [Game]
     /// Which of Home's two inline accordion panels (if any) is expanded —
@@ -22,9 +30,6 @@ struct GamesOverviewSummary: View {
     /// number of distinct `RosterMember`s, same source `PlayersViewV2` uses.
     @Query private var members: [RosterMember]
     @Environment(EnabledLeagues.self) private var enabled
-    @Environment(SyncCoordinator.self) private var syncCoordinator
-    @Environment(\.modelContext) private var context
-    @State private var showingSyncPicker = false
 
     private var activeCount: Int { games.filter { $0.status != .complete }.count }
 
@@ -55,17 +60,6 @@ struct GamesOverviewSummary: View {
             }
             .buttonStyle(.plain)
         } row2: {
-            Button {
-                showingSyncPicker = true
-            } label: {
-                V2Tile(
-                    icon: "arrow.triangle.2.circlepath",
-                    label: syncCoordinator.isSyncing ? "SYNCING…" : "SYNC",
-                    color: V2Theme.accent
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(syncCoordinator.isSyncing)
             // Toggles an inline accordion section on Home instead of pushing
             // a screen — see `HomeHelpPanel` in `V2PreviewMenuView`.
             Button { toggle(.help) } label: {
@@ -73,11 +67,7 @@ struct GamesOverviewSummary: View {
             }
             .buttonStyle(.plain)
             V2TileBlank()
-        }
-        .sheet(isPresented: $showingSyncPicker) {
-            SyncGamePickerViewV2(games: games) { gameIDs in
-                Task { await syncCoordinator.sync(context: context, gameIDs: gameIDs) }
-            }
+            V2TileBlank()
         }
     }
 }

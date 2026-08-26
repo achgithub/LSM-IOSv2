@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Full-width gold rounded button — the V2 replacement for the default
-/// bordered/plain Button styles on primary actions ("Save", "Add").
+/// Full-width rounded button, filled `V2Theme.accent` by default — the V2
+/// replacement for the default bordered/plain Button styles on primary
+/// actions ("Save", "Add"). Pass `tint:` for a mode-specific fill.
 struct PrimaryButton: View {
     let title: String
     var isEnabled = true

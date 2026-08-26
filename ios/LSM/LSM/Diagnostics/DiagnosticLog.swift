@@ -8,7 +8,7 @@ import Foundation
 /// most recent ~300KB so it never grows unbounded.
 ///
 /// Mostly failure-only, matching those chokepoints, with one deliberate
-/// exception: the sync outbox (`PWARoundPusher`/`SyncCoordinator`) also logs
+/// exception: the push outbox (`PWARoundPusher`/`PushCoordinator`) also logs
 /// its *successful* retries here ("outbox cleared", "outbox sweep retried
 /// N") — that's new information a failure log alone wouldn't capture (did a
 /// queued write ever actually land?), not duplicate noise. It does NOT log

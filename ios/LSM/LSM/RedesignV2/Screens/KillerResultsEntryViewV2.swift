@@ -82,7 +82,7 @@ struct KillerResultsEntryViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2KillerFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Results · Round \(round.roundNumber)") {
+            .v2FloatingHeader("Results · Round \(round.roundNumber)", showBack: false) {
                 HStack(spacing: 14) {
                     LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
                     Button("Done") { dismiss() }

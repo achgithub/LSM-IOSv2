@@ -9,8 +9,10 @@ import SwiftData
 /// Leads with the games overview summary, then a Favourites shortcut (a
 /// game's star toggle lives on `GameSummaryRow`, shared with the Games
 /// screen's per-mode sections — favouriting here doesn't remove it from its
-/// normal section there, it's a shortcut, not a move), an "All games"
-/// overview, then a menu of links to each restyled screen.
+/// normal section there, it's a shortcut, not a move), then an "All games"
+/// overview. No menu list below that — every other destination is one of
+/// the header's own tiles (see `GamesOverviewSummary`) or HELP's inline
+/// panel (see `HomeHelpPanel` below).
 ///
 /// Its floating header is a `V2FloatingHeader` (the same component every
 /// other tile-grid screen uses via `.v2FloatingHeaderWithTiles`), composed
@@ -23,10 +25,10 @@ import SwiftData
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var wizardGame: Game?
-    /// Which of the LEAGUES/HELP tiles' inline accordion sections (if any)
-    /// is expanded at the bottom of this screen — see `GamesOverviewSummary`
-    /// (owns the tiles that toggle this) and `HomeFootballPanel`/
-    /// `HomeHelpPanel` below (the content that renders when set).
+    /// Which of Home's inline accordion sections (if any) is expanded at the
+    /// bottom of this screen — see `GamesOverviewSummary` (owns the HELP
+    /// tile that toggles this) and `HomeHelpPanel` below (the content that
+    /// renders when set).
     @State private var expandedPanel: HomePanel?
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }

@@ -25,7 +25,7 @@ struct PredictorStandingsViewV2: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .v2TrophyRoomScene()
+            .v2PredictorFormScene()
             .v2FloatingHeader("Standings")
         }
     }

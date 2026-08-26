@@ -68,11 +68,16 @@ struct PicksEntryViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2LMSFormScene()
             .v2LoadingOverlay(isLoading && data == nil, label: "Loading fixtures…")
-            .v2FloatingHeader("Picks · Round \(round.roundNumber)") {
-                Button("Auto-Assign") { showAutoAssignConfirm = true }
-                    .disabled(teamRefs.isEmpty || unpickedCount == 0)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(teamRefs.isEmpty || unpickedCount == 0 ? V2Theme.textTertiary : V2Theme.Mode.lms)
+            .v2FloatingHeader("Picks · Round \(round.roundNumber)", showBack: false) {
+                HStack(spacing: 14) {
+                    Button("Auto-Assign") { showAutoAssignConfirm = true }
+                        .disabled(teamRefs.isEmpty || unpickedCount == 0)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(teamRefs.isEmpty || unpickedCount == 0 ? V2Theme.textTertiary : V2Theme.Mode.lms)
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(V2Theme.Mode.lms)
+                }
             }
             .task { await load() }
             .safeAreaInset(edge: .top) {

@@ -117,12 +117,17 @@ extension View {
         modifier(V2PhotoSceneModifier(dayImageName: "V2TacticsOfficeDay", nightImageName: "V2TacticsOfficeNight"))
     }
 
-    /// Calm, low-detail per-mode backgrounds for the busy form/entry screens
-    /// (picks, predictions, results, round setup) — a heavily blurred,
-    /// mode-tinted location rather than the fuller browsing-screen scenes
-    /// above, so the photo reads as quiet texture behind a form instead of
-    /// competing with it. Geometry-matched day/night pairs, same as the
-    /// other scenes.
+    /// Calm, low-detail per-mode backgrounds — a heavily blurred, mode-
+    /// tinted location rather than the fuller browsing-screen scenes above,
+    /// so the photo reads as quiet texture behind the content instead of
+    /// competing with it. Originally just the busy form/entry screens
+    /// (picks, predictions, results, round setup); now every single-mode V2
+    /// screen uses its mode's scene here rather than the generic
+    /// `v2TrophyRoomScene()` (standings/lives, tie resolution, declare
+    /// winners, add players — see V2 audit 4.3), so "form" undersells what
+    /// this now covers, but the three functions keep their names rather
+    /// than force a rename mid-fix. Geometry-matched day/night pairs, same
+    /// as the other scenes.
     func v2LMSFormScene() -> some View {
         modifier(V2PhotoSceneModifier(dayImageName: "V2LMSTunnelDay", nightImageName: "V2LMSTunnelNight"))
     }

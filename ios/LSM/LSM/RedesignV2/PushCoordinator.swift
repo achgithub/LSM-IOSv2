@@ -3,47 +3,73 @@ import Observation
 import OSLog
 import SwiftData
 
-private let syncLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
+private let pushLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
-/// One game's push failure, surfaced in the post-sync summary rather than
-/// aborting the rest of the sync.
-struct SyncGameError: Identifiable {
+/// One game's push failure, surfaced in the post-push summary rather than
+/// aborting the rest of the push.
+struct PushGameError: Identifiable {
     let id = UUID()
     let gameName: String
     let message: String
 }
 
-/// Outcome of the most recent `SyncCoordinator.sync()` call — mirrors
+/// Outcome of the most recent `PushCoordinator.push()` call — mirrors
 /// Clubroom2's `SyncResult` shape (push count + pull count + per-item
 /// failures), adapted to this app's games/submissions.
-struct SyncResult {
+struct PushResult {
     let gamesPushed: Int
     let pendingCount: Int
-    let errors: [SyncGameError]
+    let errors: [PushGameError]
     /// Games with no open round, so nothing was pushed for them — surfaced
     /// separately from `errors` since it isn't a failure, but a manager
-    /// still needs to know: until a round opens and a sync pushes it,
-    /// that game's player link isn't live yet.
+    /// still needs to know: until a round opens and a push goes out, that
+    /// game's player link isn't live yet.
     let skippedNoOpenRound: [String]
     /// Of `gamesPushed`, how many were retried because a *previous* push
     /// never confirmed (`Game.pushPending`), not because the manager picked
     /// them this time — the client-side outbox. Surfaced separately so a
     /// retry-driven push to an unselected game is visible, not silent.
     let retriedOutstanding: Int
+
+    /// Brief post-push summary ("3 games pushed, 2 pending submissions"),
+    /// surfacing errors instead of the pending count when any game failed.
+    /// Shared by every entry point into `PushCoordinator.push` (currently
+    /// just Games' PUSH tile — see that screen's doc comment on why Home's
+    /// no longer has one of its own) so the manager sees the same feedback
+    /// regardless of where they tapped from.
+    var summaryText: String {
+        let gamesPart = gamesPushed == 1 ? "1 game pushed" : "\(gamesPushed) games pushed"
+        let skippedPart: String = {
+            guard !skippedNoOpenRound.isEmpty else { return "" }
+            let count = skippedNoOpenRound.count
+            return count == 1 ? ", 1 waiting for a round" : ", \(count) waiting for a round"
+        }()
+        let retriedPart: String = {
+            guard retriedOutstanding > 0 else { return "" }
+            return retriedOutstanding == 1 ? ", 1 retried" : ", \(retriedOutstanding) retried"
+        }()
+        if errors.isEmpty {
+            let pendingPart = pendingCount == 1 ? "1 pending submission" : "\(pendingCount) pending submissions"
+            return "\(gamesPart), \(pendingPart)\(skippedPart)\(retriedPart)"
+        } else {
+            let errorPart = errors.count == 1 ? "1 game failed" : "\(errors.count) games failed"
+            return "\(gamesPart) — \(errorPart)\(skippedPart)\(retriedPart)"
+        }
+    }
 }
 
-/// Return shape for `SyncCoordinator.pushGames` — everything `SyncResult`
-/// needs except `pendingCount`, which only `sync()`/`retryOutstanding()`
+/// Return shape for `PushCoordinator.pushGames` — everything `PushResult`
+/// needs except `pendingCount`, which only `push()`/`retryOutstanding()`
 /// know how to fetch (via `SubmissionBadgeStore`) after the push loop ends.
 private struct PushGamesOutcome {
     let pushed: Int
     let retried: Int
-    let errors: [SyncGameError]
+    let errors: [PushGameError]
     let skippedNoOpenRound: [String]
 }
 
-/// Unified "Sync" action, **RedesignV2 only**: pushes the open round of
-/// every game the manager explicitly picks in `SyncGamePickerViewV2`
+/// Unified "push to players" action, **RedesignV2 only**: sends the open
+/// round of every game the manager explicitly picks in `PushGamePickerViewV2`
 /// (across LMS/Predictor/Killer) to the Player App and refreshes the
 /// pending-submission count, replacing what today is three separate manual
 /// flows (per-game "Resend to Player App", pull-to-refresh inside the
@@ -51,20 +77,33 @@ private struct PushGamesOutcome {
 /// existing per-game flows exactly as they are (`SubmissionQueueView`, each
 /// mode's `resend()`); this is not retrofitted there.
 ///
+/// Named `PushCoordinator`, not `SyncCoordinator` — deliberately, after the
+/// two collided. "Sync" is already the app's word for cloud game recovery
+/// (`GameSyncClient`/`GameSyncListModel`, surfaced on `ProfileSettingsViewV2`
+/// as "bring a game to this device"), a genuinely different operation this
+/// type has nothing to do with. This one only ever moves data toward the
+/// PWA and refreshes what's pending there — "push" is the accurate verb, and
+/// keeps the two apart in code, comments and UI copy alike.
+///
 /// Singleton, injected once at the app root alongside `SubmissionBadgeStore`
 /// (see `RootTabView`), same `@Observable @MainActor` shape so every V2
-/// screen reads the same live sync state.
+/// screen reads the same live push state.
 ///
 /// Explicitly does **not** auto-approve anything — approve/reject stays a
-/// manual per-submission decision in `SubmissionInboxViewV2`. Sync only
-/// pushes open rounds and refreshes visibility of what's pending.
+/// manual per-submission decision in `SubmissionInboxViewV2`. Push only
+/// sends open rounds and refreshes visibility of what's pending.
 @Observable @MainActor
-final class SyncCoordinator {
-    static let shared = SyncCoordinator()
+final class PushCoordinator {
+    static let shared = PushCoordinator()
 
-    private(set) var isSyncing = false
-    private(set) var lastSyncedAt: Date?
-    private(set) var lastSyncResult: SyncResult?
+    private(set) var isPushing = false
+    private(set) var lastPushedAt: Date?
+    private(set) var lastPushResult: PushResult?
+    /// True for a few seconds after a manager-initiated `push()` completes —
+    /// drives the post-push summary card every entry point shares (see
+    /// `PushResult.summaryText` and `View.v2PushSummary`). Not set by
+    /// `retryOutstanding()`'s silent background sweep.
+    private(set) var showSummary = false
 
     private init() {}
 
@@ -72,21 +111,21 @@ final class SyncCoordinator {
     /// round, reusing the *existing* per-game push logic in `PWARoundPusher`
     /// (`pushLMSOrPredictor`/`pushKiller`) — no new push implementation.
     /// `gameIDs` is required, not defaulted to "all games": every call site
-    /// goes through `SyncGamePickerViewV2` so a manager explicitly picks
+    /// goes through `PushGamePickerViewV2` so a manager explicitly picks
     /// which games to push each time, rather than a stray tap fanning out
     /// a network call per game — each push is a billed Worker invocation, so
-    /// an unfiltered "sync everything" button was a standing cost risk with
+    /// an unfiltered "push everything" button was a standing cost risk with
     /// more than a couple of games running (there's deliberately no
     /// select-all shortcut in the picker either, for the same reason).
-    /// Failures are collected per-game rather than aborting the whole sync on
+    /// Failures are collected per-game rather than aborting the whole push on
     /// one bad game. Once every push has settled, refreshes
     /// `SubmissionBadgeStore` so the pending count reflects whatever the
     /// pushes just made visible (subject to the backend's own ≤60s KV
     /// propagation window — the summary reads as "as of now", not exact).
-    func sync(context: ModelContext, gameIDs: Set<UUID>) async {
-        guard !isSyncing, !gameIDs.isEmpty else { return }
-        isSyncing = true
-        defer { isSyncing = false }
+    func push(context: ModelContext, gameIDs: Set<UUID>) async {
+        guard !isPushing, !gameIDs.isEmpty else { return }
+        isPushing = true
+        defer { isPushing = false }
 
         let managerName = UserDefaults.standard.string(forKey: ManagerSettings.nameKey) ?? ""
         let pwaSubmissionsEnabled = UserDefaults.standard.bool(forKey: "pwaSubmissionsEnabled")
@@ -95,8 +134,9 @@ final class SyncCoordinator {
             // push, but still worth refreshing the badge in case tier/toggle
             // changed since the last look.
             await SubmissionBadgeStore.shared.refresh()
-            lastSyncResult = SyncResult(gamesPushed: 0, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: [], skippedNoOpenRound: [], retriedOutstanding: 0)
-            lastSyncedAt = Date()
+            lastPushResult = PushResult(gamesPushed: 0, pendingCount: SubmissionBadgeStore.shared.pendingCount, errors: [], skippedNoOpenRound: [], retriedOutstanding: 0)
+            lastPushedAt = Date()
+            presentSummary()
             return
         }
 
@@ -106,7 +146,7 @@ final class SyncCoordinator {
         // for (`Game.pushPending`) — the client-side outbox. Retried
         // alongside the explicit selection even when not picked this time:
         // bounded by what this device already tried, not an open-ended
-        // resync, so it doesn't undermine the "manager picks what syncs"
+        // resync, so it doesn't undermine the "manager picks what pushes"
         // design above. Excludes anything already in `selected` to avoid a
         // double push.
         let outstanding = allGames.filter { $0.pushPending && !gameIDs.contains($0.id) }
@@ -115,14 +155,28 @@ final class SyncCoordinator {
 
         await SubmissionBadgeStore.shared.refresh()
 
-        lastSyncResult = SyncResult(
+        lastPushResult = PushResult(
             gamesPushed: pushedOutstanding.pushed,
             pendingCount: SubmissionBadgeStore.shared.pendingCount,
             errors: pushedOutstanding.errors,
             skippedNoOpenRound: pushedOutstanding.skippedNoOpenRound,
             retriedOutstanding: pushedOutstanding.retried
         )
-        lastSyncedAt = Date()
+        lastPushedAt = Date()
+        presentSummary()
+    }
+
+    /// Shows the summary card for a few seconds, then hides it again — see
+    /// `showSummary`. Both branches of `push()` call this so a manager gets
+    /// the same feedback whether or not there was anything to push (see V2
+    /// audit 1.1: before this was factored out, Home's tile called `push`
+    /// directly and skipped this step entirely, so it silently completed).
+    private func presentSummary() {
+        showSummary = true
+        Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            showSummary = false
+        }
     }
 
     /// One-time backfill, run once ever on first launch after this shipped:
@@ -152,27 +206,27 @@ final class SyncCoordinator {
     }
 
     /// App-foreground/launch hook: retries every game with an unconfirmed
-    /// push, without requiring the manager to open the sync picker. Same
-    /// outbox mechanism as the sweep inside `sync()` above, just without an
-    /// explicit selection driving it. Silent on success (no result surfaced)
-    /// — a manager-initiated `sync()` is what shows a summary; this just
-    /// clears the backlog quietly in the background.
+    /// push, without requiring the manager to open the push picker. Same
+    /// outbox mechanism as the sweep inside `push()` above, just without an
+    /// explicit selection driving it. Silent on success (no result surfaced,
+    /// no summary card) — a manager-initiated `push()` is what shows one;
+    /// this just clears the backlog quietly in the background.
     func retryOutstanding(context: ModelContext) async {
-        guard !isSyncing else { return }
+        guard !isPushing else { return }
         let pwaSubmissionsEnabled = UserDefaults.standard.bool(forKey: "pwaSubmissionsEnabled")
         guard Entitlements.shared.canUseCloud, pwaSubmissionsEnabled else { return }
 
         let outstanding = ((try? context.fetch(FetchDescriptor<Game>())) ?? []).filter { $0.pushPending }
         guard !outstanding.isEmpty else { return }
 
-        isSyncing = true
-        defer { isSyncing = false }
+        isPushing = true
+        defer { isPushing = false }
         let managerName = UserDefaults.standard.string(forKey: ManagerSettings.nameKey) ?? ""
         _ = await pushGames(outstanding, managerName: managerName, context: context, outstandingIDs: Set(outstanding.map(\.id)))
         await SubmissionBadgeStore.shared.refresh()
     }
 
-    /// Shared push loop for `sync()` and `retryOutstanding()`. `outstandingIDs`
+    /// Shared push loop for `push()` and `retryOutstanding()`. `outstandingIDs`
     /// marks which of `games` are being retried rather than freshly selected
     /// — those use `.all` scope rather than `.forRoundPush`, since a retry
     /// can't tell whether the write that never confirmed was a full-roster
@@ -184,7 +238,7 @@ final class SyncCoordinator {
     ) async -> PushGamesOutcome {
         var pushed = 0
         var retried = 0
-        var errors: [SyncGameError] = []
+        var errors: [PushGameError] = []
         var skippedNoOpenRound: [String] = []
 
         for game in games {
@@ -208,8 +262,8 @@ final class SyncCoordinator {
                 pushed += 1
                 if isRetry { retried += 1 }
             } catch {
-                syncLog.warning("Sync push failed for \(game.name): \(error.localizedDescription)")
-                errors.append(SyncGameError(gameName: game.name, message: error.localizedDescription))
+                pushLog.warning("Push failed for \(game.name): \(error.localizedDescription)")
+                errors.append(PushGameError(gameName: game.name, message: error.localizedDescription))
             }
         }
         if retried > 0 {

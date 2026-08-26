@@ -75,7 +75,7 @@ struct KillerPredictionsEntryViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2KillerFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Round \(round.roundNumber)") {
+            .v2FloatingHeader("Round \(round.roundNumber)", showBack: false) {
                 Button("Done") { dismiss() }
                     .fontWeight(.semibold)
                     .foregroundStyle(V2Theme.Mode.killer)
@@ -85,26 +85,9 @@ struct KillerPredictionsEntryViewV2: View {
     }
 
     private func playerRow(current: Player) -> some View {
-        Button { showingPlayerPicker = true } label: {
-            Card(padding: 14, floating: true) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        MicroLabel(text: "Player")
-                        Text(current.name)
-                            .font(V2Theme.Typography.rowTitle)
-                            .foregroundStyle(V2Theme.textPrimary)
-                    }
-                    Spacer()
-                    if slateComplete(current) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(V2Theme.accent)
-                    }
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(V2Theme.textSecondary)
-                }
-            }
+        V2EntryPlayerCard(name: current.name, isComplete: slateComplete(current)) {
+            showingPlayerPicker = true
         }
-        .buttonStyle(.plain)
     }
 
     private func load() async {

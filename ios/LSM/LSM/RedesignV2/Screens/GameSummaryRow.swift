@@ -22,7 +22,7 @@ struct GameSummaryRow: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(modeColor)
                     .frame(width: 42, height: 42)
-                    .background(modeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(modeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: V2Theme.Radius.pill, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)

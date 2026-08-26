@@ -37,7 +37,7 @@ struct KillerLivesViewV2: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .v2TrophyRoomScene()
+            .v2KillerFormScene()
             .v2FloatingHeader("Lives")
         }
     }

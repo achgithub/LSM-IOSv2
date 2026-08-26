@@ -16,7 +16,7 @@ struct V2RootView: View {
     @State private var entitlements = Entitlements.shared
     @State private var lockoutState = DeviceLockoutState.shared
     @State private var submissionBadgeStore = SubmissionBadgeStore.shared
-    @State private var syncCoordinator = SyncCoordinator.shared
+    @State private var pushCoordinator = PushCoordinator.shared
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
     @State private var showLeagueManager = false
@@ -27,7 +27,7 @@ struct V2RootView: View {
         v2Content
             .environment(entitlements)
             .environment(submissionBadgeStore)
-            .environment(syncCoordinator)
+            .environment(pushCoordinator)
             .sheet(isPresented: .constant(!splashActive && managerName.isEmpty)) {
                 ManagerOnboardingView(managerName: $managerName)
             }
@@ -44,7 +44,7 @@ struct V2RootView: View {
                 LeagueDowngradeView(forced: true).environment(entitlements)
             }
             .task {
-                await AppBootstrap.run(context: context, entitlements: entitlements, enabled: enabled, syncCoordinator: syncCoordinator)
+                await AppBootstrap.run(context: context, entitlements: entitlements, enabled: enabled, pushCoordinator: pushCoordinator)
             }
     }
 

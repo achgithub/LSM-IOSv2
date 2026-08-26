@@ -69,3 +69,21 @@ struct V2TileGrid<Row1: View, Row2: View>: View {
         }
     }
 }
+
+/// The first tile of every pushed portal's grid (`GamesPortalViewV2`/
+/// `LeaguesPortalViewV2`/`PlayersViewV2`) — dismisses back to Home. Factored
+/// out after the same `Button { dismiss() } label: { V2Tile(icon:
+/// "house.fill", …) }` had been hand-rolled three times over (see V2 audit
+/// 3.5) — one more copy anywhere else should reach for this instead.
+struct V2HomeTile: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Button {
+            dismiss()
+        } label: {
+            V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
+        }
+        .buttonStyle(.plain)
+    }
+}

@@ -204,51 +204,68 @@ private struct SubmissionDetailSheet: View {
         game?.mode ?? item.mode.flatMap(GameMode.init(rawValue:))
     }
 
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(V2Theme.textSecondary)
+            Spacer()
+            Text(value).foregroundStyle(V2Theme.textPrimary)
+        }
+        .font(V2Theme.Typography.metadata)
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    LabeledContent("Player", value: item.playerName)
-                    LabeledContent("Game", value: game?.name ?? item.gameName ?? AppString("Unknown"))
-                    if let mode {
-                        LabeledContent("Mode", value: mode.displayName)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: V2Theme.Spacing.section) {
+                    Card(floating: true) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            SectionHeader(title: "Submission")
+                            detailRow("Player", item.playerName)
+                            detailRow("Game", game?.name ?? item.gameName ?? AppString("Unknown"))
+                            if let mode {
+                                detailRow("Mode", mode.displayName)
+                            }
+                            detailRow("Round", "\(item.roundNumber)")
+                        }
                     }
-                    LabeledContent("Round", value: "\(item.roundNumber)")
-                }
-                if onApprove == nil {
-                    Section {
-                        Text("This looks like a submission for a game you no longer have. You can only delete it.")
-                            .foregroundStyle(V2Theme.textSecondary)
+                    if onApprove == nil {
+                        Card(floating: true) {
+                            Text("This looks like a submission for a game you no longer have. You can only delete it.")
+                                .foregroundStyle(V2Theme.textSecondary)
+                        }
+                    } else {
+                        Card(floating: true) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                SectionHeader(title: "Picks")
+                                SubmissionRow(item: item, game: game)
+                            }
+                        }
                     }
-                } else {
-                    Section("Submission") {
-                        SubmissionRow(item: item, game: game)
-                    }
-                }
-                Section {
                     if let onApprove {
-                        Button {
+                        PrimaryButton(title: "Approve") {
                             onApprove()
                             dismiss()
-                        } label: {
-                            Label("Approve", systemImage: "checkmark.circle.fill")
                         }
-                        .foregroundStyle(.green)
                     }
-                    Button(role: .destructive) {
+                    ActionRow(
+                        title: onApprove == nil ? "Delete" : "Reject",
+                        icon: "xmark.circle.fill",
+                        tint: V2Theme.danger
+                    ) {
                         onDelete()
                         dismiss()
-                    } label: {
-                        Label(onApprove == nil ? "Delete" : "Reject", systemImage: "xmark.circle.fill")
                     }
+                    .padding(16)
+                    .v2FloatingCard()
                 }
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
+                .padding(.vertical, V2Theme.Spacing.section)
             }
-            .navigationTitle("Submission")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .v2TrophyRoomScene()
+            .v2FloatingHeader("Submission", showBack: false) {
+                Button("Close") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
             }
         }
     }

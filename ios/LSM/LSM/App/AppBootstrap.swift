@@ -10,7 +10,7 @@ import SwiftData
 /// in each root, since that's exactly where the two are allowed to differ.
 enum AppBootstrap {
     @MainActor
-    static func run(context: ModelContext, entitlements: Entitlements, enabled: EnabledLeagues, syncCoordinator: SyncCoordinator) async {
+    static func run(context: ModelContext, entitlements: Entitlements, enabled: EnabledLeagues, pushCoordinator: PushCoordinator) async {
         #if DEBUG
         DemoRosterSeeder.seedIfNeeded(context: context)
         DemoPredictorSeeder.seedIfNeeded(context: context)
@@ -43,13 +43,13 @@ enum AppBootstrap {
         Task { await Leagues.refreshFromRegistry() }
         // One-time-ever: flags existing cloud games so the outbox retry
         // right below picks them up and backfills game_config_json for
-        // per-game sync. See `SyncCoordinator.backfillGameConfigIfNeeded`.
-        syncCoordinator.backfillGameConfigIfNeeded(context: context)
+        // per-game sync. See `PushCoordinator.backfillGameConfigIfNeeded`.
+        pushCoordinator.backfillGameConfigIfNeeded(context: context)
         // Fire-and-forget: clears the client-side outbox — any push from
         // a previous session that never confirmed (dropped connection,
         // backgrounded mid-request) gets retried now rather than waiting
-        // for the manager to notice and tap Sync. See
-        // `SyncCoordinator.retryOutstanding`/`Game.pushPending`.
-        Task { await syncCoordinator.retryOutstanding(context: context) }
+        // for the manager to notice and tap Push. See
+        // `PushCoordinator.retryOutstanding`/`Game.pushPending`.
+        Task { await pushCoordinator.retryOutstanding(context: context) }
     }
 }

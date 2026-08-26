@@ -73,7 +73,7 @@ struct LMSStandingsViewV2: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .v2TrophyRoomScene()
+            .v2LMSFormScene()
             .v2FloatingHeader("Standings")
         }
     }

@@ -6,7 +6,7 @@ import UIKit
 /// so the whole look can be swapped later by editing only this file.
 ///
 /// Palette modeled on the reference mockup (lms-app-mockup.tsx): navy
-/// background, flat panels with no border by default, teal-green as the
+/// background, flat panels with a faint border, teal-green as the
 /// primary/positive accent, gold for attention/deadlines, red for danger/
 /// elimination. Light-mode values are this app's own equivalent (the
 /// reference is dark-only) — same accent hues, inverted neutrals.
@@ -15,7 +15,9 @@ import UIKit
 /// dimmed/brightened — adjust either side freely.
 enum V2Theme {
     static let background = Color.v2(light: 0xF4F5F7, dark: 0x0B1220)
-    /// Flat card/panel fill — no border by default (see `Card`).
+    /// Flat card/panel fill — paired with `cardBorder`'s stroke by default
+    /// (see `Card`); `Card.floating` swaps both for `.v2FloatingCard()`'s
+    /// own translucent fill/border pair instead.
     static let cardBackground = Color.v2(light: 0xFFFFFF, dark: 0x111A2B)
     /// Faint seam only needed on a plain-white panel in light mode; in dark
     /// mode it matches `cardBackground` so no seam shows, matching the
@@ -129,6 +131,20 @@ enum V2Theme {
         static let section: CGFloat = 20
         static let cardPadding: CGFloat = 18
         static let horizontal: CGFloat = 16
+
+        /// Height for a screen embedded inline inside another's accordion
+        /// panel (Leagues' Fixtures/Standings/Manage/Subscription, Players'
+        /// Roster) — bounded by the device's screen height rather than a
+        /// bare literal. A fixed `560` could exceed the viewport entirely on
+        /// a small device once the ~260pt tile header above it is accounted
+        /// for (see V2 audit 1.2); this also converges what used to be two
+        /// independent copies of that same `560` literal, one each in
+        /// `LeaguesPortalViewV2` and `PlayersViewV2`, into the one value
+        /// both now read. Floors at 320 so the panel doesn't collapse to
+        /// something unusably short either.
+        static var inlinePanelHeight: CGFloat {
+            min(560, max(320, UIScreen.main.bounds.height * 0.62))
+        }
     }
 
     /// Tokens for the stadium-atmosphere chrome behind V2 scenes (see
@@ -167,9 +183,11 @@ enum V2Theme {
         /// is passed to `V2StadiumBackground`.
         static let lampGlow = Color(UIColor(v2Hex: 0x3DA8FF))
 
-        /// Legibility knob between the image and card content. Start low and
-        /// raise per-screen only if content over the busier parts of the
-        /// image (e.g. long standings lists) proves hard to read — see the
+        /// Legibility knob between the image and card content, read by every
+        /// `.v2*Scene()` via `V2StadiumBackdrop`/`V2PhotoSceneModifier` — one
+        /// global value, not a per-screen setting. Kept low; raise here (not
+        /// per call site) only if content over the busier parts of the image
+        /// (e.g. long standings lists) proves hard to read — see the
         /// handoff doc's "manageable risk, mitigate with translucency" call.
         static let contentOverlayOpacity: Double = 0.05
         /// Used instead of `contentOverlayOpacity` when Reduce Transparency
@@ -191,7 +209,8 @@ enum V2Theme {
         static let rowTitle = Font.system(.body).weight(.semibold)
         static let metadata = Font.system(.caption)
         /// Small uppercase-tracked label ("ROUND 14", "LEAGUE STANDINGS") —
-        /// pair with `.textCase(.uppercase)` and `.tracking(1.2)`.
+        /// pair with `.textCase(.uppercase)` and `.tracking(1.1)`, matching
+        /// `MicroLabel`'s own usage.
         static let microLabel = Font.system(.caption2).weight(.semibold)
     }
 }

@@ -2,28 +2,24 @@ import SwiftUI
 import SwiftData
 
 /// The portal home: games grouped by mode (LMS / Predictor / Killer), each
-/// mode as one main card containing its games nested inside. Each game row
-/// leads with manager-relevant status — submissions in vs. due date — then a
-/// mode-appropriate standing (LMS: who's still in; Killer: lives; Predictor:
-/// points table), collapsed to a couple of entries with a "+more" toggle that
-/// expands the card in place. Every number is computed from existing shared
-/// logic (`PredictorStandings`, `KillerCardData`, `Game.activePlayers`, the
-/// round's own `picks`/`predictions`/`killerPredictions`) rather than
-/// re-derived here, so it can't drift from the real share-card numbers.
+/// mode as a capsule header (tap to collapse/expand) over its own games,
+/// each game its own `GameSummaryRow`. Every number is computed from
+/// existing shared logic (`PredictorStandings`, `KillerCardData`,
+/// `Game.activePlayers`, the round's own `picks`/`predictions`/
+/// `killerPredictions`) rather than re-derived here, so it can't drift from
+/// the real share-card numbers.
 ///
-/// Tapping the chevron pushes the *existing* per-mode detail view — those
-/// haven't been restyled yet; that's the next phase of the V2 build.
+/// Tapping the chevron pushes each mode's restyled detail view
+/// (`GameDetailViewV2`/`PredictorGameDetailViewV2`/`KillerGameDetailViewV2`).
 struct GamesPortalViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(SubmissionBadgeStore.self) private var badgeStore
-    @Environment(SyncCoordinator.self) private var syncCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(PushCoordinator.self) private var pushCoordinator
     @Environment(\.modelContext) private var context
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var showingNewGame = false
     @State private var showingGameLimit = false
-    @State private var showingSyncSummary = false
-    @State private var showingSyncPicker = false
+    @State private var showingPushPicker = false
     @State private var showingWizard = false
     @State private var wizardGame: Game?
 
@@ -38,47 +34,9 @@ struct GamesPortalViewV2: View {
         games.filter { $0.status != .complete }.count >= entitlements.maxActiveGames
     }
 
-    /// Same two stats that used to live on Home's tile bar before Games got
-    /// its own — reused here now that Games has tiles of its own to fill.
+    /// Same stat that used to live on Home's tile bar before Games got its
+    /// own — reused here now that Games has tiles of its own to fill.
     private var activeCount: Int { games.filter { $0.status != .complete }.count }
-    private var dueCount: Int {
-        games.filter { ManagerRoundStatus.make(for: $0)?.tint == V2Theme.warning }.count
-    }
-
-    /// Brief post-sync summary ("3 games synced, 2 pending submissions"),
-    /// surfacing errors instead of the pending count when any game failed to
-    /// push. Reads `syncCoordinator.lastSyncResult`, set once `sync()`
-    /// finishes — see `SyncCoordinator`.
-    private var syncSummaryText: String {
-        guard let result = syncCoordinator.lastSyncResult else { return "" }
-        let gamesPart = result.gamesPushed == 1 ? "1 game synced" : "\(result.gamesPushed) games synced"
-        let skippedPart: String = {
-            guard !result.skippedNoOpenRound.isEmpty else { return "" }
-            let count = result.skippedNoOpenRound.count
-            return count == 1 ? ", 1 waiting for a round" : ", \(count) waiting for a round"
-        }()
-        // A retry-driven push to a game the manager didn't select this time
-        // (the outbox catching up on a previously dropped write) — surfaced
-        // so it's visible, not silent.
-        let retriedPart: String = {
-            guard result.retriedOutstanding > 0 else { return "" }
-            return result.retriedOutstanding == 1 ? ", 1 retried" : ", \(result.retriedOutstanding) retried"
-        }()
-        if result.errors.isEmpty {
-            let pendingPart = result.pendingCount == 1 ? "1 pending submission" : "\(result.pendingCount) pending submissions"
-            return "\(gamesPart), \(pendingPart)\(skippedPart)\(retriedPart)"
-        } else {
-            let errorPart = result.errors.count == 1 ? "1 game failed" : "\(result.errors.count) games failed"
-            return "\(gamesPart) — \(errorPart)\(skippedPart)\(retriedPart)"
-        }
-    }
-
-    private func performSync(gameIDs: Set<UUID>) async {
-        await syncCoordinator.sync(context: context, gameIDs: gameIDs)
-        withAnimation { showingSyncSummary = true }
-        try? await Task.sleep(nanoseconds: 3_500_000_000)
-        withAnimation { showingSyncSummary = false }
-    }
 
     var body: some View {
         ScrollView {
@@ -104,28 +62,23 @@ struct GamesPortalViewV2: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TrophyRoomScene()
         // Every action/stat this screen needs is one of the six tiles now
-        // (Add/Sync/Guided Setup/Submissions/Active/Due) — no separate
-        // header icons, matching Home's tile grid instead of the old
-        // four-icon toolbar.
+        // (Add/Push/Guided Setup/Submissions/Active/Submissions) — no
+        // separate header icons, matching Home's tile grid instead of the
+        // old four-icon toolbar.
         .v2FloatingHeaderWithTiles("Games") {
             V2TileGrid {
+                V2HomeTile()
                 Button {
-                    dismiss()
-                } label: {
-                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
-                }
-                .buttonStyle(.plain)
-                Button {
-                    showingSyncPicker = true
+                    showingPushPicker = true
                 } label: {
                     V2Tile(
                         icon: "arrow.triangle.2.circlepath",
-                        label: syncCoordinator.isSyncing ? "SYNCING…" : "SYNC",
+                        label: pushCoordinator.isPushing ? "PUSHING…" : "PUSH",
                         color: V2Theme.accent
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(syncCoordinator.isSyncing)
+                .disabled(pushCoordinator.isPushing)
                 Button {
                     if atGameLimit { showingGameLimit = true } else { showingNewGame = true }
                 } label: {
@@ -154,31 +107,16 @@ struct GamesPortalViewV2: View {
             }
         }
         .task { await badgeStore.refresh() }
-        // Pull-to-refresh opens the same game picker as the toolbar button —
-        // both routes into Sync go through an explicit per-game choice, so
+        // Pull-to-refresh opens the same game picker as the PUSH tile —
+        // both routes into Push go through an explicit per-game choice, so
         // pulling to refresh can't silently fan a push out across every
         // running game (each push is a billed Worker call).
-        .refreshable { showingSyncPicker = true }
-        .overlay(alignment: .top) {
-            if showingSyncSummary, let result = syncCoordinator.lastSyncResult {
-                Card {
-                    HStack(spacing: 10) {
-                        Image(systemName: result.errors.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(result.errors.isEmpty ? V2Theme.accent : V2Theme.warning)
-                        Text(syncSummaryText)
-                            .font(V2Theme.Typography.metadata)
-                            .foregroundStyle(V2Theme.textPrimary)
-                    }
-                }
-                .padding(.horizontal, V2Theme.Spacing.horizontal)
-                .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
+        .refreshable { showingPushPicker = true }
+        .v2PushSummary(pushCoordinator)
         .sheet(isPresented: $showingNewGame) { NewGameViewV2() }
-        .sheet(isPresented: $showingSyncPicker) {
-            SyncGamePickerViewV2(games: games) { gameIDs in
-                Task { await performSync(gameIDs: gameIDs) }
+        .sheet(isPresented: $showingPushPicker) {
+            PushGamePickerViewV2(games: games) { gameIDs in
+                Task { await pushCoordinator.push(context: context, gameIDs: gameIDs) }
             }
         }
         .fullScreenCover(isPresented: $showingWizard) { GameWizardViewV2() }

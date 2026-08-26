@@ -35,16 +35,11 @@ struct GameDetailViewV2: View {
     @State private var autoOpenType: RoundType?
     @State private var pendingRemovePlayer: Player?
     @State private var pendingEditFixtures = false
-    @State private var renaming = false
-    @State private var renameText = ""
-    /// CSV/Transfer export — mirrors Predictor/Killer V2.
-    @State private var isPreparingExport = false
-    @State private var exportFiles: [URL]?
-    @State private var exportError: String?
+    /// Header export/rename controls — see `V2GameHeaderActions`.
+    @State private var headerActions = V2GameHeaderActionsModel(exporter: .lms)
 
-    private var sortedPlayers: [Player] {
-        game.players.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
+    private var roundContext: V2GameRoundContext { V2GameRoundContext(game: game) }
+    private var sortedPlayers: [Player] { roundContext.sortedPlayers }
 
     private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
 
@@ -59,14 +54,9 @@ struct GameDetailViewV2: View {
         return allMembers.first { $0.id == id }
     }
 
-    private var currentRound: Round? { game.currentRound }
-    private var openRound: Round? {
-        if let round = currentRound, round.status != .closed { return round }
-        return nil
-    }
-    private var latestClosedRound: Round? {
-        game.rounds.filter { $0.status == .closed }.max(by: { $0.roundNumber < $1.roundNumber })
-    }
+    private var currentRound: Round? { roundContext.currentRound }
+    private var openRound: Round? { roundContext.openRound }
+    private var latestClosedRound: Round? { roundContext.latestClosedRound }
     private var unresolvedTie: Bool {
         game.status == .active && openRound == nil
             && game.activePlayers.isEmpty && latestClosedRound != nil
@@ -97,56 +87,9 @@ struct GameDetailViewV2: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TrophyRoomScene()
         .v2FloatingHeader(game.name) {
-            HStack(spacing: 10) {
-                if isPreparingExport {
-                    ProgressView()
-                } else {
-                    Menu {
-                        Button { Task { await exportGame() } } label: {
-                            Label("Export as CSV (backup)", systemImage: "doc.text")
-                        }
-                        Button { Task { await exportForTransfer() } } label: {
-                            Label("Export for Transfer", systemImage: "square.and.arrow.up.on.square")
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(V2Theme.textPrimary)
-                            .frame(width: 36, height: 36)
-                            .background(V2Theme.cardBackground, in: Circle())
-                    }
-                }
-                Button {
-                    renameText = game.name
-                    renaming = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(V2Theme.textPrimary)
-                        .frame(width: 36, height: 36)
-                        .background(V2Theme.cardBackground, in: Circle())
-                }
-            }
+            V2GameHeaderActions(game: game, model: headerActions)
         }
-        .alert("Rename game", isPresented: $renaming) {
-            TextField("Game name", text: $renameText)
-            Button("Rename") { commitRename() }
-            Button("Cancel", role: .cancel) {}
-        }
-        .sheet(item: Binding(
-            get: { exportFiles.map(ExportShareItem.init) },
-            set: { if $0 == nil { exportFiles = nil } }
-        )) { item in
-            ActivityShareView(items: item.urls)
-        }
-        .alert("Export Failed", isPresented: Binding(
-            get: { exportError != nil },
-            set: { if !$0 { exportError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(exportError ?? "")
-        }
+        .v2GameHeaderActions(game: game, model: headerActions)
         .sheet(isPresented: $showingAddPlayers) { AddPlayersViewV2(game: game) }
         .sheet(item: $sheet, onDismiss: presentPendingResolve) { which in
             switch which {
@@ -327,26 +270,15 @@ struct GameDetailViewV2: View {
     // MARK: - Players
 
     private var playersCard: some View {
-        Card(floating: true) {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Players (\(game.players.count))")
-                if game.players.isEmpty {
-                    Text("No players yet.").font(.footnote).foregroundStyle(V2Theme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(sortedPlayers) { player in
-                            PlayerRowV2(player: player, member: rosterMember(for: player), pwaEnabled: pwaEnabled, tint: V2Theme.Mode.lms)
-                                .contextMenu {
-                                    Button(role: .destructive) { pendingRemovePlayer = player } label: {
-                                        Label("Remove", systemImage: "person.fill.xmark")
-                                    }
-                                }
-                        }
-                    }
-                }
-                ActionRow(title: "Add Players", icon: "person.badge.plus") { showingAddPlayers = true }
-            }
-        }
+        V2GamePlayersCard(
+            players: sortedPlayers,
+            tint: V2Theme.Mode.lms,
+            pwaEnabled: pwaEnabled,
+            showsStatus: true,
+            rosterMember: rosterMember(for:),
+            onRemove: { pendingRemovePlayer = $0 },
+            onAdd: { showingAddPlayers = true }
+        )
     }
 
     // MARK: - Actions
@@ -375,82 +307,5 @@ struct GameDetailViewV2: View {
         guard let type = pendingAutoOpen else { return }
         pendingAutoOpen = nil
         autoOpenType = type
-    }
-
-    private func commitRename() {
-        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        game.name = name
-        try? context.save()
-    }
-
-    private func exportGame() async {
-        isPreparingExport = true
-        defer { isPreparingExport = false }
-        do {
-            let data = try await LeagueData.load(for: game.leagues)
-            exportFiles = try GameExportFiles.write(for: game, data: data)
-        } catch {
-            exportError = AppString("Couldn't prepare the export. Please try again.")
-        }
-    }
-
-    private func exportForTransfer() async {
-        isPreparingExport = true
-        defer { isPreparingExport = false }
-        do {
-            exportFiles = try [GameTransferFile.write(snapshot: GameTransferBuilder.snapshot(of: game), gameName: game.name)]
-        } catch {
-            exportError = AppString("Couldn't prepare the export. Please try again.")
-        }
-    }
-}
-
-/// A game's player row — tapping a roster-linked player opens
-/// `PlayerDetailViewV2` (same screen `PlayersViewV2` links to) so link mint/
-/// regenerate/remove queries can be handled right from the game without a
-/// trip to the Players tab. Players with no roster member (manager's own
-/// entry, or typed directly with no link possible) render inert, no tap.
-private struct PlayerRowV2: View {
-    let player: Player
-    let member: RosterMember?
-    let pwaEnabled: Bool
-    let tint: Color
-
-    var body: some View {
-        if let member {
-            NavigationLink {
-                PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
-            } label: {
-                content
-            }
-            .buttonStyle(.plain)
-        } else {
-            content
-        }
-    }
-
-    private var content: some View {
-        HStack {
-            Text(player.name)
-                .font(V2Theme.Typography.rowTitle)
-                .foregroundStyle(V2Theme.textPrimary)
-            if player.isManager {
-                V2StatusBadge(label: "you", tint: tint)
-            }
-            Spacer()
-            if pwaEnabled, let member {
-                Image(systemName: member.submissionTokenRaw != nil ? "link" : "plus.circle")
-                    .font(.caption)
-                    .foregroundStyle(V2Theme.textSecondary)
-            }
-            if player.status != .active {
-                Text(player.status.label)
-                    .font(.caption)
-                    .foregroundStyle(player.status == .winner ? V2Theme.accent : V2Theme.danger)
-            }
-        }
-        .padding(10)
-        .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
     }
 }

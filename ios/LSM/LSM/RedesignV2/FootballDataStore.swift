@@ -2,9 +2,9 @@ import Foundation
 
 /// Home screen's combined "Update football data" action — refreshes every
 /// enabled league's matches AND standings together in one tap, gated behind
-/// one shared throttle. Deliberately separate from `SyncCoordinator`: Sync
-/// pushes/pulls a manager's own game rounds and player submissions; this
-/// refreshes the football provider data (fixtures/scores/tables) those
+/// one shared throttle. Deliberately separate from `PushCoordinator`: Push
+/// sends a manager's own game rounds and player submissions to the PWA;
+/// this refreshes the football provider data (fixtures/scores/tables) those
 /// rounds are built from. A manager can hit either without the other
 /// implying it.
 ///

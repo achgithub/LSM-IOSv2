@@ -67,8 +67,13 @@ struct ResultsEntryViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2LMSFormScene()
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
-            .v2FloatingHeader("Results · Round \(round.roundNumber)") {
-                LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
+            .v2FloatingHeader("Results · Round \(round.roundNumber)", showBack: false) {
+                HStack(spacing: 14) {
+                    LiveMatchRefreshButton(state: refresh) { await pullFromServer() }
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(V2Theme.Mode.lms)
+                }
             }
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
                 if refresh.isThrottled { refresh.now = tick }

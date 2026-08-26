@@ -60,7 +60,7 @@ struct DeclareWinnersViewV2: View {
                 .padding(.vertical, V2Theme.Spacing.section)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .v2TrophyRoomScene()
+            .v2LMSFormScene()
             .v2FloatingHeader("Declare Winner(s)", showBack: false) {
                 HStack(spacing: 14) {
                     Button("Cancel") { dismiss() }

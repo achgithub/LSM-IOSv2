@@ -51,7 +51,7 @@ nonisolated struct GameSyncBundle: Decodable {
     /// False when `gameConfigJson` is nil — a game pushed before
     /// `round_pushes.game_config_json` existed, whose owning device hasn't
     /// relaunched to run the one-time backfill yet (see
-    /// `SyncCoordinator.backfillGameConfigIfNeeded`). Reconstructing without
+    /// `PushCoordinator.backfillGameConfigIfNeeded`). Reconstructing without
     /// config would mean guessing at scoring-critical settings, so
     /// `pullGame` throws `.notSyncable` rather than returning a bundle the
     /// caller might try to build from anyway.

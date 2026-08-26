@@ -13,16 +13,8 @@ import SwiftUI
 /// file's doc comment — since this screen supplies both for all four).
 struct LeaguesPortalViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
-    @Environment(\.dismiss) private var dismiss
     @State private var store = FootballDataStore()
     @State private var expandedPanel: LeaguesPanelV2?
-
-    /// Bounds each embedded screen's own `ScrollView` so a long list
-    /// (fixtures, standings) scrolls inside its panel instead of trying to
-    /// grow to fill the whole screen — see the embedded screens' doc
-    /// comments for why they still carry `.frame(maxHeight: .infinity)`
-    /// internally; this caps what that resolves to here.
-    private static let panelHeight: CGFloat = 560
 
     private func toggle(_ panel: LeaguesPanelV2) {
         withAnimation(.easeInOut(duration: 0.2)) {
@@ -43,12 +35,7 @@ struct LeaguesPortalViewV2: View {
         .v2DataRoomScene()
         .v2FloatingHeaderWithTiles("Leagues") {
             V2TileGrid {
-                Button {
-                    dismiss()
-                } label: {
-                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
-                }
-                .buttonStyle(.plain)
+                V2HomeTile()
                 Button { toggle(.fixtures) } label: {
                     V2Tile(icon: "sportscourt", label: "FIXTURES", color: V2Theme.warning, isSelected: expandedPanel == .fixtures)
                 }
@@ -133,8 +120,14 @@ struct LeaguesPortalViewV2: View {
         Card(floating: true) {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(title: title)
+                // Bounds the embedded screen's own `ScrollView` so a long
+                // list (fixtures, standings) scrolls inside its panel
+                // instead of trying to grow to fill the whole screen — see
+                // the embedded screens' doc comments for why they still
+                // carry `.frame(maxHeight: .infinity)` internally; this
+                // caps what that resolves to here.
                 content()
-                    .frame(height: Self.panelHeight)
+                    .frame(height: V2Theme.Spacing.inlinePanelHeight)
                     .clipShape(RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
             }
         }

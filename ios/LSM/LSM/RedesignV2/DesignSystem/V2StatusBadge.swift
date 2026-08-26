@@ -24,14 +24,4 @@ extension V2StatusBadge {
         case .complete: self.init(label: status.label, tint: V2Theme.textSecondary)
         }
     }
-
-    init(gameMode mode: GameMode) {
-        let label: String
-        switch mode {
-        case .lms: label = "LMS"
-        case .predictor: label = "Predictor"
-        case .killer: label = "Killer"
-        }
-        self.init(label: label, tint: V2Theme.accent)
-    }
 }

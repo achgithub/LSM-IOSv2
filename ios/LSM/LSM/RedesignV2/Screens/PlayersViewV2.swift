@@ -12,7 +12,6 @@ import UniformTypeIdentifiers
 struct PlayersViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
-    @Environment(\.dismiss) private var dismiss
     @Query(sort: \RosterMember.name) private var members: [RosterMember]
     @Query(sort: \PlayerGroup.name) private var groups: [PlayerGroup]
 
@@ -75,12 +74,7 @@ struct PlayersViewV2: View {
         .v2TeamRoomScene()
         .v2FloatingHeaderWithTiles("Players") {
             V2TileGrid {
-                Button {
-                    dismiss()
-                } label: {
-                    V2Tile(icon: "house.fill", label: "HOME", color: V2Theme.textSecondary)
-                }
-                .buttonStyle(.plain)
+                V2HomeTile()
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
                 } label: {
@@ -158,9 +152,10 @@ struct PlayersViewV2: View {
         }
     }
 
-    // MARK: CSV import (mirrors RosterSettingsViewV2.handleImport/importRows —
-    // no per-row group picker here, rows with a group column still resolve
-    // to/create that group; rows without one stay ungrouped)
+    // MARK: CSV import (see `RosterImporter` — shared with
+    // RosterSettingsViewV2.handleImport/importRows. No per-row group picker
+    // here, so no fallback group: rows with a group column still resolve
+    // to/create that group; rows without one stay ungrouped.)
 
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
@@ -180,42 +175,13 @@ struct PlayersViewV2: View {
     }
 
     private func importRows(_ rows: [RosterCSV.Row]) {
-        var membersByName = Dictionary(members.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
-        var groupsByName = Dictionary(groups.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
+        let summary = RosterImporter.importRows(
+            rows, existingMembers: members, existingGroups: groups, context: context
+        )
 
-        func resolveGroup(_ name: String) -> PlayerGroup {
-            let key = name.lowercased()
-            if let existing = groupsByName[key] { return existing }
-            let created = PlayerGroup(name: name)
-            context.insert(created)
-            groupsByName[key] = created
-            return created
-        }
-
-        var added = 0, skipped = 0
-        for row in rows {
-            let key = row.name.lowercased()
-            let member: RosterMember
-            if let existing = membersByName[key] {
-                member = existing
-                skipped += 1
-            } else {
-                member = RosterMember(name: row.name)
-                context.insert(member)
-                membersByName[key] = member
-                added += 1
-            }
-            if let groupName = row.group {
-                let group = resolveGroup(groupName)
-                if !member.groups.contains(where: { $0.id == group.id }) {
-                    member.groups.append(group)
-                }
-            }
-        }
-
-        var parts = [added == 1 ? AppString("Imported 1 new player") : AppString("Imported \(added) new players")]
-        if skipped > 0 {
-            parts.append(skipped == 1 ? AppString("1 already existed") : AppString("\(skipped) already existed"))
+        var parts = [summary.added == 1 ? AppString("Imported 1 new player") : AppString("Imported \(summary.added) new players")]
+        if summary.skipped > 0 {
+            parts.append(summary.skipped == 1 ? AppString("1 already existed") : AppString("\(summary.skipped) already existed"))
         }
         importExportMessage = parts.joined(separator: ", ") + "."
     }
@@ -262,7 +228,7 @@ struct PlayersViewV2: View {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(title: "Roster")
                 RosterSettingsViewV2()
-                    .frame(height: 560)
+                    .frame(height: V2Theme.Spacing.inlinePanelHeight)
                     .clipShape(RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
             }
         }

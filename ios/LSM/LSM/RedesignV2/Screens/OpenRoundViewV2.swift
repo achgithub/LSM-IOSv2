@@ -8,15 +8,27 @@ import SwiftData
 /// than shared with the original, since that's a large mode-agnostic view
 /// also used live by LMS itself; touching it wasn't part of this pass.
 /// `AddManualFixtureSheet` is reused as-is (unstyled, out of scope).
+///
+/// `body`'s scene switch below also branches on `.killer`, but no call site
+/// in the app ever constructs this view with a Killer game — Killer's
+/// fixed-count Manager Picked Games flow goes entirely through
+/// `KillerOpenRoundViewV2` instead (see that file's doc comment). That
+/// branch is dead, not reachable-but-untested; left in place rather than
+/// removed here since deleting it isn't part of this pass.
 struct OpenRoundViewV2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
     let game: Game
     var roundType: RoundType = .normal
-    /// Mode identity color — defaults to Predictor's (the original caller);
-    /// LMS's `GameDetailViewV2` passes `V2Theme.Mode.lms`.
-    var tint: Color = V2Theme.Mode.predictor
+    /// Mode identity color — no default. This screen backs both LMS's "Open
+    /// Round" and Predictor's "Open Matchday", and a mode-specific default
+    /// here once let a caller silently render one mode's screen in the
+    /// other's color — see V2 audit 4.1, where `GameWizardViewV2`'s shared
+    /// `.openRound` sheet case did exactly that. Pass
+    /// `V2Theme.Mode.color(for: game.mode)` (or the caller's own mode
+    /// constant) explicitly every time instead.
+    let tint: Color
     var onOpened: () -> Void = {}
 
     @State private var data: LeagueData?

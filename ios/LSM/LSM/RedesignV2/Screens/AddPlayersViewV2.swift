@@ -20,31 +20,43 @@ struct AddPlayersViewV2: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: V2Theme.Spacing.section) {
-                    if !groups.isEmpty {
-                        filterCard
-                    }
-                    TextField("Search players...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
-                    if !managerTrimmed.isEmpty {
-                        youCard
-                    }
-                    addableCard
-                    inGameCard
+            switch game.mode {
+            case .lms: scenedBody.v2LMSFormScene()
+            case .predictor: scenedBody.v2PredictorFormScene()
+            case .killer: scenedBody.v2KillerFormScene()
+            }
+        }
+    }
+
+    /// Reached from all three modes' game-detail screens, so the scene
+    /// switches on `game.mode` (see `OpenRoundViewV2`'s identical pattern)
+    /// rather than defaulting to one mode's background — this used to be a
+    /// fixed `.v2TrophyRoomScene()` regardless of which mode's game it was
+    /// adding players to (see V2 audit 4.3).
+    private var scenedBody: some View {
+        ScrollView {
+            LazyVStack(spacing: V2Theme.Spacing.section) {
+                if !groups.isEmpty {
+                    filterCard
                 }
-                .padding(.horizontal, V2Theme.Spacing.horizontal)
-                .padding(.vertical, V2Theme.Spacing.section)
+                TextField("Search players...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
+                if !managerTrimmed.isEmpty {
+                    youCard
+                }
+                addableCard
+                inGameCard
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .v2TrophyRoomScene()
-            .v2FloatingHeader("Add Players", showBack: false) {
-                Button("Done") { dismiss() }
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(V2Theme.textPrimary)
-            }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2FloatingHeader("Add Players", showBack: false) {
+            Button("Done") { dismiss() }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(V2Theme.textPrimary)
         }
     }
 

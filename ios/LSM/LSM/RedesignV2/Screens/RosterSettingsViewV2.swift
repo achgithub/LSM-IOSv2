@@ -201,54 +201,24 @@ struct RosterSettingsViewV2: View {
     /// Insert new (case-insensitively unique) members, resolve/create groups on
     /// the fly, and assign each member to its per-row group or the fallback.
     private func importRows(_ rows: [RosterCSV.Row]) {
-        var membersByName = Dictionary(members.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
-        var groupsByName = Dictionary(groups.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
         let fallbackGroupName = importGroupId.flatMap { id in groups.first { $0.id == id }?.name }
+        let summary = RosterImporter.importRows(
+            rows, existingMembers: members, existingGroups: groups,
+            fallbackGroupName: fallbackGroupName, context: context
+        )
 
-        func resolveGroup(_ name: String) -> PlayerGroup {
-            let key = name.lowercased()
-            if let existing = groupsByName[key] { return existing }
-            let created = PlayerGroup(name: name)
-            context.insert(created)
-            groupsByName[key] = created
-            return created
-        }
-
-        var added = 0, skipped = 0, assigned = 0
-        for row in rows {
-            let key = row.name.lowercased()
-            let member: RosterMember
-            if let existing = membersByName[key] {
-                member = existing
-                skipped += 1
-            } else {
-                member = RosterMember(name: row.name)
-                context.insert(member)
-                membersByName[key] = member
-                added += 1
-            }
-
-            if let groupName = row.group ?? fallbackGroupName {
-                let group = resolveGroup(groupName)
-                if !member.groups.contains(where: { $0.id == group.id }) {
-                    member.groups.append(group)
-                    assigned += 1
-                }
-            }
-        }
-
-        var parts = [added == 1
+        var parts = [summary.added == 1
                      ? AppString("Imported 1 new player")
-                     : AppString("Imported \(added) new players")]
-        if skipped > 0 {
-            parts.append(skipped == 1
+                     : AppString("Imported \(summary.added) new players")]
+        if summary.skipped > 0 {
+            parts.append(summary.skipped == 1
                          ? AppString("1 already existed")
-                         : AppString("\(skipped) already existed"))
+                         : AppString("\(summary.skipped) already existed"))
         }
-        if assigned > 0 {
-            parts.append(assigned == 1
+        if summary.assigned > 0 {
+            parts.append(summary.assigned == 1
                          ? AppString("1 group assignment")
-                         : AppString("\(assigned) group assignments"))
+                         : AppString("\(summary.assigned) group assignments"))
         }
         message = parts.joined(separator: ", ") + "."
     }

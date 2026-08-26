@@ -14,11 +14,11 @@ import SwiftData
 /// - Killer's Scratchpad step is dropped entirely (not just left on V1) —
 ///   it was a v1 proof-of-concept intentionally dropped from V2, see
 ///   `KillerGameDetailViewV2`'s doc comment.
-/// - Reworked around V2's refresh policy (`SyncCoordinator`/
+/// - Reworked around V2's refresh policy (`PushCoordinator`/
 ///   `SubmissionBadgeStore`/`FootballDataStore`), replacing V1's standalone
 ///   "Check Submission Queue" step: once a round is open and picks/
 ///   predictions are being collected, the wizard prompts to push to the PWA
-///   (`SyncCoordinator.sync`, this game only) and offers an ad-gated
+///   (`PushCoordinator.push`, this game only) and offers an ad-gated
 ///   "Check Submissions" action (`SubmissionInboxViewV2`, filtered to this
 ///   game — same screen, now behind the same rewarded-ad gate every other
 ///   wizard utility step uses, not a free side door). Once results are due,
@@ -28,7 +28,7 @@ struct GameWizardViewV2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
-    @Environment(SyncCoordinator.self) private var syncCoordinator
+    @Environment(PushCoordinator.self) private var pushCoordinator
     @Environment(EnabledLeagues.self) private var enabledLeagues
     @AppStorage("hasCompletedFirstRun") private var hasCompletedFirstRun = false
     @AppStorage("pwaSubmissionsEnabled") private var pwaSubmissionsEnabled = false
@@ -166,7 +166,7 @@ struct GameWizardViewV2: View {
         // level (never stacked on the resolution sheet).
         .sheet(item: $autoOpenType) { type in
             if let game {
-                OpenRoundViewV2(game: game, roundType: type)
+                OpenRoundViewV2(game: game, roundType: type, tint: V2Theme.Mode.color(for: game.mode))
             }
         }
     }
@@ -219,7 +219,7 @@ struct GameWizardViewV2: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(V2Theme.textSecondary)
                 }
-                if card.promptSync { syncRow }
+                if card.promptPush { pushRow }
                 ForEach(card.secondaryActions, id: \.sheet) { action in
                     ActionRow(title: action.label, icon: "bell.badge") { open(action.sheet) }
                 }
@@ -235,21 +235,21 @@ struct GameWizardViewV2: View {
     }
 
     /// Pushes this one game's open round to the PWA — same
-    /// `SyncCoordinator.sync` call `GamesPortalViewV2`'s Sync toolbar button
-    /// makes, just scoped to `game.id` instead of routing through
-    /// `SyncGamePickerViewV2`'s picker, since the wizard already knows
-    /// exactly which game it's driving. Not ad-gated — Sync never has been
+    /// `PushCoordinator.push` call `GamesPortalViewV2`'s PUSH tile makes,
+    /// just scoped to `game.id` instead of routing through
+    /// `PushGamePickerViewV2`'s picker, since the wizard already knows
+    /// exactly which game it's driving. Not ad-gated — Push never has been
     /// anywhere else in V2 either.
     @ViewBuilder
-    private var syncRow: some View {
+    private var pushRow: some View {
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             ActionRow(
-                title: syncCoordinator.isSyncing ? "Pushing to PWA…" : "Push to PWA",
+                title: pushCoordinator.isPushing ? "Pushing to Players…" : "Push to Players",
                 icon: "arrow.triangle.2.circlepath",
-                isEnabled: !syncCoordinator.isSyncing
+                isEnabled: !pushCoordinator.isPushing
             ) {
                 guard let game else { return }
-                Task { await syncCoordinator.sync(context: context, gameIDs: [game.id]) }
+                Task { await pushCoordinator.push(context: context, gameIDs: [game.id]) }
             }
         }
     }
@@ -301,7 +301,7 @@ struct GameWizardViewV2: View {
         var primary: Action?
         var shares: [Action] = []
         var secondaryActions: [Action] = []  // ad-gated utility buttons (e.g. Check Submissions)
-        var promptSync: Bool = false
+        var promptPush: Bool = false
         var promptFootballUpdate: Bool = false
         var showFinish: Bool = false
     }
@@ -350,7 +350,7 @@ struct GameWizardViewV2: View {
                 primary: .init(label: "Enter Picks", sheet: .picks),
                 shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)],
                 secondaryActions: checkSubmissionsAction,
-                promptSync: true)
+                promptPush: true)
         case .enterResults:
             return PhaseCard(
                 icon: "flag.checkered",
@@ -408,7 +408,7 @@ struct GameWizardViewV2: View {
                 primary: .init(label: "Enter Predictions", sheet: .predictorPredictions),
                 shares: [.init(label: "Share Fixtures Card", sheet: .shareFixtures)],
                 secondaryActions: checkSubmissionsAction,
-                promptSync: true)
+                promptPush: true)
         case .enterPredictorResults:
             return PhaseCard(
                 icon: "flag.checkered",
@@ -443,7 +443,7 @@ struct GameWizardViewV2: View {
                 primary: .init(label: "Enter Predictions", sheet: .killerPredictions),
                 shares: [.init(label: "Share Fixtures Card", sheet: .killerShareFixtures)],
                 secondaryActions: checkSubmissionsAction,
-                promptSync: true)
+                promptPush: true)
         case .enterKillerResults:
             let isKillPhase = game.flatMap { g in openRound.map { KillerScoringService.phase(for: $0, game: g) } } == .kill
             return PhaseCard(
@@ -466,7 +466,7 @@ struct GameWizardViewV2: View {
         case .addPlayers:
             if let game { AddPlayersViewV2(game: game) }
         case .openRound:
-            if let game { OpenRoundViewV2(game: game) }
+            if let game { OpenRoundViewV2(game: game, tint: V2Theme.Mode.color(for: game.mode)) }
         case .checkSubmissions:
             if let gameToken = game?.cloudGameToken {
                 NavigationStack { SubmissionInboxViewV2(filterGameToken: gameToken) }
