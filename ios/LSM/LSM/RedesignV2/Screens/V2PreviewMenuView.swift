@@ -18,6 +18,11 @@ import SwiftData
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var wizardGame: Game?
+    /// Which of the LEAGUES/HELP tiles' inline accordion sections (if any)
+    /// is expanded at the bottom of this screen — see `GamesOverviewSummary`
+    /// (owns the tiles that toggle this) and `HomeFootballPanel`/
+    /// `HomeHelpPanel` below (the content that renders when set).
+    @State private var expandedPanel: HomePanel?
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
@@ -40,6 +45,15 @@ struct V2PreviewMenuView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 14) {
+                    // LEAGUES/HELP don't push a screen — they expand one of
+                    // these two inline right here instead (see `HomePanel`),
+                    // so it shows immediately below the tiles rather than
+                    // being scrolled out of view under a long games list.
+                    switch expandedPanel {
+                    case .football: HomeFootballPanel()
+                    case .help: HomeHelpPanel()
+                    case nil: EmptyView()
+                    }
                     if !favouriteGames.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             SectionHeader(title: "Favourites")
@@ -120,7 +134,7 @@ struct V2PreviewMenuView: View {
                 .foregroundStyle(V2Theme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .center)
             if !games.isEmpty {
-                GamesOverviewSummary(games: games)
+                GamesOverviewSummary(games: games, expandedPanel: $expandedPanel)
             }
         }
         .padding(.horizontal, V2Theme.Spacing.horizontal)
@@ -130,5 +144,146 @@ struct V2PreviewMenuView: View {
         // stadium the same way they did before this became a pinned
         // section header; only the metric tiles carry their own individual
         // card backing (see `GamesOverviewSummary`).
+    }
+}
+
+/// LEAGUES tile's inline content — replaces the old standalone
+/// `FootballDataViewV2` push destination (retired; nothing else pushed to
+/// it). The status/disclaimer text plus a refresh action are the only
+/// things unique to this screen; Fixtures/Leagues/Manage/Subscription are
+/// still their own destinations, just reached as ordinary rows here instead
+/// of a second tile grid inside a second header.
+private struct HomeFootballPanel: View {
+    @Environment(EnabledLeagues.self) private var enabled
+    @State private var store = FootballDataStore()
+
+    var body: some View {
+        Card(floating: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: "Football Data")
+                statusLine
+                VStack(spacing: 8) {
+                    NavigationLink {
+                        MatchesViewV2()
+                    } label: {
+                        row("Fixtures", icon: "sportscourt", tint: V2Theme.warning)
+                    }
+                    NavigationLink {
+                        StandingsViewV2()
+                    } label: {
+                        row("Leagues & Standings", icon: "list.number", tint: V2Theme.warning)
+                    }
+                    NavigationLink {
+                        LeagueSettingsViewV2()
+                    } label: {
+                        row("Manage Leagues", icon: "slider.horizontal.3", tint: V2Theme.Mode.predictor)
+                    }
+                    NavigationLink {
+                        SubscriptionSettingsViewV2()
+                    } label: {
+                        row("Subscription", icon: "star.fill", tint: V2Theme.warning)
+                    }
+                }
+                ActionRow(
+                    title: store.isLoading ? "Updating football data…" : "Update football data",
+                    icon: "arrow.clockwise",
+                    isEnabled: !store.isLoading && !store.isThrottled
+                ) {
+                    store.refresh(leagues: enabled.leagues)
+                }
+            }
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
+            if store.isThrottled { store.now = tick }
+        }
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if store.isThrottled, let freshUntil = store.freshUntil {
+                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
+                Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.textSecondary)
+            } else if let lastRefreshed = store.lastRefreshed {
+                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.textSecondary)
+            } else if let errorMessage = store.errorMessage {
+                Text(errorMessage)
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.danger)
+            }
+            Text(DataDisclaimer.text)
+                .font(.caption2)
+                .foregroundStyle(V2Theme.textTertiary)
+        }
+    }
+
+    private func row(_ title: String, icon: String, tint: Color) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption)
+        }
+        .foregroundStyle(tint)
+    }
+}
+
+/// HELP tile's inline content — replaces the old standalone `SettingsViewV2`
+/// push destination (retired; nothing else pushed to it). The "New design"
+/// v1 fallback toggle is the only thing unique to this screen; Profile/
+/// Language/About/Report a Bug are still their own destinations, just
+/// reached as ordinary rows here instead of a second tile grid inside a
+/// second header.
+private struct HomeHelpPanel: View {
+    @AppStorage(V2PreviewFlag.key) private var v2Enabled = true
+
+    var body: some View {
+        Card(floating: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: "Help")
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: $v2Enabled) {
+                        MenuRow(systemImage: "sparkles", title: "New design", floating: true)
+                    }
+                    Text("Switch off to go back to the classic design.")
+                        .font(V2Theme.Typography.metadata)
+                        .foregroundStyle(V2Theme.textSecondary)
+                }
+                VStack(spacing: 8) {
+                    NavigationLink {
+                        ProfileSettingsViewV2()
+                    } label: {
+                        row("Profile", icon: "person.crop.circle.fill", tint: V2Theme.accent)
+                    }
+                    NavigationLink {
+                        LanguageSettingsViewV2()
+                    } label: {
+                        row("Language", icon: "globe", tint: V2Theme.Mode.predictor)
+                    }
+                    NavigationLink {
+                        AboutViewV2()
+                    } label: {
+                        row("About", icon: "info.circle.fill", tint: V2Theme.warning)
+                    }
+                    NavigationLink {
+                        ReportBugViewV2()
+                    } label: {
+                        row("Report a Bug", icon: "ladybug.fill", tint: V2Theme.Mode.killer)
+                    }
+                }
+            }
+        }
+    }
+
+    private func row(_ title: String, icon: String, tint: Color) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption)
+        }
+        .foregroundStyle(tint)
     }
 }

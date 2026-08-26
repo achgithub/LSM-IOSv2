@@ -11,6 +11,12 @@ import SwiftData
 /// already paid elsewhere.
 struct GamesOverviewSummary: View {
     let games: [Game]
+    /// Which of Home's two inline accordion panels (if any) is expanded —
+    /// owned by `V2PreviewMenuView` since the panel content renders in its
+    /// scroll area, not here; this view only needs to read/toggle it so the
+    /// LEAGUES/HELP tiles show the right selected state and open the right
+    /// panel.
+    @Binding var expandedPanel: HomePanel?
     /// The real roster count — not a sum of each game's player list (a
     /// player in three games would triple-count that way), the actual
     /// number of distinct `RosterMember`s, same source `PlayersViewV2` uses.
@@ -22,6 +28,12 @@ struct GamesOverviewSummary: View {
 
     private var activeCount: Int { games.filter { $0.status != .complete }.count }
 
+    private func toggle(_ panel: HomePanel) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedPanel = (expandedPanel == panel) ? nil : panel
+        }
+    }
+
     var body: some View {
         V2TileGrid {
             NavigationLink {
@@ -30,10 +42,10 @@ struct GamesOverviewSummary: View {
                 V2Tile(value: "\(activeCount)", label: "GAMES", color: V2Theme.accent)
             }
             .buttonStyle(.plain)
-            NavigationLink {
-                FootballDataViewV2()
-            } label: {
-                V2Tile(value: "\(enabled.ids.count)", label: "LEAGUES", color: V2Theme.warning)
+            // Toggles an inline accordion section on Home instead of pushing
+            // a screen — see `HomeFootballPanel` in `V2PreviewMenuView`.
+            Button { toggle(.football) } label: {
+                V2Tile(value: "\(enabled.ids.count)", label: "LEAGUES", color: V2Theme.warning, isSelected: expandedPanel == .football)
             }
             .buttonStyle(.plain)
             NavigationLink {
@@ -54,14 +66,10 @@ struct GamesOverviewSummary: View {
             }
             .buttonStyle(.plain)
             .disabled(syncCoordinator.isSyncing)
-            // SettingsViewV2 is now the Help hub (Profile/Language/About/
-            // Report a Bug) — dedicated Settings tile is gone, its other
-            // former contents moved to Football Data (Subscription/Leagues)
-            // and Players (Roster) — see 2026-08-25 restructure.
-            NavigationLink {
-                SettingsViewV2()
-            } label: {
-                V2Tile(icon: "questionmark.circle", label: "HELP", color: V2Theme.warning)
+            // Toggles an inline accordion section on Home instead of pushing
+            // a screen — see `HomeHelpPanel` in `V2PreviewMenuView`.
+            Button { toggle(.help) } label: {
+                V2Tile(icon: "questionmark.circle", label: "HELP", color: V2Theme.warning, isSelected: expandedPanel == .help)
             }
             .buttonStyle(.plain)
             V2TileBlank()
@@ -72,4 +80,10 @@ struct GamesOverviewSummary: View {
             }
         }
     }
+}
+
+/// Which of Home's two inline accordion panels is open — at most one at a
+/// time (see `GamesOverviewSummary.toggle`).
+enum HomePanel {
+    case football, help
 }

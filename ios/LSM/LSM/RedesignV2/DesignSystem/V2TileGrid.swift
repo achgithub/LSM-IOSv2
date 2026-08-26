@@ -9,6 +9,11 @@ struct V2Tile: View {
     var icon: String?
     let label: String
     let color: Color
+    /// True while this tile's own accordion panel is expanded (e.g. Home's
+    /// LEAGUES/HELP tiles, which toggle an inline section instead of
+    /// pushing a screen) — draws a colored ring so it reads as "open"
+    /// rather than just a static shortcut.
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -26,6 +31,10 @@ struct V2Tile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
         .v2FloatingCard(cornerRadius: V2Theme.Radius.row)
+        .overlay(
+            RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous)
+                .stroke(isSelected ? color : .clear, lineWidth: 1.5)
+        )
     }
 }
 
