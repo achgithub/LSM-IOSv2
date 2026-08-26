@@ -12,6 +12,12 @@ import SwiftData
 /// Tapping the chevron pushes each mode's restyled detail view
 /// (`GameDetailViewV2`/`PredictorGameDetailViewV2`/`KillerGameDetailViewV2`).
 struct GamesPortalViewV2: View {
+    /// Set when pushed from Home's Favourites card (see `FavouriteGameCard`)
+    /// — Favourites is informational only and never jumps straight to game
+    /// detail, so this is how it still gets you to the right place: land
+    /// here, already scrolled to and briefly highlighting that one game's
+    /// row, same list everything else uses.
+    var focusGameID: UUID?
     @Environment(Entitlements.self) private var entitlements
     @Environment(SubmissionBadgeStore.self) private var badgeStore
     @Environment(PushCoordinator.self) private var pushCoordinator
@@ -22,6 +28,7 @@ struct GamesPortalViewV2: View {
     @State private var showingPushPicker = false
     @State private var showingWizard = false
     @State private var wizardGame: Game?
+    @State private var highlightedGameID: UUID?
 
     private var modesInPlay: [GameMode] {
         [.lms, .predictor, .killer].filter { mode in games.contains { $0.mode == mode } }
@@ -39,6 +46,7 @@ struct GamesPortalViewV2: View {
     private var activeCount: Int { games.filter { $0.status != .complete }.count }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
                 if games.isEmpty {
@@ -50,7 +58,11 @@ struct GamesPortalViewV2: View {
                     .padding(.top, 40)
                 } else {
                     ForEach(modesInPlay, id: \.self) { mode in
-                        ModeSectionCard(mode: mode, games: games.filter { $0.mode == mode }) { game in
+                        ModeSectionCard(
+                            mode: mode,
+                            games: games.filter { $0.mode == mode },
+                            highlightedGameID: highlightedGameID
+                        ) { game in
                             wizardGame = game
                         }
                     }
@@ -110,7 +122,20 @@ struct GamesPortalViewV2: View {
         // photo behind it (this scene's `.background`) stays fully visible
         // the whole way down instead of fading out with it.
         .v2TrophyRoomScene()
-        .task { await badgeStore.refresh() }
+        .task {
+            await badgeStore.refresh()
+            // Only when pushed from Home's Favourites card — scroll to and
+            // briefly ring the highlighted game's row, then clear it. The
+            // sleep before scrolling gives the just-pushed list a layout
+            // pass first; without it `scrollTo` can fire before the row has
+            // a real position to scroll to.
+            guard let focusGameID else { return }
+            highlightedGameID = focusGameID
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            withAnimation { proxy.scrollTo(focusGameID, anchor: .center) }
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            withAnimation { highlightedGameID = nil }
+        }
         // Pull-to-refresh opens the same game picker as the PUSH tile —
         // both routes into Push go through an explicit per-game choice, so
         // pulling to refresh can't silently fan a push out across every
@@ -131,12 +156,14 @@ struct GamesPortalViewV2: View {
             let limit = entitlements.maxActiveGames
             Text("Your \(entitlements.tier.label) plan includes \(limit) active games. Complete an existing game or upgrade to run more.")
         }
+        }
     }
 }
 
 private struct ModeSectionCard: View {
     let mode: GameMode
     let games: [Game]
+    var highlightedGameID: UUID?
     var onResume: (Game) -> Void = { _ in }
 
     private var title: String { V2Theme.Mode.displayName(for: mode) }
@@ -181,6 +208,11 @@ private struct ModeSectionCard: View {
                 VStack(spacing: 14) {
                     ForEach(games) { game in
                         GameSummaryRow(game: game) { onResume(game) }
+                            .id(game.id)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: V2Theme.Radius.card, style: .continuous)
+                                    .stroke(highlightedGameID == game.id ? V2Theme.accent : .clear, lineWidth: 2)
+                            )
                     }
                 }
             }

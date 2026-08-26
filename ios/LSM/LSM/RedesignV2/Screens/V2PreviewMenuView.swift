@@ -6,14 +6,15 @@ import SwiftData
 /// `NavigationStack` by `V2RootView` (see `AppRootView`, which picks V2RootView
 /// vs. `RootTabView` per `V2PreviewFlag` — on by default, works in every
 /// build, not `#if DEBUG`, since v1 needs to stay a real, live fallback).
-/// Leads with the games overview summary, then a Favourites shortcut (a
-/// game's star toggle lives on `GameSummaryRow`, shared with the Games
-/// screen's per-mode sections — favouriting here doesn't remove it from its
-/// normal section there, it's a shortcut, not a move). No full games list
-/// here — that's the Games portal's job (its own GAMES tile above), so
-/// Home doesn't repeat it. No menu list either — every other destination is
-/// one of the header's own tiles (see `GamesOverviewSummary`) or HELP's
-/// inline panel (see `HomeHelpPanel` below).
+/// Leads with the games overview summary, then a Favourites shortcut — a
+/// game's star toggle lives on `GameSummaryRow` in the Games portal, not
+/// here (see `FavouriteGameCard`, an informational-only card; tapping it
+/// jumps to that game's row in the Games portal, not straight to game
+/// detail). No full games list here — that's the Games portal's job (its
+/// own GAMES tile above), so Home doesn't repeat it. No menu list either —
+/// every other destination is one of the header's own tiles (see
+/// `GamesOverviewSummary`) or HELP's inline panel (see `HomeHelpPanel`
+/// below).
 ///
 /// Its floating header + fade is `.v2FloatingHeaderWithTiles`, the same
 /// modifier every other tile-grid screen uses (Games/Leagues/Players) — this
@@ -24,7 +25,6 @@ import SwiftData
 /// so the back chevron is omitted rather than shown as a dead control.
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
-    @State private var wizardGame: Game?
     /// Which of Home's inline accordion sections (if any) is expanded at the
     /// bottom of this screen — see `GamesOverviewSummary` (owns the HELP
     /// tile that toggles this) and `HomeHelpPanel` below (the content that
@@ -50,7 +50,7 @@ struct V2PreviewMenuView: View {
                         SectionHeader(title: "Favourites")
                         VStack(spacing: 14) {
                             ForEach(favouriteGames) { game in
-                                GameSummaryRow(game: game) { wizardGame = game }
+                                FavouriteGameCard(game: game)
                             }
                         }
                     }
@@ -83,7 +83,6 @@ struct V2PreviewMenuView: View {
         // No .refreshable here — this is a static navigation menu, not a
         // live list. Games portal and the inbox itself both have their own
         // .refreshable/.task for the screens where it's actually live data.
-        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
     }
 }
 
