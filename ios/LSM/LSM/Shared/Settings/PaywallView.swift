@@ -56,10 +56,14 @@ struct PaywallView: View {
                     Link("Privacy Policy", destination: URL(string: "https://sportsmanager.site/lsm/privacy")!)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(V2Theme.background.ignoresSafeArea())
             .navigationTitle("Go Premium")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(V2Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
             .disabled(working != nil)
             .overlay {

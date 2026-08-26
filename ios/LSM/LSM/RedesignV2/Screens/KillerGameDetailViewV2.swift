@@ -13,8 +13,8 @@ private enum KillerSheetV2: String, Identifiable {
 /// V2. Predictions/Results/Lives/Add Players route to their own restyled V2
 /// screens; the rest still open the original view. The original view is
 /// untouched (bar the Add Players sheet target). No
-/// per-game Submission Queue entry point — the always-visible Home/Games
-/// bell (`AppHeader`) reaches every game's submissions already.
+/// per-game Submission Queue entry point — Games' SUBMISSIONS tile
+/// (see `GamesPortalViewV2`) reaches every game's submissions already.
 struct KillerGameDetailViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements

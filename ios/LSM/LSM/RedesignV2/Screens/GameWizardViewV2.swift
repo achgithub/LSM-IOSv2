@@ -156,7 +156,7 @@ struct GameWizardViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2FloatingHeader("Guided Setup", showBack: false) {
-            Button("Exit") { dismiss() }
+            Button("Cancel") { dismiss() }
                 .foregroundStyle(V2Theme.textSecondary)
         }
         .sheet(item: $activeSheet, onDismiss: afterSheet) { which in

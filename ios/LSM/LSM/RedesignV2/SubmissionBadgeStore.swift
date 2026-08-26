@@ -4,7 +4,7 @@ import OSLog
 
 private let badgeLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
-/// Live count backing the V2 bell badge on Home and Games (`AppHeader`).
+/// Live count backing Games' SUBMISSIONS tile (see `GamesPortalViewV2`).
 /// Singleton, injected once at the app root alongside `Entitlements.shared`
 /// (see `RootTabView`), so every V2 screen reads the same cached count
 /// instead of each fetching its own copy of the same aggregate endpoint.

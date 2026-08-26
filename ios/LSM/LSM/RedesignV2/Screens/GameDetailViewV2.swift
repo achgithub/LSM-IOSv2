@@ -12,8 +12,8 @@ private enum LMSSheetV2: String, Identifiable {
 /// unstyled v1 screen except the ones restyled in this pass (Open Round,
 /// Picks Entry, Results Entry, Declare Winners, Tie Resolution, Add Players);
 /// share cards stay v1 (out of scope — see `SummaryShareView`). The original
-/// view is untouched. No per-game Submission Queue entry point — the
-/// always-visible Home/Games bell (`AppHeader`) reaches every game's
+/// view is untouched. No per-game Submission Queue entry point — Games'
+/// SUBMISSIONS tile (see `GamesPortalViewV2`) reaches every game's
 /// submissions already.
 struct GameDetailViewV2: View {
     @Environment(\.modelContext) private var context

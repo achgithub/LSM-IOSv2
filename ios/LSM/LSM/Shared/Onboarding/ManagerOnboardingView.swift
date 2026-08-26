@@ -68,8 +68,12 @@ struct ManagerOnboardingView: View {
                 case .enterCode(let email): codeForm(email: email)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(V2Theme.background.ignoresSafeArea())
             .navigationTitle("Welcome")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(V2Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
         .interactiveDismissDisabled()
         .sheet(isPresented: $showLinkDevice) {

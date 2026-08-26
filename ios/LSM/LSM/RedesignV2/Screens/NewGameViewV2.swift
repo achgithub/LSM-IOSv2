@@ -129,6 +129,18 @@ struct NewGameViewV2: View {
         }
     }
 
+    /// Steps back to the mode picker without dismissing the sheet — visually
+    /// distinct (leading chevron, not bare text) from the plain-text Cancel/
+    /// Done trailing buttons every other V2 sheet root uses for that reason,
+    /// since this one isn't a dismiss.
+    private var backToModePickerButton: some View {
+        Button { mode = nil } label: {
+            Label("Back", systemImage: "chevron.left")
+                .labelStyle(.titleAndIcon)
+        }
+        .foregroundStyle(V2Theme.textSecondary)
+    }
+
     private func modeIcon(_ mode: GameMode) -> String {
         switch mode {
         case .lms: return "figure.walk"
@@ -217,8 +229,7 @@ struct NewGameViewV2: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2PredictorFormScene()
         .v2FloatingHeader("New Predictor Game", showBack: false) {
-            Button("Back") { mode = nil }
-                .foregroundStyle(V2Theme.textSecondary)
+            backToModePickerButton
         }
     }
 
@@ -428,8 +439,7 @@ extension NewGameViewV2 {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2LMSFormScene()
         .v2FloatingHeader("New LMS Game", showBack: false) {
-            Button("Back") { mode = nil }
-                .foregroundStyle(V2Theme.textSecondary)
+            backToModePickerButton
         }
     }
 
@@ -518,8 +528,7 @@ extension NewGameViewV2 {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2KillerFormScene()
         .v2FloatingHeader("New Killer Game", showBack: false) {
-            Button("Back") { mode = nil }
-                .foregroundStyle(V2Theme.textSecondary)
+            backToModePickerButton
         }
     }
 

@@ -45,7 +45,10 @@ struct SyncGamePickerViewV2: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2TrophyRoomScene()
-            .v2FloatingHeader("Sync Games")
+            .v2FloatingHeader("Sync Games", showBack: false) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(V2Theme.textSecondary)
+            }
             .safeAreaInset(edge: .bottom) {
                 Button {
                     onConfirm(selected)

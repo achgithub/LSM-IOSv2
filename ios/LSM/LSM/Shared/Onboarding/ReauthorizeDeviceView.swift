@@ -40,8 +40,12 @@ struct ReauthorizeDeviceView: View {
                 case .enterCode(let email): codeForm(email: email)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(V2Theme.background.ignoresSafeArea())
             .navigationTitle("Confirm It's You")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(V2Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
         .interactiveDismissDisabled()
         .task {

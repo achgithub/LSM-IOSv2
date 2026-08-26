@@ -12,9 +12,14 @@ import SwiftData
 /// normal section there, it's a shortcut, not a move), an "All games"
 /// overview, then a menu of links to each restyled screen.
 ///
-/// `.v2Header` is called with `showBack: false` — as the stack root there's
-/// nothing to dismiss to, so the back chevron is omitted rather than shown
-/// as a dead control.
+/// Its floating header is a `V2FloatingHeader` (the same component every
+/// other tile-grid screen uses via `.v2FloatingHeaderWithTiles`), composed
+/// directly rather than through that convenience modifier — this screen's
+/// `ZStack`+mask hero layout needs the header's *height* (for the fade mask
+/// below) without the modifier's own `.safeAreaInset` spacing, which would
+/// double-reserve the space this view already accounts for manually. Called
+/// with `showBack: false` — as the stack root there's nothing to dismiss to,
+/// so the back chevron is omitted rather than shown as a dead control.
 struct V2PreviewMenuView: View {
     @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
     @State private var wizardGame: Game?
@@ -107,13 +112,13 @@ struct V2PreviewMenuView: View {
             // status bar automatically like any ordinary view.
             stickyHeader
         }
-        // No `.v2Header`/system nav bar at all here, not even a transparent
-        // one — a real `UINavigationController` nav bar still paints a
-        // solid strip across the true top safe area regardless of
+        // No system nav bar at all here, not even a transparent one — a
+        // real `UINavigationController` nav bar still paints a solid strip
+        // across the true top safe area regardless of
         // `.toolbarBackground(.hidden, ...)`, which cut the stadium image
         // off right under the status bar instead of letting it read as one
         // continuous scene. `stickyHeader` (a floating overlay, not a nav
-        // bar) supplies the title/bell instead.
+        // bar) supplies the title instead.
         .toolbar(.hidden, for: .navigationBar)
         // No .refreshable here — this is a static navigation menu, not a
         // live list. Games portal and the inbox itself both have their own
@@ -123,27 +128,23 @@ struct V2PreviewMenuView: View {
 
     /// Floating title/metrics header — fixed at the top of the screen
     /// (a `ZStack` sibling of the `ScrollView`, not part of its scrolled
-    /// content), free over the stadium with no enclosing panel. The
+    /// content), free over the stadium. `V2FloatingHeader` itself, not a
+    /// fourth hand-rolled header — same component `GamesPortalViewV2`/
+    /// `PlayersViewV2` reach via `.v2FloatingHeaderWithTiles`, just composed
+    /// directly here (see this file's top doc comment for why). The
     /// submission bell that used to sit here was dropped — Games' own
     /// SUBMISSIONS tile (see `GamesPortalViewV2`) already covers it, so this
     /// was a duplicate entry point.
     private var stickyHeader: some View {
-        VStack(spacing: 14) {
-            Text("Last Stand Manager")
-                .font(V2Theme.Typography.pageTitle)
-                .foregroundStyle(V2Theme.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .center)
+        V2FloatingHeader(title: "Last Stand Manager", showBack: false, scrimHeight: Self.headerHeight) {
             if !games.isEmpty {
                 GamesOverviewSummary(games: games, expandedPanel: $expandedPanel)
             }
         }
-        .padding(.horizontal, V2Theme.Spacing.horizontal)
-        .padding(.top, 10)
-        .padding(.bottom, 14)
-        // No enclosing panel — title/bell/metrics float free over the
-        // stadium the same way they did before this became a pinned
-        // section header; only the metric tiles carry their own individual
-        // card backing (see `GamesOverviewSummary`).
+        // No enclosing panel — title/metrics float free over the stadium
+        // the same way they did before this became a pinned section
+        // header; only the metric tiles carry their own individual card
+        // backing (see `GamesOverviewSummary`).
     }
 }
 

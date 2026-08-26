@@ -13,8 +13,8 @@ private enum PredictorSheetV2: String, Identifiable {
 /// their new V2 screens; every other sheet (standings, results entry, share
 /// cards) still opens the existing unstyled screen, matching the portal's
 /// "outer shell first, inner sheets next phase" pattern. The original view
-/// is untouched. No per-game Submission Queue entry point —
-/// the always-visible Home/Games bell (`AppHeader`) reaches every game's
+/// is untouched. No per-game Submission Queue entry point — Games'
+/// SUBMISSIONS tile (see `GamesPortalViewV2`) reaches every game's
 /// submissions already.
 struct PredictorGameDetailViewV2: View {
     @Environment(\.modelContext) private var context

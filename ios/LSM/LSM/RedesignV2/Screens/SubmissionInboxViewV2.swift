@@ -5,9 +5,9 @@ import OSLog
 private let inboxLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", category: "submissions")
 
 /// V2's submission queue: a single view backing two entry points.
-/// - `filterGameToken == nil` — the central inbox, reached from the Home/
-///   Games bell, showing pending submissions across every game grouped into
-///   color-coded sections (`V2Theme.GameIdentity`).
+/// - `filterGameToken == nil` — the central inbox, reached from Games'
+///   SUBMISSIONS tile, showing pending submissions across every game grouped
+///   into color-coded sections (`V2Theme.GameIdentity`).
 /// - `filterGameToken` set — the same view pre-filtered to one game, reached
 ///   from that game's detail screen, replacing V1's per-game
 ///   `SubmissionQueueView` for V2 only (V1 keeps using that view unchanged).
@@ -17,8 +17,8 @@ private let inboxLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "lsm", 
 ///
 /// Rows are tap-to-open, not swipe-only — a leading-edge swipe action fights
 /// the NavigationStack's interactive-pop gesture (still live even though
-/// `AppHeader` hides the system back *button*), so it isn't a reliable way
-/// to expose Approve/Reject. A tap always works and gives room to show full
+/// `V2FloatingHeader` hides the system back *button*), so it isn't a
+/// reliable way to expose Approve/Reject. A tap always works and gives room to show full
 /// submission detail instead of a truncated one-line summary.
 struct SubmissionInboxViewV2: View {
     @Environment(\.modelContext) private var context

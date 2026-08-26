@@ -101,10 +101,14 @@ struct LeagueDowngradeView: View {
                 }
                 #endif
             }
+            .scrollContentBackground(.hidden)
+            .background(V2Theme.background.ignoresSafeArea())
             .navigationTitle(allowance == 1
                              ? AppString("Choose your league")
                              : AppString("Choose your leagues"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(V2Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .interactiveDismissDisabled(forced)
             .toolbar {
                 if !forced {

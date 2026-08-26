@@ -52,7 +52,7 @@ struct TieResolutionViewV2: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2TrophyRoomScene()
             .v2FloatingHeader("No Clear Winner", showBack: false) {
-                Button("Later") { dismiss() }
+                Button("Cancel") { dismiss() }
                     .foregroundStyle(V2Theme.textSecondary)
             }
         }
