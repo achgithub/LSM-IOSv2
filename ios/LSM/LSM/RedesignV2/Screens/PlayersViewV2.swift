@@ -71,7 +71,6 @@ struct PlayersViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2TeamRoomScene()
         .v2FloatingHeaderWithTiles("Players") {
             V2TileGrid {
                 V2HomeTile()
@@ -107,6 +106,11 @@ struct PlayersViewV2: View {
                 .buttonStyle(.plain)
             }
         }
+        // Applied after the header/fade modifier, not before — the fade
+        // mask only ever covers the scrollable content, so the team room
+        // photo behind it (this scene's `.background`) stays fully visible
+        // the whole way down instead of fading out with it.
+        .v2TeamRoomScene()
         .alert("Add player", isPresented: $showAddPlayerAlert) {
             TextField("Player name", text: $newPlayerName)
             Button("Add", action: addMember)

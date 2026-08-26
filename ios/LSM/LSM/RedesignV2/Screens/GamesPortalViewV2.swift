@@ -60,7 +60,6 @@ struct GamesPortalViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2TrophyRoomScene()
         // Every action/stat this screen needs is one of the six tiles now
         // (Add/Push/Guided Setup/Submissions/Active/Submissions) — no
         // separate header icons, matching Home's tile grid instead of the
@@ -106,6 +105,11 @@ struct GamesPortalViewV2: View {
                 .buttonStyle(.plain)
             }
         }
+        // Applied after the header/fade modifier, not before — the fade
+        // mask only ever covers the scrollable content, so the trophy room
+        // photo behind it (this scene's `.background`) stays fully visible
+        // the whole way down instead of fading out with it.
+        .v2TrophyRoomScene()
         .task { await badgeStore.refresh() }
         // Pull-to-refresh opens the same game picker as the PUSH tile —
         // both routes into Push go through an explicit per-game choice, so

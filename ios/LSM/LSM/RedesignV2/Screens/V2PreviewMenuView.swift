@@ -14,12 +14,11 @@ import SwiftData
 /// the header's own tiles (see `GamesOverviewSummary`) or HELP's inline
 /// panel (see `HomeHelpPanel` below).
 ///
-/// Its floating header is a `V2FloatingHeader` (the same component every
-/// other tile-grid screen uses via `.v2FloatingHeaderWithTiles`), composed
-/// directly rather than through that convenience modifier — this screen's
-/// `ZStack`+mask hero layout needs the header's *height* (for the fade mask
-/// below) without the modifier's own `.safeAreaInset` spacing, which would
-/// double-reserve the space this view already accounts for manually. Called
+/// Its floating header + fade is `.v2FloatingHeaderWithTiles`, the same
+/// modifier every other tile-grid screen uses (Games/Leagues/Players) — this
+/// was the pattern's original hand-rolled home (a `ZStack`+`.mask` composed
+/// directly in this file) before it got shared out so the other three
+/// screens faded content the same way instead of hard-clipping it. Called
 /// with `showBack: false` — as the stack root there's nothing to dismiss to,
 /// so the back chevron is omitted rather than shown as a dead control.
 struct V2PreviewMenuView: View {
@@ -33,120 +32,63 @@ struct V2PreviewMenuView: View {
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
-    /// Approximate rendered height of `stickyHeader`, used to (a) push
-    /// scrolled content down clear of it and (b) size the fade zone content
-    /// scrolls through as it passes underneath. Fixed rather than measured
-    /// (e.g. via a `GeometryReader` + `PreferenceKey`) — a reasonable
-    /// tradeoff for now; revisit if Dynamic Type ever visibly misaligns it.
-    private static let headerHeight: CGFloat = 220
-    // The header has no background panel (free-floating title/bell/metrics,
-    // see `stickyHeader`), so content scrolling underneath must already be
-    // fully invisible for that entire span — not fading somewhere inside
-    // it — or it shows through the gaps between the floating elements.
-    // The actual fade ramp is a short zone just *below* that, so content
-    // is already gone by the time it would reach the header at all, and
-    // only reappears once genuinely clear of it.
-    private static let fadeRampHeight: CGFloat = 40
-
     var body: some View {
-        ZStack(alignment: .top) {
-            ScrollView {
-                VStack(spacing: 14) {
-                    // HELP doesn't push a screen — it expands inline right
-                    // here instead (see `HomePanel`), so it shows
-                    // immediately below the tiles rather than being scrolled
-                    // out of view under a long games list. LEAGUES pushes to
-                    // `LeaguesPortalViewV2` now, same as GAMES/PLAYERS.
-                    switch expandedPanel {
-                    case .help: HomeHelpPanel()
-                    case nil: EmptyView()
-                    }
-                    if !favouriteGames.isEmpty {
-                        VStack(alignment: .leading, spacing: 14) {
-                            SectionHeader(title: "Favourites")
-                            VStack(spacing: 14) {
-                                ForEach(favouriteGames) { game in
-                                    GameSummaryRow(game: game) { wizardGame = game }
-                                }
+        ScrollView {
+            VStack(spacing: 14) {
+                // HELP doesn't push a screen — it expands inline right
+                // here instead (see `HomePanel`), so it shows
+                // immediately below the tiles rather than being scrolled
+                // out of view under a long games list. LEAGUES pushes to
+                // `LeaguesPortalViewV2` now, same as GAMES/PLAYERS.
+                switch expandedPanel {
+                case .help: HomeHelpPanel()
+                case nil: EmptyView()
+                }
+                if !favouriteGames.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionHeader(title: "Favourites")
+                        VStack(spacing: 14) {
+                            ForEach(favouriteGames) { game in
+                                GameSummaryRow(game: game) { wizardGame = game }
                             }
                         }
                     }
-                    if !games.isEmpty {
-                        VStack(alignment: .leading, spacing: 14) {
-                            SectionHeader(title: "All games", subtitle: "Drill into Games for the full per-mode view")
-                            VStack(spacing: 14) {
-                                ForEach(games) { game in
-                                    GameSummaryRow(game: game) { wizardGame = game }
-                                }
+                }
+                if !games.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionHeader(title: "All games", subtitle: "Drill into Games for the full per-mode view")
+                        VStack(spacing: 14) {
+                            ForEach(games) { game in
+                                GameSummaryRow(game: game) { wizardGame = game }
                             }
                         }
                     }
-                    // No menu list at all below the tiles anymore — all six
-                    // (Games/Leagues/Players/Sync/Help/Settings) are the
-                    // header's tile grid now (see `GamesOverviewSummary`).
                 }
-                .padding(.horizontal, V2Theme.Spacing.horizontal)
-                // Clears the mask's fully-invisible zone *and* the fade
-                // ramp below it — otherwise the first section starts
-                // partway into the ramp and reads as already fading at
-                // rest, before any scrolling has happened.
-                .padding(.top, Self.headerHeight + Self.fadeRampHeight)
-                .padding(.bottom, V2Theme.Spacing.section)
+                // No menu list at all below the tiles anymore — all six
+                // (Games/Leagues/Players/Sync/Help/Settings) are the
+                // header's tile grid now (see `GamesOverviewSummary`).
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Fully hidden for the header's whole footprint, then ramps
-            // back in just below it — see the constants' doc comments —
-            // applied only to this ScrollView (not the background) so the
-            // stadium image itself stays put.
-            .mask(alignment: .top) {
-                VStack(spacing: 0) {
-                    Color.clear.frame(height: Self.headerHeight)
-                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                        .frame(height: Self.fadeRampHeight)
-                    Color.black
-                }
-            }
-            .v2StadiumScene()
-
-            // Floating header, not scrolled content — sits above the masked
-            // ScrollView in z-order, unaffected by its fade mask, and
-            // (having no `.ignoresSafeArea()` of its own) sits below the
-            // status bar automatically like any ordinary view.
-            stickyHeader
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
         }
-        // No system nav bar at all here, not even a transparent one — a
-        // real `UINavigationController` nav bar still paints a solid strip
-        // across the true top safe area regardless of
-        // `.toolbarBackground(.hidden, ...)`, which cut the stadium image
-        // off right under the status bar instead of letting it read as one
-        // continuous scene. `stickyHeader` (a floating overlay, not a nav
-        // bar) supplies the title instead.
-        .toolbar(.hidden, for: .navigationBar)
-        // No .refreshable here — this is a static navigation menu, not a
-        // live list. Games portal and the inbox itself both have their own
-        // .refreshable/.task for the screens where it's actually live data.
-        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
-    }
-
-    /// Floating title/metrics header — fixed at the top of the screen
-    /// (a `ZStack` sibling of the `ScrollView`, not part of its scrolled
-    /// content), free over the stadium. `V2FloatingHeader` itself, not a
-    /// fourth hand-rolled header — same component `GamesPortalViewV2`/
-    /// `PlayersViewV2` reach via `.v2FloatingHeaderWithTiles`, just composed
-    /// directly here (see this file's top doc comment for why). The
-    /// submission bell that used to sit here was dropped — Games' own
-    /// SUBMISSIONS tile (see `GamesPortalViewV2`) already covers it, so this
-    /// was a duplicate entry point.
-    private var stickyHeader: some View {
-        V2FloatingHeader(title: "Last Stand Manager", showBack: false, scrimHeight: Self.headerHeight) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The submission bell that used to sit in this header was dropped —
+        // Games' own SUBMISSIONS tile (see `GamesPortalViewV2`) already
+        // covers it, so this was a duplicate entry point.
+        .v2FloatingHeaderWithTiles("Last Stand Manager") {
             if !games.isEmpty {
                 GamesOverviewSummary(games: games, expandedPanel: $expandedPanel)
             }
         }
-        // No enclosing panel — title/metrics float free over the stadium
-        // the same way they did before this became a pinned section
-        // header; only the metric tiles carry their own individual card
-        // backing (see `GamesOverviewSummary`).
+        // Applied after the header/fade modifier, not before — the fade
+        // mask only ever covers the scrollable content, so the stadium
+        // photo behind it (this scene's `.background`) stays fully visible
+        // the whole way down instead of fading out with it.
+        .v2StadiumScene()
+        // No .refreshable here — this is a static navigation menu, not a
+        // live list. Games portal and the inbox itself both have their own
+        // .refreshable/.task for the screens where it's actually live data.
+        .fullScreenCover(item: $wizardGame) { game in GameWizardViewV2(game: game) }
     }
 }
 

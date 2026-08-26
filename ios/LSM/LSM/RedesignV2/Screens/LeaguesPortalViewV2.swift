@@ -32,7 +32,6 @@ struct LeaguesPortalViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2DataRoomScene()
         .v2FloatingHeaderWithTiles("Leagues") {
             V2TileGrid {
                 V2HomeTile()
@@ -56,6 +55,11 @@ struct LeaguesPortalViewV2: View {
                 V2TileBlank()
             }
         }
+        // Applied after the header/fade modifier, not before — the fade
+        // mask only ever covers the scrollable content, so the data room
+        // photo behind it (this scene's `.background`) stays fully visible
+        // the whole way down instead of fading out with it.
+        .v2DataRoomScene()
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
             if store.isThrottled { store.now = tick }
         }

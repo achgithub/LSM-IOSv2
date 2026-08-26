@@ -162,25 +162,59 @@ extension View {
     }
 
     /// Header + a `V2TileGrid` (see that type) appended below the title
-    /// row, both inside the same scrim — for screens whose actions/stats
-    /// moved from standalone header icons into the shared tile system
-    /// (currently `GamesPortalViewV2`/`PlayersViewV2`). Distinct name from
-    /// `v2FloatingHeader(_:trailing:)`, not an overload — both take a bare
-    /// trailing closure, which Swift can't disambiguate by inferred View
-    /// content alone.
+    /// row, both inside the same scrim — for every screen with a tile grid
+    /// (Home, Games, Leagues, Players). Content scrolling underneath fades
+    /// out over `headerHeight`/`V2FloatingHeaderFade.fadeRampHeight` rather
+    /// than being hard-clipped by a plain `safeAreaInset` — this used to be
+    /// Home's own hand-rolled `ZStack`+`.mask` (see `V2PreviewMenuView`'s
+    /// git history), shared out here so every tile-grid screen fades the
+    /// same way instead of Home fading and the rest cutting off flat.
+    /// Distinct name from `v2FloatingHeader(_:trailing:)`, not an overload —
+    /// both take a bare trailing closure, which Swift can't disambiguate by
+    /// inferred View content alone.
     ///
     /// Defaults `showBack` to false — a tile-grid screen carries its own
-    /// HOME tile (see `V2Navigator`) instead of the chevron; every screen
+    /// HOME tile (see `V2HomeTile`) instead of the chevron; every screen
     /// with a tile grid is expected to include one.
+    ///
+    /// Apply this *before* the screen's `.v2*Scene()` background modifier —
+    /// the fade mask only ever covers `self` (the scrollable content); a
+    /// scene applied after sits behind everything, un-masked, so the photo
+    /// stays fully visible the whole way down while only the content in
+    /// front of it fades.
     func v2FloatingHeaderWithTiles<Tiles: View>(
         _ title: String,
         showBack: Bool = false,
+        headerHeight: CGFloat = V2FloatingHeaderFade.headerHeight,
         @ViewBuilder tiles: @escaping () -> Tiles
     ) -> some View {
-        self
-            .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top) {
-                V2FloatingHeader(title: title, showBack: showBack, tiles: tiles)
-            }
+        ZStack(alignment: .top) {
+            self
+                .safeAreaInset(edge: .top) {
+                    Color.clear.frame(height: headerHeight + V2FloatingHeaderFade.fadeRampHeight)
+                }
+                .mask(alignment: .top) {
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: headerHeight)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: V2FloatingHeaderFade.fadeRampHeight)
+                        Color.black
+                    }
+                }
+            V2FloatingHeader(title: title, showBack: showBack, scrimHeight: headerHeight, tiles: tiles)
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
+}
+
+/// Shared sizing for `.v2FloatingHeaderWithTiles`'s fade — one title row
+/// plus `V2TileGrid`'s two tile rows measures ~185pt in practice; the
+/// original Home-only constant was 220, which left a visibly dead band of
+/// scrim between where the real header content ended and where scrolled
+/// content actually finished fading in. Fixed rather than measured (see
+/// `V2TileGrid`'s doc comment) — revisit if Dynamic Type ever visibly
+/// misaligns it.
+enum V2FloatingHeaderFade {
+    static let headerHeight: CGFloat = 185
+    static let fadeRampHeight: CGFloat = 28
 }
