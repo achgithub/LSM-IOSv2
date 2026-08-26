@@ -50,12 +50,12 @@ struct V2PreviewMenuView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 14) {
-                    // LEAGUES/HELP don't push a screen — they expand one of
-                    // these two inline right here instead (see `HomePanel`),
-                    // so it shows immediately below the tiles rather than
-                    // being scrolled out of view under a long games list.
+                    // HELP doesn't push a screen — it expands inline right
+                    // here instead (see `HomePanel`), so it shows
+                    // immediately below the tiles rather than being scrolled
+                    // out of view under a long games list. LEAGUES pushes to
+                    // `LeaguesPortalViewV2` now, same as GAMES/PLAYERS.
                     switch expandedPanel {
-                    case .football: HomeFootballPanel()
                     case .help: HomeHelpPanel()
                     case nil: EmptyView()
                     }
@@ -145,90 +145,6 @@ struct V2PreviewMenuView: View {
         // the same way they did before this became a pinned section
         // header; only the metric tiles carry their own individual card
         // backing (see `GamesOverviewSummary`).
-    }
-}
-
-/// LEAGUES tile's inline content — replaces the old standalone
-/// `FootballDataViewV2` push destination (retired; nothing else pushed to
-/// it). The status/disclaimer text plus a refresh action are the only
-/// things unique to this screen; Fixtures/Leagues/Manage/Subscription are
-/// still their own destinations, just reached as ordinary rows here instead
-/// of a second tile grid inside a second header.
-private struct HomeFootballPanel: View {
-    @Environment(EnabledLeagues.self) private var enabled
-    @State private var store = FootballDataStore()
-
-    var body: some View {
-        Card(floating: true) {
-            VStack(alignment: .leading, spacing: 14) {
-                SectionHeader(title: "Football Data")
-                statusLine
-                VStack(spacing: 8) {
-                    NavigationLink {
-                        MatchesViewV2()
-                    } label: {
-                        row("Fixtures", icon: "sportscourt", tint: V2Theme.warning)
-                    }
-                    NavigationLink {
-                        StandingsViewV2()
-                    } label: {
-                        row("Leagues & Standings", icon: "list.number", tint: V2Theme.warning)
-                    }
-                    NavigationLink {
-                        LeagueSettingsViewV2()
-                    } label: {
-                        row("Manage Leagues", icon: "slider.horizontal.3", tint: V2Theme.Mode.predictor)
-                    }
-                    NavigationLink {
-                        SubscriptionSettingsViewV2()
-                    } label: {
-                        row("Subscription", icon: "star.fill", tint: V2Theme.warning)
-                    }
-                }
-                ActionRow(
-                    title: store.isLoading ? "Updating football data…" : "Update football data",
-                    icon: "arrow.clockwise",
-                    isEnabled: !store.isLoading && !store.isThrottled
-                ) {
-                    store.refresh(leagues: enabled.leagues)
-                }
-            }
-        }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-            if store.isThrottled { store.now = tick }
-        }
-    }
-
-    @ViewBuilder
-    private var statusLine: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if store.isThrottled, let freshUntil = store.freshUntil {
-                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
-                Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let lastRefreshed = store.lastRefreshed {
-                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let errorMessage = store.errorMessage {
-                Text(errorMessage)
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.danger)
-            }
-            Text(DataDisclaimer.text)
-                .font(.caption2)
-                .foregroundStyle(V2Theme.textTertiary)
-        }
-    }
-
-    private func row(_ title: String, icon: String, tint: Color) -> some View {
-        HStack {
-            Label(title, systemImage: icon)
-            Spacer()
-            Image(systemName: "chevron.right").font(.caption)
-        }
-        .foregroundStyle(tint)
     }
 }
 

@@ -7,7 +7,9 @@ import UniformTypeIdentifiers
 /// precedent as `OpenRoundViewV2`/`LeagueSettingsViewV2` — a `List`/`Section`
 /// screen doesn't map onto a card layout as a shared component). Distinct
 /// from `PlayersViewV2`, which stays a lean browse/search list — this is the
-/// administration screen it was split off from in v1.
+/// administration screen it was split off from in v1. Embedded inline inside
+/// `PlayersViewV2`'s ROSTER accordion panel, not a pushed screen — no
+/// scene/header of its own; the portal supplies both.
 struct RosterSettingsViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
@@ -120,8 +122,6 @@ struct RosterSettingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2TeamRoomScene()
-        .v2FloatingHeader("Roster")
         .alert("Rename group", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
             TextField("Group name", text: $renameText)
             Button("Rename") { commitRename() }

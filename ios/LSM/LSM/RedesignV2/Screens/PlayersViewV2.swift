@@ -4,8 +4,11 @@ import UniformTypeIdentifiers
 
 /// Card-based restyle of `PlayersView` — same roster data/filtering, pushed
 /// into an existing NavigationStack (no `List`, no embedded NavigationStack).
-/// Row tap pushes `PlayerDetailViewV2` — see that file for the detail
-/// restyle.
+/// Row tap still pushes `PlayerDetailViewV2` (see that file for the detail
+/// restyle) — unlike ROSTER below, it isn't inlined here yet, since that
+/// screen is also pushed from three game-detail screens and calls
+/// `dismiss()` on its own Remove Player flow, which would pop this screen
+/// instead of just collapsing an inline panel if embedded as-is.
 struct PlayersViewV2: View {
     @Environment(\.modelContext) private var context
     @Environment(Entitlements.self) private var entitlements
@@ -28,6 +31,10 @@ struct PlayersViewV2: View {
     @State private var importing = false
     @State private var exporting = false
     @State private var importExportMessage: String?
+    /// ROSTER's inline accordion panel (see `RosterSettingsViewV2`'s doc
+    /// comment) — a single flag, not shared state with anything else on this
+    /// screen, so a plain `Bool` rather than an enum like Home's `HomePanel`.
+    @State private var showRosterPanel = false
 
     private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled }
 
@@ -50,6 +57,7 @@ struct PlayersViewV2: View {
                         .v2FloatingCard()
                 }
                 filterCard
+                if showRosterPanel { rosterPanel }
                 playersList
                 if let importExportMessage {
                     Text(importExportMessage)
@@ -95,11 +103,12 @@ struct PlayersViewV2: View {
                 .disabled(members.isEmpty)
                 // Roster moved here from the old dedicated Settings screen —
                 // group create/rename/delete, not just the filter pills
-                // below (those stay inline; this is management).
-                NavigationLink {
-                    RosterSettingsViewV2()
+                // below (those stay inline; this is management). Expands
+                // inline below like Leagues' tiles, not a push.
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showRosterPanel.toggle() }
                 } label: {
-                    V2Tile(icon: "person.3", label: "ROSTER", color: V2Theme.Mode.lms)
+                    V2Tile(icon: "person.3", label: "ROSTER", color: V2Theme.Mode.lms, isSelected: showRosterPanel)
                 }
                 .buttonStyle(.plain)
             }
@@ -241,6 +250,21 @@ struct PlayersViewV2: View {
             }
             .padding(14)
             .v2FloatingCard()
+        }
+    }
+
+    /// ROSTER's inline panel — `RosterSettingsViewV2` embedded directly (its
+    /// own scene/header stripped, see that file's doc comment), height-
+    /// bounded so its own `ScrollView` scrolls inside this card instead of
+    /// trying to grow to fill the whole screen.
+    private var rosterPanel: some View {
+        Card(floating: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: "Roster")
+                RosterSettingsViewV2()
+                    .frame(height: 560)
+                    .clipShape(RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+            }
         }
     }
 

@@ -42,10 +42,10 @@ struct GamesOverviewSummary: View {
                 V2Tile(value: "\(activeCount)", label: "GAMES", color: V2Theme.accent)
             }
             .buttonStyle(.plain)
-            // Toggles an inline accordion section on Home instead of pushing
-            // a screen — see `HomeFootballPanel` in `V2PreviewMenuView`.
-            Button { toggle(.football) } label: {
-                V2Tile(value: "\(enabled.ids.count)", label: "LEAGUES", color: V2Theme.warning, isSelected: expandedPanel == .football)
+            NavigationLink {
+                LeaguesPortalViewV2()
+            } label: {
+                V2Tile(value: "\(enabled.ids.count)", label: "LEAGUES", color: V2Theme.warning)
             }
             .buttonStyle(.plain)
             NavigationLink {
@@ -82,8 +82,11 @@ struct GamesOverviewSummary: View {
     }
 }
 
-/// Which of Home's two inline accordion panels is open — at most one at a
-/// time (see `GamesOverviewSummary.toggle`).
+/// Home's one remaining inline accordion panel (HELP) — LEAGUES now pushes
+/// to `LeaguesPortalViewV2` like GAMES/PLAYERS instead of expanding here.
+/// Still an enum (rather than a plain `Bool`) so `GamesOverviewSummary`'s
+/// `toggle` stays generic and Home's `switch` reads the same way it did with
+/// two cases.
 enum HomePanel {
-    case football, help
+    case help
 }

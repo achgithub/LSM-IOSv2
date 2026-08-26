@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// Card-based restyle of `StandingsView`, sharing the same `StandingsStore`
-/// (load/refresh/throttle logic) so both stay correct in parallel. Reached
-/// only from the V2 preview menu — the original `StandingsView` in the real
-/// tab bar is untouched.
+/// (load/refresh/throttle logic) so both stay correct in parallel. The
+/// original `StandingsView` in the real tab bar is untouched. Embedded
+/// inline inside `LeaguesPortalViewV2`'s Standings accordion panel, not a
+/// pushed screen — no scene/header of its own; the portal supplies both.
 struct StandingsViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var selectedLeague: LeagueOption?
@@ -56,9 +57,7 @@ struct StandingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2DataRoomScene()
         .v2LoadingOverlay(store.isLoading, label: store.standings.isEmpty ? "Loading standings…" : "Refreshing…")
-        .v2FloatingHeader("Standings")
         .task(id: league) { await store.load(league: league, force: false) }
         .task(id: store.freshUntil) { await store.armClock() }
     }

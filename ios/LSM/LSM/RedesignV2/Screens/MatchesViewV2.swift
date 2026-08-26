@@ -1,11 +1,13 @@
 import Combine
 import SwiftUI
 
-/// Card-based restyle of `MatchesView` ("Fixtures" in the V2 menu) with
-/// inline filter chips instead of the sheet-based search panel — every
-/// filter dimension and invariant is preserved from v1 (see `MatchesView`):
-/// empty `selectedLeagueIds` means "all enabled leagues", never allow
-/// emptying to zero, and the enabled-league-set reconciliation task.
+/// Card-based restyle of `MatchesView` ("Fixtures") with inline filter chips
+/// instead of the sheet-based search panel — every filter dimension and
+/// invariant is preserved from v1 (see `MatchesView`): empty
+/// `selectedLeagueIds` means "all enabled leagues", never allow emptying to
+/// zero, and the enabled-league-set reconciliation task. Embedded inline
+/// inside `LeaguesPortalViewV2`'s Fixtures accordion panel, not a pushed
+/// screen — no scene/header of its own; the portal supplies both.
 struct MatchesViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var store = MatchesStoreV2()
@@ -98,7 +100,6 @@ struct MatchesViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2DataRoomScene()
         .v2LoadingOverlay(store.isLoading, label: store.items.isEmpty ? "Loading matches…" : "Refreshing…")
         .safeAreaInset(edge: .top) {
             if let errorMessage = store.errorMessage, !store.items.isEmpty {
@@ -113,7 +114,6 @@ struct MatchesViewV2: View {
             }
         }
         .safeAreaInset(edge: .bottom) { footer }
-        .v2FloatingHeader("Fixtures")
         .task(id: enabled.leagues.map(\.id)) {
             let validIds = Set(enabled.leagues.map(\.id))
             selectedLeagueIds.formIntersection(validIds)

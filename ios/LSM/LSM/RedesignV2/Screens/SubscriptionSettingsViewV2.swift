@@ -2,7 +2,9 @@ import SwiftUI
 import StoreKit
 
 /// Card restyle of `SubscriptionSettingsView` — plan status, upgrade/
-/// restore, and (debug builds only) the tier simulator.
+/// restore, and (debug builds only) the tier simulator. Embedded inline
+/// inside `LeaguesPortalViewV2`'s Subscription accordion panel, not a
+/// pushed screen — no scene/header of its own; the portal supplies both.
 struct SubscriptionSettingsViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @State private var showPaywall = false
@@ -79,8 +81,6 @@ struct SubscriptionSettingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2DataRoomScene()
-        .v2FloatingHeader("Subscription")
         .sheet(isPresented: $showPaywall) {
             PaywallView().environment(entitlements)
         }

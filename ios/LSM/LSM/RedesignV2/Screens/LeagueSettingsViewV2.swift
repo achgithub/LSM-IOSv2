@@ -5,7 +5,9 @@ import SwiftData
 /// same single-league-plan swap flow, logic copied verbatim (list-based
 /// `Button`/checkmark rows don't translate directly to a card layout, so
 /// this isn't a shared component with the original — same precedent as
-/// `OpenRoundViewV2`).
+/// `OpenRoundViewV2`). Embedded inline inside `LeaguesPortalViewV2`'s Manage
+/// Leagues accordion panel, not a pushed screen — no scene/header of its
+/// own; the portal supplies both.
 struct LeagueSettingsViewV2: View {
     @Environment(Entitlements.self) private var entitlements
     @Environment(EnabledLeagues.self) private var enabled
@@ -41,8 +43,6 @@ struct LeagueSettingsViewV2: View {
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .v2DataRoomScene()
-        .v2FloatingHeader("Leagues")
         .confirmationDialog(
             "Disable \(pendingDisable?.name ?? "league")?",
             isPresented: Binding(get: { pendingDisable != nil }, set: { if !$0 { pendingDisable = nil } }),
