@@ -39,10 +39,10 @@ struct FixtureLabelV2: View {
         VStack(alignment: .leading, spacing: 4) {
             scheduleLine
             HStack(spacing: 8) {
-                Text(name(fixture.homeTeamId)).lineLimit(1)
+                Text(name(fixture.homeTeamId)).lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 Text("v").font(.caption2).foregroundStyle(V2Theme.textTertiary)
-                Text(name(fixture.awayTeamId)).lineLimit(1)
+                Text(name(fixture.awayTeamId)).lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .font(.callout)

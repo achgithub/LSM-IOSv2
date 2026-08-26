@@ -107,14 +107,14 @@ struct NewGameViewV2: View {
                             selectedLeagueIds = Set(enabled.leagues.map(\.id))
                         }
                     } label: {
-                        MenuRow(systemImage: modeIcon(candidate), title: candidate.displayName, tint: V2Theme.Mode.color(for: candidate))
+                        MenuRow(systemImage: modeIcon(candidate), title: candidate.displayName, tint: V2Theme.Mode.color(for: candidate), floating: true)
                     }
                     .buttonStyle(.plain)
                 }
                 Button {
                     showingImport = true
                 } label: {
-                    MenuRow(systemImage: "square.and.arrow.down", title: "Import Game", tint: V2Theme.accent)
+                    MenuRow(systemImage: "square.and.arrow.down", title: "Import Game", tint: V2Theme.accent, floating: true)
                 }
                 .buttonStyle(.plain)
             }

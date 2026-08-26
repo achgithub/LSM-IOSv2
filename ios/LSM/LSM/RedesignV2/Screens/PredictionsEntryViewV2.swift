@@ -220,6 +220,7 @@ struct PredictionsEntryViewV2: View {
                                         .font(.subheadline)
                                         .foregroundStyle(V2Theme.textPrimary)
                                         .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                     Spacer()
                                     if isPending {
                                         Image(systemName: "checkmark.circle.fill").foregroundStyle(V2Theme.warning)
@@ -266,6 +267,7 @@ struct PredictionsEntryViewV2: View {
                             Text(current.map(fixtureLabel) ?? "No joker selected")
                                 .foregroundStyle(current != nil ? V2Theme.textPrimary : V2Theme.textSecondary)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Spacer()
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.caption.weight(.semibold))
