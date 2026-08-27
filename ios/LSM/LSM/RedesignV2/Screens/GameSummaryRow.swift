@@ -23,7 +23,7 @@ struct GameSummaryRow: View {
     @State private var leagueData: LeagueData?
     @State private var sheet: RowSheet?
 
-    private var managerStatus: ManagerRoundStatus? { ManagerRoundStatus.make(for: game) }
+    private var managerStatus: ManagerRoundStatus? { ManagerRoundStatus.make(for: game, data: leagueData) }
     private var modeColor: Color { V2Theme.Mode.color(for: game.mode) }
     private var roundContext: V2GameRoundContext { V2GameRoundContext(game: game) }
     private var pwaEnabled: Bool { entitlements.canUseCloud && pwaSubmissionsEnabled && game.cloudGameToken != nil }
@@ -108,8 +108,8 @@ struct GameSummaryRow: View {
         }
         .sheet(item: $sheet) { which in
             switch which {
-            case .picks:
-                if let round = roundContext.openRound { picksDestination(round: round) }
+            case .picks(let startFilteredToUnassigned):
+                if let round = roundContext.openRound { picksDestination(round: round, startFilteredToUnassigned: startFilteredToUnassigned) }
             case .submissionQueue:
                 SubmissionInboxViewV2(filterGameToken: game.cloudGameToken)
             case .shareLastRound:
@@ -123,24 +123,48 @@ struct GameSummaryRow: View {
         switch nextUp {
         case .none:
             EmptyView()
+        case .addPlayers:
+            HStack(spacing: 8) {
+                NavigationLink {
+                    addPlayersDestination
+                } label: {
+                    nextUpLabel(title: "Assign Players", icon: "person.badge.plus", tint: modeColor)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 2)
+        case .openRound:
+            HStack(spacing: 8) {
+                NavigationLink {
+                    openRoundDestination
+                } label: {
+                    nextUpLabel(title: "Open Round", icon: "play.circle.fill", tint: modeColor)
+                }
+                .buttonStyle(.plain)
+                if roundContext.latestClosedRound != nil { shareButton }
+            }
+            .padding(.top, 2)
         case .enterPicks(let pwa):
             nextUpButton(title: pwa ? "Check Submission Queue" : "Enter Picks", icon: "square.and.pencil") {
-                sheet = pwa ? .submissionQueue : .picks
+                sheet = pwa ? .submissionQueue : .picks()
             }
         case .confirmEntries(let pwa):
             nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
-                sheet = pwa ? .submissionQueue : .picks
+                sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
             }
         case .matchesInProgress(let finished, let total):
-            HStack(spacing: 8) {
-                Image(systemName: "sportscourt")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(V2Theme.textSecondary)
-                Text("Matches playing — \(finished) of \(total) in")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(V2Theme.textSecondary)
-                Spacer()
-                if roundContext.latestClosedRound != nil { shareButton }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sportscourt")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(V2Theme.textSecondary)
+                    Text("Matches playing — \(finished) of \(total) in")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(V2Theme.textSecondary)
+                    Spacer()
+                    if roundContext.latestClosedRound != nil { shareButton }
+                }
+                unsubmittedReminder
             }
             .padding(.top, 2)
         case .processResults:
@@ -154,6 +178,28 @@ struct GameSummaryRow: View {
                 if roundContext.latestClosedRound != nil { shareButton }
             }
             .padding(.top, 2)
+        }
+    }
+
+    /// Once matches kick off, `NextUpStep` stops mentioning missing picks at
+    /// all (it's purely match-progress from there) — but a manager can still
+    /// remember a pick someone texted them mid-round, so this keeps the
+    /// reminder alive alongside "Matches playing." Never a gate: tapping it
+    /// just opens the same picks sheet, jumped to the stragglers for LMS.
+    @ViewBuilder
+    private var unsubmittedReminder: some View {
+        if let missing = managerStatus?.missingCount, missing > 0 {
+            Button {
+                sheet = .picks(startFilteredToUnassigned: game.mode == .lms)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.bubble")
+                    Text(missing == 1 ? "1 unsubmitted" : "\(missing) unsubmitted")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(V2Theme.warning)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -191,9 +237,9 @@ struct GameSummaryRow: View {
     }
 
     @ViewBuilder
-    private func picksDestination(round: Round) -> some View {
+    private func picksDestination(round: Round, startFilteredToUnassigned: Bool = false) -> some View {
         switch game.mode {
-        case .lms: PicksEntryViewV2(game: game, round: round)
+        case .lms: PicksEntryViewV2(game: game, round: round, startFilteredToUnassigned: startFilteredToUnassigned)
         case .predictor: PredictionsEntryViewV2(game: game, round: round)
         case .killer: KillerPredictionsEntryViewV2(game: game, round: round)
         }
@@ -236,6 +282,30 @@ struct GameSummaryRow: View {
         }
     }
 
+    /// Same as `destination`, but lands with the add-players sheet already
+    /// open — for `.addPlayers`, a game that doesn't have enough eligible
+    /// players yet to open its first round.
+    @ViewBuilder
+    private var addPlayersDestination: some View {
+        switch game.mode {
+        case .lms: GameDetailViewV2(game: game, autoShowAddPlayers: true)
+        case .predictor: PredictorGameDetailViewV2(game: game, autoShowAddPlayers: true)
+        case .killer: KillerGameDetailViewV2(game: game, autoShowAddPlayers: true)
+        }
+    }
+
+    /// Same as `destination`, but lands with the open-round sheet already
+    /// open — for `.openRound`, a game with enough players and either no
+    /// round yet or its last one closed.
+    @ViewBuilder
+    private var openRoundDestination: some View {
+        switch game.mode {
+        case .lms: GameDetailViewV2(game: game, autoOpenSheet: .open)
+        case .predictor: PredictorGameDetailViewV2(game: game, autoOpenSheet: .open)
+        case .killer: KillerGameDetailViewV2(game: game, autoOpenSheet: .open)
+        }
+    }
+
     /// One compact line summarizing the game's current standing — full
     /// per-player breakdown lives one tap away on `destination`, matching
     /// the slimmer POC card (icon/name/detail, no inline mini-leaderboard).
@@ -262,7 +332,7 @@ struct GameSummaryRow: View {
 /// single `Identifiable` enum rather than several competing `Bool`/`item`
 /// states.
 private enum RowSheet: Identifiable {
-    case picks
+    case picks(startFilteredToUnassigned: Bool = false)
     case submissionQueue
     case shareLastRound
     var id: String {
@@ -275,57 +345,93 @@ private enum RowSheet: Identifiable {
 }
 
 /// A manager-facing status for the game's current round: how many of the
-/// eligible players have submitted, and when it's due — or, once submissions
-/// close, whether the manager still needs to enter results.
+/// eligible players have submitted, and when it's due — or, once the
+/// deadline's passed, who's still missing so the manager knows who to chase
+/// (or enter for) before kickoff. This is purely informational — it never
+/// blocks entry; see `RoundPhase`'s doc comment and `NextUpStep`.
 struct ManagerRoundStatus {
     let label: String
     let detail: String
     let tint: Color
     /// Submitted/eligible for the current round's open submission window —
-    /// nil once the window has closed (results/closed) or there's nothing
-    /// to submit, so a finished round doesn't show a stale progress bar.
+    /// nil once the deadline's passed or there's nothing to submit, so a
+    /// finished round (or a "missing" nudge) doesn't show a stale bar.
     let submissionProgress: Double?
+    /// Players still missing a pick, once the deadline's passed — nil before
+    /// the deadline (already covered by the submitted/eligible label above)
+    /// or once the round's closed/complete. `GameSummaryRow` surfaces this
+    /// as a standing reminder chip that persists into live play, since the
+    /// badge text itself moves on to match progress once kickoff happens.
+    let missingCount: Int?
 
-    static func make(for game: Game) -> ManagerRoundStatus? {
+    static func make(for game: Game, data: LeagueData?) -> ManagerRoundStatus? {
         guard game.status != .complete else { return nil }
-        guard let round = game.currentRound else {
-            return ManagerRoundStatus(label: "Not started", detail: "", tint: V2Theme.textSecondary, submissionProgress: nil)
-        }
 
-        let eligible: Int
-        let submitted: Int
+        switch RoundPhase.make(for: game, data: data) {
+        case .complete:
+            return nil
+        case .addPlayers:
+            return ManagerRoundStatus(label: "Not started", detail: "Needs players", tint: V2Theme.warning, submissionProgress: nil, missingCount: nil)
+        case .openRound:
+            return ManagerRoundStatus(label: "Not started", detail: "", tint: V2Theme.textSecondary, submissionProgress: nil, missingCount: nil)
+        case .closed:
+            let roundNumber = game.currentRound?.roundNumber ?? 0
+            return ManagerRoundStatus(label: "Round \(roundNumber) closed", detail: "", tint: V2Theme.textTertiary, submissionProgress: nil, missingCount: nil)
+        case .beforeDeadline:
+            guard let round = game.currentRound else { return nil }
+            let (eligible, submitted) = Self.submissionCounts(for: game, round: round)
+            let allIn = eligible > 0 && submitted >= eligible
+            let due = "Due " + Self.dateFormatter.string(from: round.deadline)
+            return ManagerRoundStatus(
+                label: "\(submitted)/\(eligible) submitted",
+                detail: due,
+                tint: allIn ? V2Theme.accent : V2Theme.warning,
+                submissionProgress: eligible > 0 ? Double(submitted) / Double(eligible) : nil,
+                missingCount: nil
+            )
+        case .beforeKickoff:
+            guard let round = game.currentRound else { return nil }
+            let (eligible, submitted) = Self.submissionCounts(for: game, round: round)
+            let missing = eligible - submitted
+            guard missing > 0 else {
+                return ManagerRoundStatus(label: "All submitted", detail: "Kickoff pending", tint: V2Theme.accent, submissionProgress: nil, missingCount: nil)
+            }
+            // Deadline's passed, but nothing's locked — the manager can
+            // still tap in a late/texted-in pick right up to kickoff. This
+            // is a to-do count for them, not a gate.
+            return ManagerRoundStatus(label: "Submissions closed", detail: "\(missing) missing", tint: V2Theme.warning, submissionProgress: nil, missingCount: missing)
+        case .live(let finished, let total):
+            var missing: Int?
+            if let round = game.currentRound {
+                let (eligible, submitted) = Self.submissionCounts(for: game, round: round)
+                let count = eligible - submitted
+                missing = count > 0 ? count : nil
+            }
+            return ManagerRoundStatus(label: "Live", detail: "\(finished)/\(total) matches in", tint: V2Theme.textSecondary, submissionProgress: nil, missingCount: missing)
+        case .readyToProcess:
+            let roundNumber = game.currentRound?.roundNumber ?? 0
+            return ManagerRoundStatus(label: "Results due", detail: "Round \(roundNumber)", tint: V2Theme.danger, submissionProgress: nil, missingCount: nil)
+        }
+    }
+
+    private static func submissionCounts(for game: Game, round: Round) -> (eligible: Int, submitted: Int) {
         switch game.mode {
         case .lms:
-            eligible = game.activePlayers.count
-            submitted = round.picks.count
+            return (game.activePlayers.count, round.picks.count)
         case .predictor:
             // Not `round.predictions.count` — that's one row per fixture
             // per player, not per player, so it overcounts by roughly the
             // fixture count (e.g. 14 players × 5 fixtures showed as
             // "70/14"). Count players with a complete slate instead.
-            eligible = game.players.count
-            submitted = game.players.filter { PredictorScoringService.slateComplete(for: $0, round: round) }.count
+            let eligible = game.players.count
+            let submitted = game.players.filter { PredictorScoringService.slateComplete(for: $0, round: round) }.count
+            return (eligible, submitted)
         case .killer:
             // Same overcounting risk as Predictor when a round has more than
             // one Manager Picked Game — count players, not prediction rows.
-            eligible = game.activePlayers.count
-            submitted = game.activePlayers.filter { KillerScoringService.slateComplete(for: $0, round: round, game: game) }.count
-        }
-
-        let due = "Due " + Self.dateFormatter.string(from: round.deadline)
-        switch round.status {
-        case .open, .picks:
-            let allIn = eligible > 0 && submitted >= eligible
-            return ManagerRoundStatus(
-                label: "\(submitted)/\(eligible) submitted",
-                detail: due,
-                tint: allIn ? V2Theme.accent : V2Theme.warning,
-                submissionProgress: eligible > 0 ? Double(submitted) / Double(eligible) : nil
-            )
-        case .results:
-            return ManagerRoundStatus(label: "Results due", detail: "Round \(round.roundNumber)", tint: V2Theme.danger, submissionProgress: nil)
-        case .closed:
-            return ManagerRoundStatus(label: "Round \(round.roundNumber) closed", detail: "", tint: V2Theme.textTertiary, submissionProgress: nil)
+            let eligible = game.activePlayers.count
+            let submitted = game.activePlayers.filter { KillerScoringService.slateComplete(for: $0, round: round, game: game) }.count
+            return (eligible, submitted)
         }
     }
 

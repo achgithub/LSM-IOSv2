@@ -30,6 +30,11 @@ struct GameDetailViewV2: View {
     /// on the plain detail screen, without duplicating this file's own
     /// tie-resolution/auto-open-next-round state machine to do it.
     var autoOpenSheet: LMSSheetV2?
+    /// Same idea as `autoOpenSheet`, for the `.addPlayers` Next Up case —
+    /// there's no `AddPlayersViewV2` case in `LMSSheetV2` since it's a
+    /// separate `@State` sheet already (`showingAddPlayers`), not one of
+    /// this screen's own `.sheet(item:)` cases.
+    var autoShowAddPlayers = false
     @State private var showingAddPlayers = false
     @State private var sheet: LMSSheetV2?
     /// The tie resolution is presented at the top level (never stacked on the
@@ -99,6 +104,7 @@ struct GameDetailViewV2: View {
         }
         .v2GameHeaderActions(game: game, model: headerActions)
         .onAppear {
+            if autoShowAddPlayers { showingAddPlayers = true }
             guard let autoOpenSheet else { return }
             sheet = autoOpenSheet
         }

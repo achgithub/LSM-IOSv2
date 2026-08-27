@@ -30,6 +30,8 @@ struct PredictorGameDetailViewV2: View {
     /// `GameSummaryRow`) — opens straight into that sheet instead of landing
     /// on the plain detail screen.
     var autoOpenSheet: PredictorSheetV2?
+    /// Same idea as `autoOpenSheet`, for the `.addPlayers` Next Up case.
+    var autoShowAddPlayers = false
     @State private var showingAddPlayers = false
     @State private var sheet: PredictorSheetV2?
     @State private var pendingRemovePlayer: Player?
@@ -75,6 +77,7 @@ struct PredictorGameDetailViewV2: View {
         }
         .v2GameHeaderActions(game: game, model: headerActions)
         .onAppear {
+            if autoShowAddPlayers { showingAddPlayers = true }
             guard let autoOpenSheet else { return }
             sheet = autoOpenSheet
         }

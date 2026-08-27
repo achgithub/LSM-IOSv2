@@ -18,7 +18,16 @@ struct PicksEntryViewV2: View {
     @State private var showAutoAssignConfirm = false
     @State private var showStaleTablePrompt = false
     @State private var searchText = ""
-    @State private var unassignedOnly = false
+    @State private var unassignedOnly: Bool
+
+    /// Lands straight on the "Unassigned" filter — used by the Games portal's
+    /// unsubmitted-picks reminder, which is a jump straight to the stragglers
+    /// rather than the full roster.
+    init(game: Game, round: Round, startFilteredToUnassigned: Bool = false) {
+        self.game = game
+        self.round = round
+        _unassignedOnly = State(initialValue: startFilteredToUnassigned)
+    }
 
     private var teamRefs: [TeamRef] {
         guard let data else { return [] }

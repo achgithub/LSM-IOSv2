@@ -29,6 +29,8 @@ struct KillerGameDetailViewV2: View {
     /// `GameSummaryRow`) — opens straight into that sheet instead of landing
     /// on the plain detail screen.
     var autoOpenSheet: KillerSheetV2?
+    /// Same idea as `autoOpenSheet`, for the `.addPlayers` Next Up case.
+    var autoShowAddPlayers = false
     @State private var showingAddPlayers = false
     @State private var sheet: KillerSheetV2?
     @State private var pendingRemovePlayer: Player?
@@ -78,6 +80,7 @@ struct KillerGameDetailViewV2: View {
         }
         .v2GameHeaderActions(game: game, model: headerActions)
         .onAppear {
+            if autoShowAddPlayers { showingAddPlayers = true }
             guard let autoOpenSheet else { return }
             sheet = autoOpenSheet
         }
