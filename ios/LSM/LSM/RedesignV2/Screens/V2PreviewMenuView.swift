@@ -64,7 +64,8 @@ struct V2PreviewMenuView: View {
                 // header's tile grid now (see `GamesOverviewSummary`).
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
-            .padding(.vertical, V2Theme.Spacing.section)
+            .padding(.top, V2Theme.Spacing.sceneTop)
+            .padding(.bottom, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The submission bell that used to sit in this header was dropped —

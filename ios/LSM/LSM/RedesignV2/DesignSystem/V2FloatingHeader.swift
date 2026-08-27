@@ -74,7 +74,7 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.top, 10)
-            .padding(.bottom, 14)
+            .padding(.bottom, 6)
         }
     }
 }
@@ -208,13 +208,14 @@ extension View {
 }
 
 /// Shared sizing for `.v2FloatingHeaderWithTiles`'s fade — one title row
-/// plus `V2TileGrid`'s two tile rows measures ~185pt in practice; the
-/// original Home-only constant was 220, which left a visibly dead band of
-/// scrim between where the real header content ended and where scrolled
-/// content actually finished fading in. Fixed rather than measured (see
-/// `V2TileGrid`'s doc comment) — revisit if Dynamic Type ever visibly
-/// misaligns it.
+/// plus `V2TileGrid`'s two tile rows measures ~170pt in practice; the
+/// original Home-only constant was 220, then 185, both of which still left
+/// a visibly dead band of scrim between where the real header content ended
+/// and where scrolled content actually finished fading in (reported against
+/// Home's "Favourites" section sitting noticeably below the HELP tile).
+/// Fixed rather than measured (see `V2TileGrid`'s doc comment) — revisit if
+/// Dynamic Type ever visibly misaligns it.
 enum V2FloatingHeaderFade {
-    static let headerHeight: CGFloat = 185
-    static let fadeRampHeight: CGFloat = 28
+    static let headerHeight: CGFloat = 170
+    static let fadeRampHeight: CGFloat = 14
 }

@@ -29,7 +29,8 @@ struct LeaguesPortalViewV2: View {
                 panelContent
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
-            .padding(.vertical, V2Theme.Spacing.section)
+            .padding(.top, V2Theme.Spacing.sceneTop)
+            .padding(.bottom, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2FloatingHeaderWithTiles("Leagues") {

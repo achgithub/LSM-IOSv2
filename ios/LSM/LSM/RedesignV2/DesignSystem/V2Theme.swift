@@ -131,6 +131,14 @@ enum V2Theme {
         static let section: CGFloat = 20
         static let cardPadding: CGFloat = 18
         static let horizontal: CGFloat = 16
+        /// Top padding for a tile-grid screen's scroll content (Home/Games/
+        /// Leagues/Players) — `.section` (20) stacked on top of
+        /// `.v2FloatingHeaderWithTiles`'s own reserved fade space left a
+        /// visibly dead gap before the first section header; that reserved
+        /// space already does the job `.section` does elsewhere (separating
+        /// content from whatever's above it), so this only needs to clear
+        /// the fade's tail, not repeat it.
+        static let sceneTop: CGFloat = 0
 
         /// Height for a screen embedded inline inside another's accordion
         /// panel (Leagues' Fixtures/Standings/Manage/Subscription, Players'

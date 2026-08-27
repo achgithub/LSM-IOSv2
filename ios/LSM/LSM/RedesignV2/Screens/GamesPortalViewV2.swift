@@ -66,7 +66,8 @@ struct GamesPortalViewV2: View {
                 }
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
-            .padding(.vertical, V2Theme.Spacing.section)
+            .padding(.top, V2Theme.Spacing.sceneTop)
+            .padding(.bottom, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Every action/stat this screen needs is one of the six tiles now
