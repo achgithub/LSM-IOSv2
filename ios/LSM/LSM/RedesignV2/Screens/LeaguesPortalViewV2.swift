@@ -15,10 +15,18 @@ struct LeaguesPortalViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var store = FootballDataStore()
     @State private var expandedPanel: LeaguesPanelV2?
+    /// Fixtures' filter card (league/team/home-away/matchday/date pills)
+    /// starts hidden so opening Fixtures shows the match list immediately,
+    /// no scrolling past a filter card first. SEARCH reveals it; filters
+    /// stay applied to the list even after it's hidden again — only the
+    /// controls disappear, not the filtering. Meaningless outside Fixtures,
+    /// so SEARCH is disabled unless that's the open panel (see body).
+    @State private var showFixturesFilter = false
 
     private func toggle(_ panel: LeaguesPanelV2) {
         withAnimation(.easeInOut(duration: 0.2)) {
             expandedPanel = (expandedPanel == panel) ? nil : panel
+            if expandedPanel != .fixtures { showFixturesFilter = false }
         }
     }
 
@@ -53,7 +61,13 @@ struct LeaguesPortalViewV2: View {
                     V2Tile(icon: "star.fill", label: "SUBSCRIPTION", color: V2Theme.warning, isSelected: expandedPanel == .subscription)
                 }
                 .buttonStyle(.plain)
-                V2TileBlank()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showFixturesFilter.toggle() }
+                } label: {
+                    V2Tile(icon: "magnifyingglass", label: "SEARCH", color: V2Theme.warning, isSelected: showFixturesFilter)
+                }
+                .buttonStyle(.plain)
+                .disabled(expandedPanel != .fixtures)
             }
         }
         // Applied after the header/fade modifier, not before — the fade
@@ -109,7 +123,7 @@ struct LeaguesPortalViewV2: View {
     private var panelContent: some View {
         switch expandedPanel {
         case .fixtures:
-            panel(title: "Fixtures") { MatchesViewV2() }
+            panel(title: "Fixtures") { MatchesViewV2(showFilter: $showFixturesFilter) }
         case .standings:
             panel(title: "Standings") { StandingsViewV2() }
         case .manage:

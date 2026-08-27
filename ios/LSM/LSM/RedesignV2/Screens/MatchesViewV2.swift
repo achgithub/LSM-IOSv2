@@ -12,6 +12,12 @@ struct MatchesViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var store = MatchesStoreV2()
 
+    /// Owned by `LeaguesPortalViewV2`'s SEARCH tile — the filter card starts
+    /// hidden so the match list is visible immediately (no scrolling past
+    /// filter chips first); this only hides the *controls*, filtering below
+    /// still applies while it's collapsed.
+    @Binding var showFilter: Bool
+
     // Filter state — same shape/defaults as v1's MatchesView.
     @State private var selectedLeagueIds: Set<String> = []
     @State private var teamQuery = ""
@@ -93,10 +99,9 @@ struct MatchesViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                filterCard
+                if showFilter { filterCard }
                 results
             }
-            .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
