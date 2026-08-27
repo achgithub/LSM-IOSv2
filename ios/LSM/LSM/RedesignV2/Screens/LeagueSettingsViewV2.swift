@@ -27,11 +27,9 @@ struct LeagueSettingsViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                Card(floating: true) {
-                    VStack(spacing: 10) {
-                        ForEach(Leagues.all) { league in
-                            leagueRow(league)
-                        }
+                VStack(spacing: 10) {
+                    ForEach(Leagues.all) { league in
+                        leagueRow(league)
                     }
                 }
                 Text(verbatim: leagueFooter)
@@ -39,7 +37,6 @@ struct LeagueSettingsViewV2: View {
                     .foregroundStyle(V2Theme.textSecondary)
                     .padding(.horizontal, 4)
             }
-            .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

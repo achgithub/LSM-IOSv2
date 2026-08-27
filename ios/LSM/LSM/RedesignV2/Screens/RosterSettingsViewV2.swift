@@ -118,7 +118,6 @@ struct RosterSettingsViewV2: View {
                     }
                 }
             }
-            .padding(.horizontal, V2Theme.Spacing.horizontal)
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
