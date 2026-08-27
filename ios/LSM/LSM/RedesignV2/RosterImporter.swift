@@ -1,18 +1,16 @@
 import SwiftData
 
-/// CSV player import — shared by `PlayersViewV2`'s IMPORT tile and
-/// `RosterSettingsViewV2`'s "Import CSV" action, which are now the same
-/// feature reached two ways (Roster is an inline panel inside Players — see
-/// V2 audit 3.7). Inserts new (case-insensitively unique) members, resolves
-/// or creates groups on the fly, and assigns each member to its per-row
-/// group, falling back to `fallbackGroupName` for rows with none — only
-/// `RosterSettingsViewV2` offers that fallback (its own per-import group
-/// picker); `PlayersViewV2` calls this with `fallbackGroupName: nil`,
-/// matching its prior behavior exactly. Callers format their own message
-/// from the returned `Summary` rather than sharing one string, since the
-/// two screens' messages already differed (only `RosterSettingsViewV2`
-/// mentions the assignment count) and this pass isn't the place to
-/// silently unify that copy.
+/// CSV/paste player import — shared by `RosterSettingsViewV2`'s "Import CSV"
+/// action (file-based) and `RapidEntryViewV2`'s "Add All" (typed/pasted text,
+/// same `RosterCSV.parse` line format). `PlayersViewV2`'s own top-level
+/// IMPORT/EXPORT tiles were removed in the V2 simplification pass — CSV
+/// import/export now lives solely in ROSTER's card, which already had the
+/// more capable, group-scoped version (a per-import fallback-group picker;
+/// both current callers use it). Callers format their own message from the
+/// returned `Summary` rather than sharing one string, since the two
+/// screens' messages differ (only `RosterSettingsViewV2` mentions the
+/// assignment count) and this pass isn't the place to silently unify that
+/// copy.
 enum RosterImporter {
     struct Summary {
         let added: Int
