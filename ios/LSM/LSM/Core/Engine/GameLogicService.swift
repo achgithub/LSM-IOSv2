@@ -240,6 +240,17 @@ enum GameLogicService {
         }
     }
 
+    /// What a pick on `teamId` would resolve to for a fixture already decided
+    /// as `outcome` — the same home/away mapping `applyResult` uses, exposed
+    /// standalone for `RoundCorrectionWizardView`'s LMS flow, which needs to
+    /// derive a result for a team that has no `Pick` row yet (the correction
+    /// hasn't been written), so there's nothing for `applyResult` to update.
+    static func result(forTeamId teamId: Int, homeTeamId: Int, awayTeamId: Int, outcome: FixtureOutcome) -> PickResult? {
+        if teamId == homeTeamId { return homeResult(outcome) }
+        if teamId == awayTeamId { return awayResult(outcome) }
+        return nil
+    }
+
     /// Map a provider winner string to a FixtureOutcome (for "pull from server").
     static func outcome(fromWinner winner: String?) -> FixtureOutcome? {
         switch winner {

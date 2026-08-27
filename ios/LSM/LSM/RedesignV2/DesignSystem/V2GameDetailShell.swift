@@ -69,6 +69,10 @@ final class V2GameHeaderActionsModel {
     var isPreparingExport = false
     var exportFiles: [URL]?
     var exportError: String?
+    /// Round-correction wizard entry point — see `RoundCorrectionWizardView`'s
+    /// doc comment for why this lives buried in this same menu rather than as
+    /// a first-class button.
+    var showingCorrectionWizard = false
 
     init(exporter: V2GameExporter) {
         self.exporter = exporter
@@ -127,6 +131,10 @@ struct V2GameHeaderActions: View {
                     Button { Task { await model.exportForTransfer(game) } } label: {
                         Label("Export for Transfer", systemImage: "square.and.arrow.up.on.square")
                     }
+                    Divider()
+                    Button { model.showingCorrectionWizard = true } label: {
+                        Label("Fix a Player's History", systemImage: "wrench.and.screwdriver")
+                    }
                 } label: {
                     V2HeaderIconLabel(systemImage: "square.and.arrow.up")
                 }
@@ -145,6 +153,9 @@ private struct V2GameHeaderActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .sheet(isPresented: $model.showingCorrectionWizard) {
+                RoundCorrectionWizardView(game: game)
+            }
             .alert("Rename game", isPresented: $model.renaming) {
                 TextField("Game name", text: $model.renameText)
                 Button("Rename") { model.commitRename(on: game, context: context) }
