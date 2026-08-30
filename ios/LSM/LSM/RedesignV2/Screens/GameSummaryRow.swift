@@ -123,7 +123,7 @@ struct GameSummaryRow: View {
                 switch NextUpStep.make(for: game, data: leagueData, pwaEnabled: pwaEnabled) {
                 case .confirmEntries, .matchesInProgress:
                     try? await Task.sleep(for: .seconds(60))
-                default:
+                case .addPlayers, .openRound, .enterPicks, .processResults, .none:
                     return
                 }
             }
@@ -170,9 +170,26 @@ struct GameSummaryRow: View {
             nextUpButton(title: pwa ? "Check Submission Queue" : "Enter Picks", icon: "square.and.pencil") {
                 sheet = pwa ? .submissionQueue : .picks()
             }
-        case .confirmEntries(let pwa):
-            nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
-                sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
+        case .confirmEntries(let pwa, let finished, let total):
+            VStack(alignment: .leading, spacing: 6) {
+                nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
+                    sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
+                }
+                // Same "X of Y in" language as `.matchesInProgress` below,
+                // shown ahead of kickoff too (finished is normally 0 here)
+                // so a manager glancing at this row sees the round's
+                // fixture count is already known, not just once matches
+                // actually start.
+                if total > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sportscourt")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(V2Theme.textSecondary)
+                        Text("Kicks off soon — \(finished) of \(total) in")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(V2Theme.textSecondary)
+                    }
+                }
             }
         case .matchesInProgress(let finished, let total):
             VStack(alignment: .leading, spacing: 6) {
@@ -412,6 +429,10 @@ struct ManagerRoundStatus {
                 missingCount: nil
             )
         case .beforeKickoff:
+            // Discards RoundPhase's fixture-count payload — this status is
+            // about submission counts (missing picks), not match progress;
+            // that's what GameSummaryRow's own `.confirmEntries` branch
+            // shows instead.
             guard let round = game.currentRound else { return nil }
             let (eligible, submitted) = Self.submissionCounts(for: game, round: round)
             let missing = eligible - submitted

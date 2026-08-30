@@ -33,7 +33,12 @@ enum RoundPhase {
     case beforeDeadline
     /// Deadline's passed but kickoff hasn't (per cached fixture data) — last
     /// call to catch anyone who didn't submit before the window's moot.
-    case beforeKickoff
+    /// Carries the round's fixture count (`finished` is normally 0 here,
+    /// but a fixture can rarely be marked postponed ahead of its own
+    /// kickoff, so it's computed rather than assumed) so a manager glancing
+    /// at the Portal/Favourite row sees "0 of X" waiting rather than no
+    /// count at all until kickoff actually happens.
+    case beforeKickoff(finished: Int, total: Int)
     /// Kickoff's happened; not every fixture's finished or postponed yet.
     case live(finished: Int, total: Int)
     /// Every fixture's finished/postponed — ready to score the round.
@@ -58,16 +63,16 @@ enum RoundPhase {
         guard Date() >= round.deadline else { return .beforeDeadline }
 
         let total = round.fixtureIds.count
-        guard total > 0 else { return .beforeKickoff }
+        guard total > 0 else { return .beforeKickoff(finished: 0, total: 0) }
         let fixtures = (data?.matches ?? []).filter { round.fixtureIds.contains($0.id) }
+        let finished = fixtures.filter { $0.isFinished || $0.isPostponedOrCancelled }.count
 
         let hasKickedOff = fixtures.contains { fixture in
             guard let kickoff = FixtureFormat.kickoffDate(fixture.kickoff) else { return false }
             return kickoff <= Date()
         }
-        guard hasKickedOff else { return .beforeKickoff }
+        guard hasKickedOff else { return .beforeKickoff(finished: finished, total: total) }
 
-        let finished = fixtures.filter { $0.isFinished || $0.isPostponedOrCancelled }.count
         guard fixtures.count >= total, finished >= total else {
             return .live(finished: finished, total: total)
         }
@@ -95,7 +100,8 @@ enum NextUpStep {
     case enterPicks(pwaEnabled: Bool)
     /// Deadline's passed but kickoff hasn't (per cached fixture data) — last
     /// call to catch anyone who didn't submit before the window's moot.
-    case confirmEntries(pwaEnabled: Bool)
+    /// Carries the round's fixture count — see `RoundPhase.beforeKickoff`.
+    case confirmEntries(pwaEnabled: Bool, finished: Int, total: Int)
     /// Kickoff's happened; not every fixture's finished or postponed yet.
     case matchesInProgress(finished: Int, total: Int)
     /// Every fixture's finished/postponed — ready to score the round.
@@ -113,8 +119,8 @@ enum NextUpStep {
             return .openRound
         case .beforeDeadline:
             return .enterPicks(pwaEnabled: pwaEnabled)
-        case .beforeKickoff:
-            return .confirmEntries(pwaEnabled: pwaEnabled)
+        case .beforeKickoff(let finished, let total):
+            return .confirmEntries(pwaEnabled: pwaEnabled, finished: finished, total: total)
         case .live(let finished, let total):
             return .matchesInProgress(finished: finished, total: total)
         case .readyToProcess:
