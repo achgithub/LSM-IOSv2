@@ -170,34 +170,26 @@ struct GameSummaryRow: View {
             nextUpButton(title: pwa ? "Check Submission Queue" : "Enter Picks", icon: "square.and.pencil") {
                 sheet = pwa ? .submissionQueue : .picks()
             }
-        case .confirmEntries(let pwa, let finished, let total):
-            VStack(alignment: .leading, spacing: 6) {
-                nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
-                    sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
-                }
-                // Same "X of Y in" language as `.matchesInProgress` below,
-                // shown ahead of kickoff too (finished is normally 0 here)
-                // so a manager glancing at this row sees the round's
-                // fixture count is already known, not just once matches
-                // actually start.
-                if total > 0 {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sportscourt")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(V2Theme.textSecondary)
-                        Text("Kicks off soon — \(finished) of \(total) in")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(V2Theme.textSecondary)
-                    }
-                }
+        case .confirmEntries(let pwa, _, _):
+            // Fixture count intentionally not shown here — that lives only
+            // on Home's Favourites card (`FavouriteGameCard`), per Andrew:
+            // the portal/games list is for managing a game, Favourites is
+            // the at-a-glance surface. `finished`/`total` are still read
+            // out of the payload elsewhere (nothing needs discarding at
+            // the `RoundPhase`/`NextUpStep` level — see those types), just
+            // not rendered on this row.
+            nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
+                sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
             }
-        case .matchesInProgress(let finished, let total):
+        case .matchesInProgress:
+            // Same as `.confirmEntries` above — count shown on Home's
+            // Favourites card only, not here.
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Image(systemName: "sportscourt")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(V2Theme.textSecondary)
-                    Text("Matches playing — \(finished) of \(total) in")
+                    Text("Matches playing")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(V2Theme.textSecondary)
                     Spacer()
