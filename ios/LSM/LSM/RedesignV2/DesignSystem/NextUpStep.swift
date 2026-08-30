@@ -42,7 +42,10 @@ enum RoundPhase {
     /// Kickoff's happened; not every fixture's finished or postponed yet.
     case live(finished: Int, total: Int)
     /// Every fixture's finished/postponed — ready to score the round.
-    case readyToProcess
+    /// Carries `total` (finished always equals it here by definition) so
+    /// "X of Y in" doesn't just disappear the moment the last fixture
+    /// finishes — see `.beforeKickoff`/`.live` above for the same pattern.
+    case readyToProcess(total: Int)
 
     /// `data` is whatever's already cached for the game's leagues (never
     /// fetched live here — matches `LeagueData`'s own cache-only policy for
@@ -76,7 +79,7 @@ enum RoundPhase {
         guard fixtures.count >= total, finished >= total else {
             return .live(finished: finished, total: total)
         }
-        return .readyToProcess
+        return .readyToProcess(total: total)
     }
 }
 
@@ -105,7 +108,8 @@ enum NextUpStep {
     /// Kickoff's happened; not every fixture's finished or postponed yet.
     case matchesInProgress(finished: Int, total: Int)
     /// Every fixture's finished/postponed — ready to score the round.
-    case processResults
+    /// Carries `total` — see `RoundPhase.readyToProcess`.
+    case processResults(total: Int)
     /// No open round to act on (the game's complete).
     case none
 
@@ -123,8 +127,8 @@ enum NextUpStep {
             return .confirmEntries(pwaEnabled: pwaEnabled, finished: finished, total: total)
         case .live(let finished, let total):
             return .matchesInProgress(finished: finished, total: total)
-        case .readyToProcess:
-            return .processResults
+        case .readyToProcess(let total):
+            return .processResults(total: total)
         }
     }
 }

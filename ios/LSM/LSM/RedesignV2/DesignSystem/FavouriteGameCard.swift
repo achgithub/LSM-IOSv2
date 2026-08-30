@@ -73,6 +73,13 @@ struct FavouriteGameCard: View {
             resultsRow(finished: finished, total: total, label: "Kicks off soon")
         case .matchesInProgress(let finished, let total):
             resultsRow(finished: finished, total: total, label: "Matches playing")
+        case .processResults(let total) where total > 0:
+            // Every fixture's finished/postponed but the manager hasn't
+            // tapped Process Results yet — without this the line would
+            // just disappear the moment the last match ends, which is
+            // exactly the gap Andrew hit on a Killer game whose fixtures
+            // had already completed.
+            resultsRow(finished: total, total: total, label: "Complete")
         default:
             EmptyView()
         }
