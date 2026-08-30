@@ -101,10 +101,32 @@ struct GameSummaryRow: View {
         // branch of `NextUpStep` that reads fixture status at all) — reading
         // cache-only via `LeagueData.load` per `LeagueData`'s own policy, so
         // this never spends a live fetch just because the portal's on
-        // screen.
+        // screen. Re-reads every 60s while matches are actually in progress
+        // (not a fetch — `LeagueData.load` is cache-only — just re-checking
+        // the on-disk cache) so the "X of Y in" count above visibly ticks up
+        // as `SyncScheduler` (see docs/sync-refresh-policy.md) refreshes
+        // that same cache from Home in the background; stops the moment
+        // every fixture's in, since there's nothing left to change until
+        // the round closes.
         .task(id: roundContext.currentRound?.id) {
             guard let round = roundContext.currentRound, round.status != .closed, Date() >= round.deadline else { return }
-            leagueData = try? await LeagueData.load(for: game.leagues)
+            while !Task.isCancelled {
+                leagueData = try? await LeagueData.load(for: game.leagues)
+                // Keep polling through `.confirmEntries` (deadline passed,
+                // kickoff hasn't) too, not just `.matchesInProgress` —
+                // otherwise this would poll once, see kickoff hasn't
+                // happened yet, and stop for good since the round id (this
+                // task's identity) doesn't change again until the round
+                // closes. Any other phase (`.processResults`/`.none`/etc.)
+                // means there's nothing left for a fixture-status re-read to
+                // change, so stop there.
+                switch NextUpStep.make(for: game, data: leagueData, pwaEnabled: pwaEnabled) {
+                case .confirmEntries, .matchesInProgress:
+                    try? await Task.sleep(for: .seconds(60))
+                default:
+                    return
+                }
+            }
         }
         .sheet(item: $sheet) { which in
             switch which {

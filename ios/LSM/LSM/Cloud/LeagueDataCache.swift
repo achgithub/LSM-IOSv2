@@ -32,6 +32,23 @@ enum CacheTTL {
     /// hard cutoff, and accepting still goes through the same Matches ad gate
     /// as the Scores tab — there's no separate free path for fixtures.
     static let fixturesCourtesyAge: TimeInterval = 12 * 60 * 60
+
+    /// V2-only auto-refresh (`SyncScheduler`, see
+    /// docs/sync-refresh-policy.md): standings TTL used instead of the 30-min
+    /// `standings` value above while a round has a fixture in its active
+    /// window (kickoff-adjacent, not yet finished — see
+    /// `SyncScheduler.isFixtureActive`). Matches keeps its normal `matches`
+    /// TTL even then — 120s is already tight enough that a separate live
+    /// value would never bite.
+    static let standingsLiveWindow: TimeInterval = 10 * 60
+    /// V2-only (`SyncScheduler`): a fixture becomes an active-window
+    /// candidate this long before its kickoff — catches pre-match delays so
+    /// polling is already running the moment a match actually starts. There
+    /// is no matching "lag" constant: once a fixture enters the window it
+    /// stays a candidate until `MatchDTO.isFinished`/`isPostponedOrCancelled`,
+    /// not a second fixed offset — see docs/sync-refresh-policy.md "Active
+    /// window definition."
+    static let liveWindowLead: TimeInterval = 30 * 60
 }
 
 /// On-disk cache for per-league sports data, so browsing the Matches / Standings

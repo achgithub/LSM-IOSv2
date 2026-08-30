@@ -30,6 +30,9 @@ struct V2PreviewMenuView: View {
     /// tile that toggles this) and `HomeHelpPanel` below (the content that
     /// renders when set).
     @State private var expandedPanel: HomePanel?
+    @Environment(EnabledLeagues.self) private var enabledLeagues
+    @Environment(Entitlements.self) private var entitlements
+    @Environment(\.scenePhase) private var scenePhase
 
     private var favouriteGames: [Game] { games.filter(\.isFavourite) }
 
@@ -84,6 +87,37 @@ struct V2PreviewMenuView: View {
         // No .refreshable here — this is a static navigation menu, not a
         // live list. Games portal and the inbox itself both have their own
         // .refreshable/.task for the screens where it's actually live data.
+        //
+        // Auto-refresh — see docs/sync-refresh-policy.md. One-shot on
+        // appear (relaxed ladder — no-ops for Free via `refreshIfDue`'s own
+        // `removesAds` guard), plus the live-match loop below.
+        .onAppear {
+            Task { await SyncScheduler.shared.refreshIfDue(games: games, leagues: enabledLeagues.leagues, entitlements: entitlements) }
+        }
+        // Live-match tight loop — `leagues3/5/7` only (`canUseCloud`, same
+        // boundary as PWA access; `noAds` gets the relaxed ladder above but
+        // not this). Cheap 60s local-only check (`isAnyFixtureActive` never
+        // hits the network) so it can run continuously while Home is
+        // visible; an actual network refresh only happens at most every 10
+        // min, and only while a fixture is genuinely in its active window —
+        // see `CacheTTL.liveWindowLead`/`standingsLiveWindow`. `.task`
+        // (not a bare `Task` in `.onAppear`) cancels automatically when
+        // this view disappears; the `scenePhase` guard additionally stops
+        // it firing while merely backgrounded, since disappearing and
+        // backgrounding aren't the same event.
+        .task {
+            guard entitlements.canUseCloud else { return }
+            var lastPoll = Date.distantPast
+            while !Task.isCancelled {
+                if scenePhase == .active,
+                   SyncScheduler.isAnyFixtureActive(games: games),
+                   Date().timeIntervalSince(lastPoll) >= 600 {
+                    await SyncScheduler.shared.refreshIfDue(games: games, leagues: enabledLeagues.leagues, entitlements: entitlements)
+                    lastPoll = Date()
+                }
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
     }
 }
 

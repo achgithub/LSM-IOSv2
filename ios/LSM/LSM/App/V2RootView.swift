@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// V2's root shell — the real app entry point when `V2PreviewFlag` is on,
 /// alongside `RootTabView` (v1). Mirrors `RootTabView`'s non-navigation
@@ -19,7 +20,9 @@ struct V2RootView: View {
     @State private var pushCoordinator = PushCoordinator.shared
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showLeagueManager = false
+    @Query(sort: \Game.createdAt, order: .reverse) private var games: [Game]
 
     private var graceDaysRemaining: Int? { enabled.graceDaysRemaining(entitlements) }
 
@@ -45,6 +48,17 @@ struct V2RootView: View {
             }
             .task {
                 await AppBootstrap.run(context: context, entitlements: entitlements, enabled: enabled, pushCoordinator: pushCoordinator)
+            }
+            // V2-only auto-refresh foreground trigger — see
+            // docs/sync-refresh-policy.md. RootTabView (v1) intentionally
+            // doesn't get this; v1 keeps today's manual, AdGate-only
+            // refresh. `SyncScheduler.refreshIfDue` no-ops for Free itself,
+            // so no extra gating needed here.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task {
+                    await SyncScheduler.shared.refreshIfDue(games: games, leagues: enabled.leagues, entitlements: entitlements)
+                }
             }
     }
 
