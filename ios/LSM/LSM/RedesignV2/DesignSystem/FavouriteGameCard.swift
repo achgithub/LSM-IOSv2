@@ -29,12 +29,10 @@ struct FavouriteGameCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 header
+                Text(detailLine)
+                    .font(.caption)
+                    .foregroundStyle(V2Theme.textSecondary)
                 resultsLine
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
-                    ForEach(stats, id: \.label) { stat in
-                        statView(stat)
-                    }
-                }
             }
             .padding(14)
             .v2FloatingCard()
@@ -117,52 +115,23 @@ struct FavouriteGameCard: View {
         }
     }
 
-    private func statView(_ stat: Stat) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(stat.value)
-                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                .foregroundStyle(V2Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            MicroLabel(text: stat.label)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private struct Stat {
-        let label: String
-        let value: String
-    }
-
-    /// Round + starting roster size are the same shape for every mode;
-    /// what fills the other two slots is mode-specific — LMS/Killer care
-    /// about attrition (who's still in), Predictor cares about form (who
-    /// won last time, who's leading overall).
-    private var stats: [Stat] {
-        let roundLabel = game.mode == .predictor ? "MATCHDAY" : "ROUND"
-        let roundValue = round.map { "\($0.roundNumber)" } ?? "—"
-        let startedStat = Stat(label: "STARTED WITH", value: "\(game.players.count)")
-
+    /// One compact line — round/matchday plus the single most relevant stat
+    /// per mode — replacing the old 2x2 stat grid so this card fits on one
+    /// glance-height line, same compression `GameSummaryRow.detailLine`
+    /// already uses for its own row. LMS/Killer show the full "X of Y"
+    /// ratio (not just remaining count) per Andrew's ask; Predictor keeps
+    /// the leader, dropping "last week" to stay on one line.
+    private var detailLine: String {
+        let roundLabel = game.mode == .predictor ? "Matchday" : "Round"
+        let roundPart = round.map { "\(roundLabel) \($0.roundNumber) · " } ?? ""
         switch game.mode {
         case .lms, .killer:
-            return [
-                Stat(label: roundLabel, value: roundValue),
-                startedStat,
-                Stat(label: "PLAYERS LEFT", value: "\(game.activePlayers.count)"),
-            ]
+            return "\(roundPart)\(game.activePlayers.count) of \(game.players.count) players left"
         case .predictor:
-            let lastWeek = latestClosedRound.flatMap { PredictorStandings.roundWinnerName(for: game, in: $0) } ?? "—"
-            let leader = PredictorStandings.leaderName(for: game) ?? "—"
-            return [
-                Stat(label: roundLabel, value: roundValue),
-                startedStat,
-                Stat(label: "LAST WEEK", value: lastWeek),
-                Stat(label: "TOP OF LEAGUE", value: leader),
-            ]
+            if let leader = PredictorStandings.leaderName(for: game) {
+                return "\(roundPart)Leading: \(leader)"
+            }
+            return "\(roundPart)\(game.players.count) players"
         }
-    }
-
-    private var latestClosedRound: Round? {
-        game.rounds.filter { $0.status == .closed }.max(by: { $0.roundNumber < $1.roundNumber })
     }
 }
