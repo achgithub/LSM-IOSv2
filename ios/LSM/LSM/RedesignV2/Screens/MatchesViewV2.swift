@@ -23,14 +23,14 @@ struct MatchesViewV2: View {
     @State private var teamQuery = ""
     @State private var homeAway: HomeAwayFilter = .all
     @State private var matchdayFilter: Int?
-    @State private var dateRangeOn = false
-    @State private var dateFrom = Date().addingTimeInterval(-1 * 24 * 3600)
-    @State private var dateTo = Date().addingTimeInterval(14 * 24 * 3600)
+    // On by default — 1 week back, 3 weeks forward, per Andrew: "what's
+    // relevant right now," not the whole season from matchday 1. Still
+    // just the normal Dates filter — SEARCH opens the same controls to
+    // widen/narrow/turn it off.
+    @State private var dateRangeOn = true
+    @State private var dateFrom = Date().addingTimeInterval(-7 * 24 * 3600)
+    @State private var dateTo = Date().addingTimeInterval(21 * 24 * 3600)
     @State private var sortAZ = false
-    /// Applied once, the first time matches load — after that a `nil`
-    /// `matchdayFilter` means the manager deliberately chose "All" via the
-    /// filter card, not "hasn't loaded yet," so it's never reapplied.
-    @State private var hasAppliedDefaultMatchday = false
 
     // Recomputed filteredItems (not a bare per-render computed var — a full
     // season's worth of matches makes that a real per-render cost) via
@@ -63,19 +63,6 @@ struct MatchesViewV2: View {
     }
 
     private var matchdays: [Int] { Array(Set(store.items.compactMap(\.matchday))).sorted() }
-
-    /// The matchday of the earliest fixture that hasn't finished/been
-    /// postponed yet — "what's coming up," not "the whole season from
-    /// matchday 1." Falls back to the last matchday once everything's
-    /// finished, so a completed season still lands somewhere sensible
-    /// instead of nil (which would mean "show everything").
-    private func defaultMatchday() -> Int? {
-        let sorted = store.items.sorted(by: MatchDTO.byKickoffThenId)
-        if let next = sorted.first(where: { !$0.isFinished && !$0.isPostponedOrCancelled }) {
-            return next.matchday
-        }
-        return sorted.last?.matchday
-    }
 
     private func name(_ id: Int) -> String {
         store.teamsById[id]?.shortName ?? store.teamsById[id]?.name ?? "Team \(id)"
@@ -145,10 +132,6 @@ struct MatchesViewV2: View {
             selectedLeagueIds.formIntersection(validIds)
             if selectedLeagueIds.isEmpty { selectedLeagueIds = validIds }
             await store.load(leagues: enabled.leagues)
-            if !hasAppliedDefaultMatchday, !store.items.isEmpty {
-                matchdayFilter = defaultMatchday()
-                hasAppliedDefaultMatchday = true
-            }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
             if store.isThrottled { store.now = tick }
