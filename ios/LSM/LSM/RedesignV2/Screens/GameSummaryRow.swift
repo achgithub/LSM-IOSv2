@@ -150,7 +150,7 @@ struct GameSummaryRow: View {
                 NavigationLink {
                     addPlayersDestination
                 } label: {
-                    nextUpLabel(title: "Assign Players", icon: "person.badge.plus", tint: modeColor)
+                    nextUpLabel(title: AppString("Assign Players"), icon: "person.badge.plus", tint: modeColor)
                 }
                 .buttonStyle(.plain)
             }
@@ -160,7 +160,7 @@ struct GameSummaryRow: View {
                 NavigationLink {
                     openRoundDestination
                 } label: {
-                    nextUpLabel(title: "Open Round", icon: "play.circle.fill", tint: modeColor)
+                    nextUpLabel(title: AppString("Open Round"), icon: "play.circle.fill", tint: modeColor)
                 }
                 .buttonStyle(.plain)
                 Spacer(minLength: 8)
@@ -168,7 +168,7 @@ struct GameSummaryRow: View {
             }
             .padding(.top, 2)
         case .enterPicks(let pwa):
-            nextUpButton(title: pwa ? "Check Submission Queue" : "Enter Picks", icon: "square.and.pencil") {
+            nextUpButton(title: pwa ? AppString("Check Submission Queue") : AppString("Enter Picks"), icon: "square.and.pencil") {
                 sheet = pwa ? .submissionQueue : .picks()
             }
         case .confirmEntries(let pwa, _, _):
@@ -179,22 +179,23 @@ struct GameSummaryRow: View {
             // out of the payload elsewhere (nothing needs discarding at
             // the `RoundPhase`/`NextUpStep` level — see those types), just
             // not rendered on this row.
-            nextUpButton(title: "Confirm Entries", icon: "checkmark.seal") {
+            nextUpButton(title: AppString("Confirm Entries"), icon: "checkmark.seal") {
                 sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
             }
         case .matchesInProgress:
-            // No status text here at all now — "Matches playing"/fixture
+            // No separate status text here — "Matches playing"/fixture
             // count is Home's Favourites card only, full stop, per Andrew.
-            // The portal row still gets a Next Up action, though: a manager
-            // can enter results manually (e.g. a postponed fixture, or one
-            // texted in early) without waiting for every fixture to finish,
-            // same destination `.processResults` uses.
+            // The portal row's Next Up pill carries both halves of the
+            // message instead: results aren't in yet, but a manager can
+            // still enter them manually (e.g. a postponed fixture, or one
+            // texted in early) without waiting for every fixture to finish
+            // — same destination `.processResults` uses.
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     NavigationLink {
                         resultsDestination
                     } label: {
-                        nextUpLabel(title: "Enter Manually", icon: "square.and.pencil", tint: modeColor)
+                        nextUpLabel(title: AppString("Waiting on Results (or Enter Manually)"), icon: "square.and.pencil", tint: modeColor)
                     }
                     .buttonStyle(.plain)
                     Spacer(minLength: 8)
@@ -208,7 +209,7 @@ struct GameSummaryRow: View {
                 NavigationLink {
                     resultsDestination
                 } label: {
-                    nextUpLabel(title: "Process Results", icon: "checkmark.circle.fill", tint: modeColor)
+                    nextUpLabel(title: AppString("Process Results"), icon: "checkmark.circle.fill", tint: modeColor)
                 }
                 .buttonStyle(.plain)
                 Spacer(minLength: 8)
@@ -255,7 +256,12 @@ struct GameSummaryRow: View {
     private func nextUpLabel(title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-            Text("Next: \(title)")
+            // `title` is already resolved via `AppString` at each call
+            // site — wrapping the whole "Next: %@" composite the same way
+            // (rather than a bare `Text` interpolation, which wouldn't
+            // follow the app's own in-app language picker, only the
+            // device locale) gets both halves translated correctly.
+            Text(AppString("Next: \(title)"))
         }
         .font(.caption.weight(.bold))
         .foregroundStyle(tint)
