@@ -49,6 +49,21 @@ enum CacheTTL {
     /// not a second fixed offset — see docs/sync-refresh-policy.md "Active
     /// window definition."
     static let liveWindowLead: TimeInterval = 30 * 60
+
+    /// V2-only "must not still be this old" outer bound — shared by the
+    /// Standings tab's cache-only load (auto-refreshes past this age instead
+    /// of showing a silently-stale table) and Auto-Assign's staleness check
+    /// (auto-refreshes without prompting past this age, vs. just prompting
+    /// past the shorter `standings` TTL). Distinct from `standings`/
+    /// `standingsLiveWindow`, which suppress redundant Worker calls on a much
+    /// shorter clock — this is the much longer ceiling past which staying
+    /// silent isn't acceptable even if nothing asked for a refresh.
+    static let standingsStaleCeiling: TimeInterval = 12 * 60 * 60
+
+    /// V2-only: this button's own cooldown (`FootballDataStore`), independent
+    /// of the shared `matches` clock the Fixtures tab and Results entry's
+    /// "pull results" use — see `FootballDataStore` doc comment.
+    static let updateFootballDataThrottle: TimeInterval = 10 * 60
 }
 
 /// On-disk cache for per-league sports data, so browsing the Matches / Standings

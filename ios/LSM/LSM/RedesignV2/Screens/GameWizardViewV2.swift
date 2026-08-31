@@ -297,30 +297,10 @@ struct GameWizardViewV2: View {
         }
     }
 
-    /// Pulls fresh fixtures/standings before results are entered —
-    /// `FootballDataStore.refresh` is already ad-gated internally (skipped
-    /// for subscribers via `AdGate`), so this doesn't need its own gate.
+    /// Pulls fresh fixtures/standings before results are entered — see
+    /// `FootballUpdateRow`'s doc comment.
     private var footballUpdateRow: some View {
-        Button {
-            footballStore.refresh(leagues: enabledLeagues.leagues)
-        } label: {
-            HStack {
-                Label {
-                    Text(footballStore.isLoading ? "Updating football data…" : "Update football data")
-                } icon: {
-                    if footballStore.isLoading {
-                        V2LoadingIndicator(size: 20)
-                    } else {
-                        Image(systemName: "sportscourt")
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-        }
-        .foregroundStyle(V2Theme.accent)
-        .opacity(!footballStore.isLoading && !footballStore.isThrottled ? 1 : 0.4)
-        .disabled(footballStore.isLoading || footballStore.isThrottled)
+        FootballUpdateRow(store: footballStore, leagues: enabledLeagues.leagues, removesAds: entitlements.tier.removesAds)
     }
 
     // MARK: Cards
@@ -638,6 +618,52 @@ struct GameWizardViewV2: View {
 
 private enum WizardEntryChoice {
     case new, continueGame
+}
+
+/// The wizard's "Update football data" action — pulls fresh fixtures/
+/// standings before results are entered. `FootballDataStore.refresh` is
+/// already ad-gated internally (skipped for subscribers via `AdGate`), so
+/// this doesn't need its own gate. Kept as an always-available manual
+/// fallback alongside `SyncScheduler`'s own automatic ladder (see
+/// docs/sync-refresh-policy.md), with copy below explaining that ladder so
+/// the button doesn't look like the only way data ever updates — the
+/// wording is tier-conditional since `SyncScheduler.refreshIfDue` no-ops
+/// entirely for Free. Its own type (not a computed `var` on
+/// `GameWizardViewV2`) purely to keep that struct under SwiftLint's line cap.
+private struct FootballUpdateRow: View {
+    let store: FootballDataStore
+    let leagues: [LeagueOption]
+    let removesAds: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                store.refresh(leagues: leagues)
+            } label: {
+                HStack {
+                    Label {
+                        Text(store.isLoading ? "Updating football data…" : "Update football data")
+                    } icon: {
+                        if store.isLoading {
+                            V2LoadingIndicator(size: 20)
+                        } else {
+                            Image(systemName: "sportscourt")
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption)
+                }
+            }
+            .foregroundStyle(V2Theme.accent)
+            .opacity(!store.isLoading && !store.isThrottled ? 1 : 0.4)
+            .disabled(store.isLoading || store.isThrottled)
+            Text(removesAds
+                 ? "Fixtures and standings refresh automatically while matches are live, and periodically otherwise. Tap above to sync right now."
+                 : "Free plans don't refresh in the background — tap above whenever you want the latest fixtures and standings.")
+                .font(.caption2)
+                .foregroundStyle(V2Theme.textTertiary)
+        }
+    }
 }
 
 /// Front door — split into its own extension purely to keep the main

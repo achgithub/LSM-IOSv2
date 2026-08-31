@@ -56,6 +56,36 @@ final class StandingsStore {
         }
     }
 
+    /// V2-only: pure cache read, no fallback network call on an empty/corrupt
+    /// cache — `SyncScheduler` (app foreground + the live-poll loop) is V2's
+    /// sole source of truth for keeping this cache warm, so this screen
+    /// shouldn't silently hit the Worker on its own just because it appeared.
+    /// If the cache is missing, corrupt, or older than
+    /// `CacheTTL.standingsStaleCeiling` (12h), triggers a normal ad-gated
+    /// refresh instead of leaving a silently-stale (or forever-empty) table
+    /// on screen — e.g. a league enabled after first launch, or a device
+    /// that's been off `SyncScheduler`'s ladder (Free tier, or simply not
+    /// opened) for a long stretch.
+    func loadFromCache(league: LeagueOption) async {
+        isLoading = standings.isEmpty
+        errorMessage = nil
+        let key = LeagueDataCache.standingsKey(league.id)
+        switch LeagueDataCache.read(LeagueDataCache.Standings.self, key: key) {
+        case .hit(let cached):
+            teamsById = Dictionary(cached.teams.map { ($0.externalId, $0) }, uniquingKeysWith: { first, _ in first })
+            standings = StandingDTO.displayOrder(rows: cached.rows, teamsById: teamsById)
+            lastRefreshed = cached.date
+            freshUntil = throttleUntil(league: league)
+            isLoading = false
+            if !LeagueDataCache.isFresh(cached.date, ttl: CacheTTL.standingsStaleCeiling) {
+                AdGate.run { [weak self] in Task { await self?.load(league: league, force: true) } }
+            }
+        case .empty, .corrupt:
+            isLoading = false
+            AdGate.run { [weak self] in Task { await self?.load(league: league, force: true) } }
+        }
+    }
+
     /// `force` (the ad-gated refresh) hits the network and overwrites the
     /// cache; otherwise the league is served from its cache, fetching only
     /// the first time (empty/corrupt cache) — so a relaunch isn't a free

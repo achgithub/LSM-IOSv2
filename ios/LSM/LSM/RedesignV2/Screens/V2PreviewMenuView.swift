@@ -149,6 +149,11 @@ private struct HomeHelpPanel: View {
                         row("Profile", icon: "person.crop.circle.fill", tint: V2Theme.accent)
                     }
                     NavigationLink {
+                        LeagueSettingsViewV2()
+                    } label: {
+                        row("Manage Leagues", icon: "slider.horizontal.3", tint: V2Theme.warning)
+                    }
+                    NavigationLink {
                         LanguageSettingsViewV2()
                     } label: {
                         row("Language", icon: "globe", tint: V2Theme.Mode.predictor)
@@ -164,6 +169,9 @@ private struct HomeHelpPanel: View {
                         row("Report a Bug", icon: "ladybug.fill", tint: V2Theme.Mode.killer)
                     }
                 }
+                Text(DataDisclaimer.text)
+                    .font(.caption2)
+                    .foregroundStyle(V2Theme.textTertiary)
             }
         }
     }

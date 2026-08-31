@@ -4,13 +4,21 @@ import SwiftUI
 /// The Leagues portal — third of the app's four main screens (Home, Games,
 /// Leagues, Players), reached by pushing from Home's LEAGUES tile like
 /// GAMES/PLAYERS do. Its own tile grid (see `V2TileGrid`) doesn't push
-/// further screens for Fixtures/Standings/Manage Leagues/Subscription —
-/// tapping one expands that tile's content inline below, highlighted like a
-/// selected tile, and collapses if tapped again. Same accordion mechanic
-/// Home used to run LEAGUES/HELP through directly; now one level down, with
-/// Fixtures/Standings/LeagueSettings/Subscription's own screen bodies
-/// embedded as the panel content (their scene/header stripped — see each
-/// file's doc comment — since this screen supplies both for all four).
+/// further screens for Fixtures/Standings/Subscription — tapping one expands
+/// that tile's content inline below, highlighted like a selected tile, and
+/// collapses if tapped again. Same accordion mechanic Home used to run
+/// LEAGUES/HELP through directly; now one level down, with Fixtures/
+/// Standings/Subscription's own screen bodies embedded as the panel content
+/// (their scene/header stripped — see each file's doc comment — since this
+/// screen supplies both for all three).
+///
+/// The fourth row-2 tile is SYNC, not a panel — the manual "Update football
+/// data" action (its own 10-minute cooldown, `CacheTTL.updateFootballDataThrottle`),
+/// firing directly on tap rather than expanding anything. It replaces the
+/// old MANAGE tile, which pushed Manage Leagues inline here; that screen now
+/// lives under Home's HELP panel instead (see `LeagueSettingsViewV2`) — this
+/// slot went to the sync action so it wouldn't need its own card real estate
+/// (see `FootballDataStore`).
 struct LeaguesPortalViewV2: View {
     @Environment(EnabledLeagues.self) private var enabled
     @State private var store = FootballDataStore()
@@ -33,7 +41,6 @@ struct LeaguesPortalViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                statusCard
                 panelContent
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)
@@ -53,10 +60,14 @@ struct LeaguesPortalViewV2: View {
                 }
                 .buttonStyle(.plain)
             } row2: {
-                Button { toggle(.manage) } label: {
-                    V2Tile(icon: "slider.horizontal.3", label: "MANAGE", color: V2Theme.warning, isSelected: expandedPanel == .manage)
+                Button {
+                    store.refresh(leagues: enabled.leagues)
+                } label: {
+                    V2Tile(icon: "arrow.clockwise", label: store.isLoading ? "SYNCING…" : "SYNC", color: V2Theme.warning)
                 }
                 .buttonStyle(.plain)
+                .disabled(store.isLoading || store.isThrottled)
+                .opacity(store.isLoading || store.isThrottled ? 0.4 : 1)
                 Button { toggle(.subscription) } label: {
                     V2Tile(icon: "star.fill", label: "SUBSCRIPTION", color: V2Theme.warning, isSelected: expandedPanel == .subscription)
                 }
@@ -75,47 +86,11 @@ struct LeaguesPortalViewV2: View {
         // photo behind it (this scene's `.background`) stays fully visible
         // the whole way down instead of fading out with it.
         .v2DataRoomScene()
+        // Ticks `store.now` so SYNC's `isThrottled` (and therefore its
+        // disabled/dimmed state) flips back off once the 10-minute cooldown
+        // lapses, without needing this screen to be re-tapped.
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
             if store.isThrottled { store.now = tick }
-        }
-    }
-
-    private var statusCard: some View {
-        Card(floating: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: "Football Data")
-                statusLine
-                ActionRow(
-                    title: store.isLoading ? "Updating football data…" : "Update football data",
-                    icon: "arrow.clockwise",
-                    isEnabled: !store.isLoading && !store.isThrottled
-                ) {
-                    store.refresh(leagues: enabled.leagues)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var statusLine: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if store.isThrottled, let freshUntil = store.freshUntil {
-                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
-                Text("Update available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let lastRefreshed = store.lastRefreshed {
-                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            } else if let errorMessage = store.errorMessage {
-                Text(errorMessage)
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.danger)
-            }
-            Text(DataDisclaimer.text)
-                .font(.caption2)
-                .foregroundStyle(V2Theme.textTertiary)
         }
     }
 
@@ -126,8 +101,6 @@ struct LeaguesPortalViewV2: View {
             panel(title: "Fixtures") { MatchesViewV2(showFilter: $showFixturesFilter) }
         case .standings:
             panel(title: "Standings") { StandingsViewV2() }
-        case .manage:
-            panel(title: "Manage Leagues") { LeagueSettingsViewV2() }
         case .subscription:
             panel(title: "Subscription") { SubscriptionSettingsViewV2() }
         case nil:
@@ -153,8 +126,9 @@ struct LeaguesPortalViewV2: View {
     }
 }
 
-/// Which of Leagues' four tiles (if any) is expanded inline below the tile
-/// grid — at most one at a time (see `LeaguesPortalViewV2.toggle`).
+/// Which of Leagues' panel-backed tiles (if any) is expanded inline below
+/// the tile grid — at most one at a time (see `LeaguesPortalViewV2.toggle`).
+/// SYNC isn't here — it fires directly on tap, no panel to expand.
 enum LeaguesPanelV2 {
-    case fixtures, standings, manage, subscription
+    case fixtures, standings, subscription
 }

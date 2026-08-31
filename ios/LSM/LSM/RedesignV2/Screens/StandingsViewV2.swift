@@ -57,7 +57,7 @@ struct StandingsViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2LoadingOverlay(store.isLoading, label: store.standings.isEmpty ? "Loading standings…" : "Refreshing…")
-        .task(id: league) { await store.load(league: league, force: false) }
+        .task(id: league) { await store.loadFromCache(league: league) }
         .task(id: store.freshUntil) { await store.armClock() }
     }
 }

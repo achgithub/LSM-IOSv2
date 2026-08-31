@@ -8,16 +8,15 @@ import Foundation
 /// rounds are built from. A manager can hit either without the other
 /// implying it.
 ///
-/// Reuses `LeagueDataCache.sharedMatchesThrottleUntil` — the same cross-
-/// screen 2-minute (`CacheTTL.matches`) clock the Fixtures tab and Results
-/// entry's "pull results" already share — rather than a clock private to
-/// this button, so tapping Update here and then opening Fixtures right after
-/// doesn't present a second ad for data that was just fetched. Standings has
-/// its own, much longer 30-minute TTL (`CacheTTL.standings`) when refreshed
-/// from its own screen; this button intentionally ignores that and force-
-/// refreshes standings on the same 2-minute cadence as matches, since this
-/// is one unified action behind its own cooldown, not the per-screen
-/// Standings refresh.
+/// Runs on its own 10-minute cooldown (`CacheTTL.updateFootballDataThrottle`)
+/// — deliberately private to this button, not the shared 2-minute
+/// (`CacheTTL.matches`) clock the Fixtures tab and Results entry's "pull
+/// results" share, since this is Manage Leagues' one manual sync-everything
+/// action, not a per-screen live-scores pull. Standings has its own, much
+/// longer 30-minute TTL (`CacheTTL.standings`) when refreshed from the
+/// Standings tab; this button intentionally ignores that and force-refreshes
+/// standings on the same cadence as matches, since this is one unified
+/// action behind its own cooldown, not the per-screen Standings refresh.
 @Observable
 final class FootballDataStore {
     var isLoading = false
@@ -55,7 +54,7 @@ final class FootballDataStore {
             errorMessage = "Couldn't reach the server."
         }
         now = Date()
-        freshUntil = LeagueDataCache.sharedMatchesThrottleUntil(for: targets.map(\.id))
+        freshUntil = Date().addingTimeInterval(CacheTTL.updateFootballDataThrottle)
         isLoading = false
     }
 }

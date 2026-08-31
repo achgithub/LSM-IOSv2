@@ -110,7 +110,7 @@ struct PicksEntryViewV2: View {
                 Text("Each unassigned player gets the bottom-of-table team still available to them.")
             }
             .confirmationDialog(
-                AppString("The league table is over an hour old"),
+                AppString("The league table is over 30 minutes old"),
                 isPresented: $showStaleTablePrompt,
                 titleVisibility: .visible
             ) {
@@ -185,9 +185,24 @@ struct PicksEntryViewV2: View {
         try? context.save()
     }
 
+    /// V2-only staleness ladder: reuses `CacheTTL.standings` (30 min, the
+    /// table's normal Worker-call-suppression TTL — a table that's still
+    /// within it is exactly as fresh as any other screen would treat it) for
+    /// the prompt threshold, instead of a separate `autoAssignTableStale`
+    /// (60 min) tracked only here. Past `standingsStaleCeiling` (12h) skips
+    /// the prompt entirely and refreshes immediately — at that age asking
+    /// "use the stale one anyway?" isn't a real choice worth offering. v1's
+    /// `PicksEntryView` keeps its own `autoAssignTableStale`-based check.
     private func runAutoAssign() {
-        if let date = data?.standingsDate,
-           !LeagueDataCache.isFresh(date, ttl: CacheTTL.autoAssignTableStale) {
+        guard let date = data?.standingsDate else {
+            commitAutoAssign()
+            return
+        }
+        if !LeagueDataCache.isFresh(date, ttl: CacheTTL.standingsStaleCeiling) {
+            AdGate.run { Task { await refreshTableThenAssign() } }
+            return
+        }
+        if !LeagueDataCache.isFresh(date, ttl: CacheTTL.standings) {
             showStaleTablePrompt = true
             return
         }
