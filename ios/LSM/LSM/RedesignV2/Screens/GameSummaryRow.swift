@@ -183,23 +183,13 @@ struct GameSummaryRow: View {
                 sheet = pwa ? .submissionQueue : .picks(startFilteredToUnassigned: game.mode == .lms)
             }
         case .matchesInProgress:
-            // Same as `.confirmEntries` above — count shown on Home's
-            // Favourites card only, not here. Still gets a Next Up pill
-            // though, per Andrew — a manager can enter results manually
-            // (e.g. a postponed fixture, or one texted in early) without
-            // waiting for every fixture to finish, same destination
-            // `.processResults` uses.
+            // No status text here at all now — "Matches playing"/fixture
+            // count is Home's Favourites card only, full stop, per Andrew.
+            // The portal row still gets a Next Up action, though: a manager
+            // can enter results manually (e.g. a postponed fixture, or one
+            // texted in early) without waiting for every fixture to finish,
+            // same destination `.processResults` uses.
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sportscourt")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(V2Theme.textSecondary)
-                    Text("Matches playing")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(V2Theme.textSecondary)
-                    Spacer()
-                    if roundContext.latestClosedRound != nil { shareButton }
-                }
                 HStack(spacing: 8) {
                     NavigationLink {
                         resultsDestination
@@ -208,6 +198,7 @@ struct GameSummaryRow: View {
                     }
                     .buttonStyle(.plain)
                     Spacer(minLength: 8)
+                    if roundContext.latestClosedRound != nil { shareButton }
                 }
                 unsubmittedReminder
             }

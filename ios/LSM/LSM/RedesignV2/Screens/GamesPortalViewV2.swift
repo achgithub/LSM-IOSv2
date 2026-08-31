@@ -126,16 +126,24 @@ struct GamesPortalViewV2: View {
         // `.task`, not chained after the badge refresh above: that's a
         // network call, and gating the scroll/highlight behind it meant a
         // slow or stalled fetch silently ate the whole effect — by the time
-        // it resolved, the manager had already stopped looking. The sleep
-        // before scrolling gives the just-pushed list a layout pass first;
-        // without it `scrollTo` can fire before the row has a real position
-        // to scroll to.
+        // it resolved, the manager had already stopped looking.
+        //
+        // A single scrollTo after one fixed delay wasn't enough for a row
+        // in a later mode section (e.g. Killer, below LMS) — LazyVStack
+        // hasn't necessarily instantiated a row that far down yet on the
+        // very first layout pass, so that one scrollTo call could silently
+        // no-op. Retrying every 100ms for up to a second means as soon as
+        // the row exists, the very next attempt lands on it, instead of
+        // gambling on one delay being long enough for every list length.
         .task {
             guard let focusGameID else { return }
             highlightedGameID = focusGameID
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            for _ in 0..<10 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                proxy.scrollTo(focusGameID, anchor: .center)
+            }
             withAnimation { proxy.scrollTo(focusGameID, anchor: .center) }
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             withAnimation { highlightedGameID = nil }
         }
         // Pull-to-refresh opens the same game picker as the PUSH tile —

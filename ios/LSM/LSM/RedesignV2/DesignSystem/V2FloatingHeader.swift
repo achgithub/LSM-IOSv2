@@ -122,7 +122,7 @@ extension V2FloatingHeader where Trailing == EmptyView, Tiles == EmptyView {
         // title row only needs enough scrim to clear the status bar plus
         // its own content, or every pushed detail/form screen gets a
         // needless band of empty photo before its first card.
-        self.scrimHeight = 100
+        self.scrimHeight = 60
         self.trailing = { EmptyView() }
         self.tiles = { EmptyView() }
     }
@@ -134,7 +134,7 @@ extension V2FloatingHeader where Tiles == EmptyView {
         self.showBack = showBack
         // See the no-trailing initializer above for why this is smaller
         // than the struct default.
-        self.scrimHeight = 100
+        self.scrimHeight = 60
         self.trailing = trailing
         self.tiles = { EmptyView() }
     }
