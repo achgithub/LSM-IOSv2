@@ -29,7 +29,17 @@ export async function refreshMatchData(
   const keys = leagueKeys(leagueId);
   await replaceFixtures(db, fixtures, leagueId);
   await recordSync(db, leagueId, "fixtures", fixtures.length);
-  await kv.put(keys.scoresData, JSON.stringify(scores));
+  // Read-before-write: this runs on every TTL-triggered refresh regardless of
+  // whether any score actually moved (e.g. a 0-0 pre-kickoff match, or a
+  // quiet window between goals) — writing the identical blob back every time
+  // was burning through KV's 1,000/day free-tier write cap for no reason.
+  // A KV read costs nothing against the 100,000/day read cap, so this trade
+  // is free; it never changes what a later kv.get(keys.scoresData) returns.
+  const scoresJson = JSON.stringify(scores);
+  const existingScoresJson = await kv.get(keys.scoresData);
+  if (existingScoresJson !== scoresJson) {
+    await kv.put(keys.scoresData, scoresJson);
+  }
   await Promise.all([touchGate(kv, keys.scores), touchGate(kv, keys.fixtures)]);
   return { scores: scores.length, fixtures: fixtures.length };
 }
