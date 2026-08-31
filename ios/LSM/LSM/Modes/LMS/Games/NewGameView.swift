@@ -606,3 +606,32 @@ enum KillerSettings {
         defaults.set(maxMPG, forKey: Key.maxMPG)
     }
 }
+
+/// UserDefaults-backed "remember last settings" for LMS's New Game form,
+/// same pattern as `PredictorSettings`/`KillerSettings` — LMS was the one
+/// mode missing this (v2 `NewGameViewV2` only; v1's own LMS form is
+/// untouched and keeps its hardcoded defaults).
+enum LMSSettings {
+    private static let defaults = UserDefaults.standard
+    private enum Key {
+        static let anonymity = "lms.lastAnonymity"
+        static let drawEliminates = "lms.lastDrawEliminates"
+        static let postponedEliminates = "lms.lastPostponedEliminates"
+    }
+
+    static var lastAnonymity: AnonymityMode {
+        (defaults.string(forKey: Key.anonymity)).flatMap(AnonymityMode.init(rawValue:)) ?? .anonymous
+    }
+    static var lastDrawEliminates: Bool {
+        defaults.object(forKey: Key.drawEliminates) as? Bool ?? true
+    }
+    static var lastPostponedEliminates: Bool {
+        defaults.object(forKey: Key.postponedEliminates) as? Bool ?? false
+    }
+
+    static func saveLastUsed(anonymity: AnonymityMode, drawEliminates: Bool, postponedEliminates: Bool) {
+        defaults.set(anonymity.rawValue, forKey: Key.anonymity)
+        defaults.set(drawEliminates, forKey: Key.drawEliminates)
+        defaults.set(postponedEliminates, forKey: Key.postponedEliminates)
+    }
+}

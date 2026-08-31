@@ -116,13 +116,17 @@ struct MatchesViewV2: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: V2Theme.Spacing.section) {
-                if showFilter { filterCard }
                 results
             }
             .padding(.vertical, V2Theme.Spacing.section)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2LoadingOverlay(store.isLoading, label: store.items.isEmpty ? "Loading matches…" : "Refreshing…")
+        // Search used to be an inline card that pushed the match list down
+        // when toggled — pulled out into its own sheet instead, per Andrew,
+        // so it appears/disappears as a distinct surface rather than
+        // reflowing the list underneath it.
+        .sheet(isPresented: $showFilter) { filterSheet }
         .safeAreaInset(edge: .top) {
             if let errorMessage = store.errorMessage, !store.items.isEmpty {
                 HStack(spacing: 6) {
@@ -196,65 +200,86 @@ struct MatchesViewV2: View {
         .background(.ultraThinMaterial)
     }
 
-    // MARK: - Filter card
+    // MARK: - Filter sheet
+
+    /// Its own sheet, not an inline card in the results scroll — appears/
+    /// disappears on tap (SEARCH tile) rather than reflowing the match list
+    /// underneath it. Own `NavigationStack` since a sheet needs its own
+    /// title/dismiss chrome; presented, not embedded, so no `floating` card
+    /// styling — this sits on the sheet's own opaque surface, not a photo.
+    private var filterSheet: some View {
+        NavigationStack {
+            ScrollView {
+                filterContent
+                    .padding(.horizontal, V2Theme.Spacing.horizontal)
+                    .padding(.vertical, V2Theme.Spacing.section)
+            }
+            .navigationTitle("Filter Fixtures")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showFilter = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
 
     @ViewBuilder
-    private var filterCard: some View {
-        Card(floating: true) {
-            VStack(alignment: .leading, spacing: 14) {
-                if enabled.leagues.count > 1 {
-                    pillRow(title: "League") {
-                        ForEach(enabled.leagues) { league in
-                            let on = selectedLeagueIds.isEmpty || selectedLeagueIds.contains(league.id)
-                            SelectablePill(title: league.displayName, isSelected: on) { toggleLeague(league.id) }
-                        }
+    private var filterContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if enabled.leagues.count > 1 {
+                pillRow(title: "League") {
+                    ForEach(enabled.leagues) { league in
+                        let on = selectedLeagueIds.isEmpty || selectedLeagueIds.contains(league.id)
+                        SelectablePill(title: league.displayName, isSelected: on) { toggleLeague(league.id) }
                     }
                 }
+            }
 
-                TextField("Search team", text: $teamQuery)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .padding(10)
-                    .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+            TextField("Search team", text: $teamQuery)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .padding(10)
+                .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
 
-                pillRow(title: nil) {
-                    SelectablePill(title: "All", isSelected: homeAway == .all) { homeAway = .all }
-                    SelectablePill(title: "Home", isSelected: homeAway == .home) { homeAway = .home }
-                    SelectablePill(title: "Away", isSelected: homeAway == .away) { homeAway = .away }
-                }
+            pillRow(title: nil) {
+                SelectablePill(title: "All", isSelected: homeAway == .all) { homeAway = .all }
+                SelectablePill(title: "Home", isSelected: homeAway == .home) { homeAway = .home }
+                SelectablePill(title: "Away", isSelected: homeAway == .away) { homeAway = .away }
+            }
 
-                pillRow(title: nil) {
-                    SelectablePill(title: "Kick-off", isSelected: !sortAZ) { sortAZ = false }
-                    SelectablePill(title: "A–Z", isSelected: sortAZ) { sortAZ = true }
-                }
+            pillRow(title: nil) {
+                SelectablePill(title: "Kick-off", isSelected: !sortAZ) { sortAZ = false }
+                SelectablePill(title: "A–Z", isSelected: sortAZ) { sortAZ = true }
+            }
 
-                if !matchdays.isEmpty {
-                    pillRow(title: "Matchday") {
-                        SelectablePill(title: "All", isSelected: matchdayFilter == nil) { matchdayFilter = nil }
-                        ForEach(matchdays, id: \.self) { md in
-                            SelectablePill(title: "MD \(md)", isSelected: matchdayFilter == md) { matchdayFilter = md }
-                        }
+            if !matchdays.isEmpty {
+                pillRow(title: "Matchday") {
+                    SelectablePill(title: "All", isSelected: matchdayFilter == nil) { matchdayFilter = nil }
+                    ForEach(matchdays, id: \.self) { md in
+                        SelectablePill(title: "MD \(md)", isSelected: matchdayFilter == md) { matchdayFilter = md }
                     }
                 }
+            }
 
-                pillRow(title: nil) {
-                    SelectablePill(title: "Dates", isSelected: dateRangeOn) {
-                        withAnimation(.easeInOut(duration: 0.2)) { dateRangeOn.toggle() }
-                    }
+            pillRow(title: nil) {
+                SelectablePill(title: "Dates", isSelected: dateRangeOn) {
+                    withAnimation(.easeInOut(duration: 0.2)) { dateRangeOn.toggle() }
                 }
-                if dateRangeOn {
-                    VStack(alignment: .leading, spacing: 8) {
-                        DatePicker("From", selection: $dateFrom, displayedComponents: .date)
-                        DatePicker("To", selection: $dateTo, in: dateFrom..., displayedComponents: .date)
-                    }
-                    .font(.subheadline)
+            }
+            if dateRangeOn {
+                VStack(alignment: .leading, spacing: 8) {
+                    DatePicker("From", selection: $dateFrom, displayedComponents: .date)
+                    DatePicker("To", selection: $dateTo, in: dateFrom..., displayedComponents: .date)
                 }
+                .font(.subheadline)
+            }
 
-                HStack {
-                    Spacer()
-                    Button("Clear all", role: .destructive) { clearAll() }
-                        .font(.caption.weight(.semibold))
-                }
+            HStack {
+                Spacer()
+                Button("Clear all", role: .destructive) { clearAll() }
+                    .font(.caption.weight(.semibold))
             }
         }
     }

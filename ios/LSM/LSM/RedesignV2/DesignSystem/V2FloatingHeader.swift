@@ -117,6 +117,12 @@ extension V2FloatingHeader where Trailing == EmptyView, Tiles == EmptyView {
     init(title: String, showBack: Bool = true) {
         self.title = title
         self.showBack = showBack
+        // No tile grid to cover — the struct's 160/260 defaults are sized
+        // for the tile-grid screens (Home/Games/Leagues/Players); a bare
+        // title row only needs enough scrim to clear the status bar plus
+        // its own content, or every pushed detail/form screen gets a
+        // needless band of empty photo before its first card.
+        self.scrimHeight = 100
         self.trailing = { EmptyView() }
         self.tiles = { EmptyView() }
     }
@@ -126,6 +132,9 @@ extension V2FloatingHeader where Tiles == EmptyView {
     init(title: String, showBack: Bool = true, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title
         self.showBack = showBack
+        // See the no-trailing initializer above for why this is smaller
+        // than the struct default.
+        self.scrimHeight = 100
         self.trailing = trailing
         self.tiles = { EmptyView() }
     }

@@ -22,7 +22,7 @@ struct RapidEntryViewV2: View {
         var groupId: UUID?
     }
 
-    @State private var rows: [EntryRow] = (0..<8).map { _ in EntryRow() }
+    @State private var rows: [EntryRow] = (0..<14).map { _ in EntryRow() }
     @State private var newGroupRowId: UUID?
     @State private var newGroupName = ""
     @State private var summary: String?
@@ -44,13 +44,22 @@ struct RapidEntryViewV2: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 header
-                gridHeader
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    gridRow(index: index, row: row)
+                // One floating surface for the whole grid, not a card per
+                // row — keeps the compact spreadsheet layout (see this
+                // file's top doc comment for why that's deliberate) while
+                // still reading as a V2 card-over-photo surface instead of
+                // floating loose on the background.
+                VStack(spacing: 0) {
+                    gridHeader
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        gridRow(index: index, row: row)
+                    }
                 }
+                .v2FloatingCard()
+                .padding(.horizontal, V2Theme.Spacing.horizontal)
             }
         }
-        .background(V2Theme.background.ignoresSafeArea())
+        .v2TeamRoomScene()
         .safeAreaInset(edge: .bottom) { footer }
         .alert("New group", isPresented: Binding(get: { newGroupRowId != nil }, set: { if !$0 { newGroupRowId = nil } })) {
             TextField("Group name", text: $newGroupName)
@@ -94,7 +103,11 @@ struct RapidEntryViewV2: View {
                 .foregroundStyle(V2Theme.textPrimary)
             Spacer()
             Button("Done") { dismiss() }
-                .foregroundStyle(V2Theme.textSecondary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(V2Theme.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(V2Theme.cardBackground, in: Capsule())
         }
         .padding(.horizontal, V2Theme.Spacing.horizontal)
         .padding(.top, 12)

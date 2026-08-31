@@ -120,13 +120,17 @@ struct GamesPortalViewV2: View {
         // photo behind it (this scene's `.background`) stays fully visible
         // the whole way down instead of fading out with it.
         .v2TrophyRoomScene()
+        .task { await badgeStore.refresh() }
+        // Only when pushed from Home's Favourites card — scroll to and
+        // briefly ring the highlighted game's row, then clear it. Its own
+        // `.task`, not chained after the badge refresh above: that's a
+        // network call, and gating the scroll/highlight behind it meant a
+        // slow or stalled fetch silently ate the whole effect — by the time
+        // it resolved, the manager had already stopped looking. The sleep
+        // before scrolling gives the just-pushed list a layout pass first;
+        // without it `scrollTo` can fire before the row has a real position
+        // to scroll to.
         .task {
-            await badgeStore.refresh()
-            // Only when pushed from Home's Favourites card — scroll to and
-            // briefly ring the highlighted game's row, then clear it. The
-            // sleep before scrolling gives the just-pushed list a layout
-            // pass first; without it `scrollTo` can fire before the row has
-            // a real position to scroll to.
             guard let focusGameID else { return }
             highlightedGameID = focusGameID
             try? await Task.sleep(nanoseconds: 300_000_000)

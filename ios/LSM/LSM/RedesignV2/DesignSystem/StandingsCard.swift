@@ -3,16 +3,18 @@ import SwiftUI
 /// Column widths shared between `StandingsHeaderRow` and each
 /// `StandingsCard` row so the two stay pixel-aligned.
 private enum StandingsColumn {
-    static let stat: CGFloat = 18
-    static let goalDifference: CGFloat = 32
-    static let points: CGFloat = 30
+    static let stat: CGFloat = 14
+    static let goalDifference: CGFloat = 26
+    static let points: CGFloat = 24
 }
 
 /// Header row (P W D L GD PTS) — place once above the list of `StandingsCard`
 /// rows.
 struct StandingsHeaderRow: View {
     var body: some View {
-        HStack(spacing: 10) {
+        // Same spacing as StandingsCard's row below — must match for the
+        // P/W/D/L/GD/PTS columns to stay aligned.
+        HStack(spacing: 6) {
             Spacer()
             label("P")
             label("W")
@@ -52,19 +54,22 @@ struct StandingsCard: View {
 
     var body: some View {
         Card(padding: 16, floating: floating) {
-            HStack(spacing: 10) {
+            // Spacing/column widths tightened from the original 10/18/32/30
+            // — the name was chopping too aggressively (e.g. "Wolverhampton
+            // Wanderers") with six stat columns eating most of the row.
+            HStack(spacing: 6) {
                 Text("\(rank)")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
-                    .frame(minWidth: 22, alignment: .leading)
+                    .frame(minWidth: 18, alignment: .leading)
                     .foregroundStyle(V2Theme.textSecondary)
                 Text(name)
                     .font(V2Theme.Typography.rowTitle)
                     .foregroundStyle(V2Theme.textPrimary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .layoutPriority(1)
                 stat(played)

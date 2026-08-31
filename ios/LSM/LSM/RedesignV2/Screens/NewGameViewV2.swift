@@ -30,9 +30,9 @@ struct NewGameViewV2: View {
     @State private var managerPlaying = true
 
     // LMS-only settings.
-    @State private var anonymity: AnonymityMode = .anonymous
-    @State private var drawEliminates = true
-    @State private var postponedEliminates = false
+    @State private var anonymity: AnonymityMode = LMSSettings.lastAnonymity
+    @State private var drawEliminates = LMSSettings.lastDrawEliminates
+    @State private var postponedEliminates = LMSSettings.lastPostponedEliminates
 
     @State private var predictorExactPoints = PredictorSettings.lastExactPoints
     @State private var predictorGDEnabled = PredictorSettings.lastGDEnabled
@@ -550,6 +550,11 @@ extension NewGameViewV2 {
             context.insert(player)
             game.players.append(player)
         }
+        LMSSettings.saveLastUsed(
+            anonymity: anonymity,
+            drawEliminates: drawEliminates,
+            postponedEliminates: postponedEliminates
+        )
         dismiss()
     }
 
