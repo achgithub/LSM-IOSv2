@@ -47,7 +47,15 @@ struct GamesPortalViewV2: View {
     var body: some View {
         ScrollViewReader { proxy in
         ScrollView {
-            LazyVStack(spacing: V2Theme.Spacing.section) {
+            // Plain VStack, not Lazy — at most 3 items (one section per
+            // game mode), so laziness buys nothing here but does cause a
+            // real bug: LazyVStack only instantiates children near the
+            // visible viewport, so `scrollTo` on a game row in a
+            // not-yet-rendered later section (e.g. Killer, below LMS)
+            // could silently no-op. Eagerly laying out 3 sections has no
+            // measurable cost, and removes the need to retry scrollTo at
+            // all — see the .task below.
+            VStack(spacing: V2Theme.Spacing.section) {
                 if games.isEmpty {
                     ContentUnavailableView {
                         Label("No games yet", systemImage: "trophy")
@@ -126,24 +134,17 @@ struct GamesPortalViewV2: View {
         // `.task`, not chained after the badge refresh above: that's a
         // network call, and gating the scroll/highlight behind it meant a
         // slow or stalled fetch silently ate the whole effect — by the time
-        // it resolved, the manager had already stopped looking.
-        //
-        // A single scrollTo after one fixed delay wasn't enough for a row
-        // in a later mode section (e.g. Killer, below LMS) — LazyVStack
-        // hasn't necessarily instantiated a row that far down yet on the
-        // very first layout pass, so that one scrollTo call could silently
-        // no-op. Retrying every 100ms for up to a second means as soon as
-        // the row exists, the very next attempt lands on it, instead of
-        // gambling on one delay being long enough for every list length.
+        // it resolved, the manager had already stopped looking. The sleep
+        // before scrolling gives the just-pushed list a layout pass first;
+        // a single attempt is reliable now that the list above is a plain
+        // VStack, not Lazy — every row exists from the first layout pass,
+        // so there's nothing to retry for.
         .task {
             guard let focusGameID else { return }
             highlightedGameID = focusGameID
-            for _ in 0..<10 {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                proxy.scrollTo(focusGameID, anchor: .center)
-            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
             withAnimation { proxy.scrollTo(focusGameID, anchor: .center) }
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
             withAnimation { highlightedGameID = nil }
         }
         // Pull-to-refresh opens the same game picker as the PUSH tile —
