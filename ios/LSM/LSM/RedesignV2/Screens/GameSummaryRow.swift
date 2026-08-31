@@ -163,6 +163,7 @@ struct GameSummaryRow: View {
                     nextUpLabel(title: "Open Round", icon: "play.circle.fill", tint: modeColor)
                 }
                 .buttonStyle(.plain)
+                Spacer(minLength: 8)
                 if roundContext.latestClosedRound != nil { shareButton }
             }
             .padding(.top, 2)
@@ -183,7 +184,11 @@ struct GameSummaryRow: View {
             }
         case .matchesInProgress:
             // Same as `.confirmEntries` above — count shown on Home's
-            // Favourites card only, not here.
+            // Favourites card only, not here. Still gets a Next Up pill
+            // though, per Andrew — a manager can enter results manually
+            // (e.g. a postponed fixture, or one texted in early) without
+            // waiting for every fixture to finish, same destination
+            // `.processResults` uses.
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Image(systemName: "sportscourt")
@@ -194,6 +199,15 @@ struct GameSummaryRow: View {
                         .foregroundStyle(V2Theme.textSecondary)
                     Spacer()
                     if roundContext.latestClosedRound != nil { shareButton }
+                }
+                HStack(spacing: 8) {
+                    NavigationLink {
+                        resultsDestination
+                    } label: {
+                        nextUpLabel(title: "Enter Manually", icon: "square.and.pencil", tint: modeColor)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 8)
                 }
                 unsubmittedReminder
             }
@@ -206,6 +220,7 @@ struct GameSummaryRow: View {
                     nextUpLabel(title: "Process Results", icon: "checkmark.circle.fill", tint: modeColor)
                 }
                 .buttonStyle(.plain)
+                Spacer(minLength: 8)
                 if roundContext.latestClosedRound != nil { shareButton }
             }
             .padding(.top, 2)
@@ -240,6 +255,7 @@ struct GameSummaryRow: View {
                 nextUpLabel(title: title, icon: icon, tint: modeColor)
             }
             .buttonStyle(.plain)
+            Spacer(minLength: 8)
             if roundContext.latestClosedRound != nil { shareButton }
         }
         .padding(.top, 2)
@@ -435,14 +451,17 @@ struct ManagerRoundStatus {
             // still tap in a late/texted-in pick right up to kickoff. This
             // is a to-do count for them, not a gate.
             return ManagerRoundStatus(label: "Submissions closed", detail: "\(missing) missing", tint: V2Theme.warning, submissionProgress: nil, missingCount: missing)
-        case .live(let finished, let total):
+        case .live:
+            // Fixture count intentionally not shown here — same rule as
+            // `.confirmEntries`/`.matchesInProgress` below: it lives only on
+            // Home's Favourites card, per Andrew.
             var missing: Int?
             if let round = game.currentRound {
                 let (eligible, submitted) = Self.submissionCounts(for: game, round: round)
                 let count = eligible - submitted
                 missing = count > 0 ? count : nil
             }
-            return ManagerRoundStatus(label: "Live", detail: "\(finished)/\(total) matches in", tint: V2Theme.textSecondary, submissionProgress: nil, missingCount: missing)
+            return ManagerRoundStatus(label: "Live", detail: "", tint: V2Theme.textSecondary, submissionProgress: nil, missingCount: missing)
         case .readyToProcess:
             let roundNumber = game.currentRound?.roundNumber ?? 0
             return ManagerRoundStatus(label: "Results due", detail: "Round \(roundNumber)", tint: V2Theme.danger, submissionProgress: nil, missingCount: nil)

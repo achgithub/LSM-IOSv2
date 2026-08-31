@@ -27,6 +27,10 @@ struct MatchesViewV2: View {
     @State private var dateFrom = Date().addingTimeInterval(-1 * 24 * 3600)
     @State private var dateTo = Date().addingTimeInterval(14 * 24 * 3600)
     @State private var sortAZ = false
+    /// Applied once, the first time matches load — after that a `nil`
+    /// `matchdayFilter` means the manager deliberately chose "All" via the
+    /// filter card, not "hasn't loaded yet," so it's never reapplied.
+    @State private var hasAppliedDefaultMatchday = false
 
     // Recomputed filteredItems (not a bare per-render computed var — a full
     // season's worth of matches makes that a real per-render cost) via
@@ -59,6 +63,19 @@ struct MatchesViewV2: View {
     }
 
     private var matchdays: [Int] { Array(Set(store.items.compactMap(\.matchday))).sorted() }
+
+    /// The matchday of the earliest fixture that hasn't finished/been
+    /// postponed yet — "what's coming up," not "the whole season from
+    /// matchday 1." Falls back to the last matchday once everything's
+    /// finished, so a completed season still lands somewhere sensible
+    /// instead of nil (which would mean "show everything").
+    private func defaultMatchday() -> Int? {
+        let sorted = store.items.sorted(by: MatchDTO.byKickoffThenId)
+        if let next = sorted.first(where: { !$0.isFinished && !$0.isPostponedOrCancelled }) {
+            return next.matchday
+        }
+        return sorted.last?.matchday
+    }
 
     private func name(_ id: Int) -> String {
         store.teamsById[id]?.shortName ?? store.teamsById[id]?.name ?? "Team \(id)"
@@ -124,6 +141,10 @@ struct MatchesViewV2: View {
             selectedLeagueIds.formIntersection(validIds)
             if selectedLeagueIds.isEmpty { selectedLeagueIds = validIds }
             await store.load(leagues: enabled.leagues)
+            if !hasAppliedDefaultMatchday, !store.items.isEmpty {
+                matchdayFilter = defaultMatchday()
+                hasAppliedDefaultMatchday = true
+            }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
             if store.isThrottled { store.now = tick }
@@ -145,7 +166,11 @@ struct MatchesViewV2: View {
                 description: Text(store.items.isEmpty ? "No matches available right now." : "No matches match your filters.")
             )
         } else {
-            VStack(spacing: 8) {
+            // Lazy, not eager — a full season is ~380 rows for a 20-team
+            // league; building all of them up front (a plain VStack) was
+            // the actual cause of "Fixtures is slow to load," not the
+            // network fetch.
+            LazyVStack(spacing: 8) {
                 ForEach(filteredItems) { item in
                     MatchRowV2(item: item, teamsById: store.teamsById)
                 }

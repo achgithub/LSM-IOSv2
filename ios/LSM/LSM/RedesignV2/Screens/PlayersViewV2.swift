@@ -184,7 +184,15 @@ struct PlayersViewV2: View {
     @ViewBuilder
     private var playersList: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Own card background — `SectionHeader`'s text color assumes a
+            // card surface (see its doc comment); this was the one header on
+            // this screen rendered bare over the locker-room photo instead,
+            // which made the count unreadable.
             SectionHeader(title: filteredMembers.count == 1 ? "1 player" : "\(filteredMembers.count) players")
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(V2Theme.cardBackground.opacity(0.9), in: Capsule())
+                .overlay(Capsule().stroke(V2Theme.cardBorder.opacity(0.7)))
             if members.isEmpty {
                 Text("No saved players yet. Add people here, then add them to a game.")
                     .font(.caption).foregroundStyle(V2Theme.textSecondary)

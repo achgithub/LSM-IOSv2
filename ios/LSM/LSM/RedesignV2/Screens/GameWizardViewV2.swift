@@ -199,8 +199,16 @@ struct GameWizardViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2FloatingHeader("Guided Setup", showBack: false) {
+            // Card surface behind the text, matching every other header
+            // control (e.g. `V2HeaderIconButton`'s circular background) —
+            // bare text here was low-contrast against the busy form-scene
+            // photo.
             Button("Cancel") { dismiss() }
-                .foregroundStyle(V2Theme.textSecondary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(V2Theme.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(V2Theme.cardBackground, in: Capsule())
         }
         .sheet(item: $activeSheet, onDismiss: afterSheet) { which in
             sheetContent(which)
