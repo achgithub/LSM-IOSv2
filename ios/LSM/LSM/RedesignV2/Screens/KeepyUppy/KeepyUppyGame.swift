@@ -17,6 +17,32 @@ enum KickFeedback: Equatable {
     case perfect, good, earlyOrLate, miss
 }
 
+/// A flying hazard that knocks the ball off course on contact — see
+/// `KeepyUppyGame.updateObstacles`. Seagull flies a straight line; drone
+/// zig-zags (a sine wave riding on top of its straight-line travel).
+enum ObstacleKind: Equatable {
+    case seagull, drone
+}
+
+/// One obstacle in flight. `x`/`baseY` are in the same 0...1 space as
+/// `BallState`; `elapsed` is simulation time since spawn (not wall-clock —
+/// see `KeepyUppyGame.tick`), so a paused game can't cause a drone to jump
+/// along its sine path when resumed.
+struct Obstacle: Identifiable, Equatable {
+    let id = UUID()
+    let kind: ObstacleKind
+    var x: CGFloat
+    let baseY: CGFloat
+    let velocityX: CGFloat
+    var elapsed: CGFloat = 0
+}
+
+/// Fired once per obstacle collision — cleared by the view after it fires
+/// the haptic, same pattern as `KeepyUppyGame.lastFeedback`.
+struct ObstacleHitEvent: Equatable {
+    let kind: ObstacleKind
+}
+
 /// POC game engine for the keepy-uppy motion-control experiment
 /// (docs/keepy-uppy-poc-scope.md) — self-contained physics/scoring, no
 /// dependency on the Games/LMS/Predictor/Killer mode infrastructure this app
@@ -55,6 +81,17 @@ final class KeepyUppyGame {
     private var windTarget: CGFloat = 0
     private var windGustTimer: CGFloat = 0
     private var lastAnnouncedTier = 0
+
+    /// Seagulls/drones currently in flight — see `updateObstacles`. Public
+    /// (read-only in spirit, but `@Observable` needs it settable) so the
+    /// view can render each one at `obstacleY(_:)`.
+    var obstacles: [Obstacle] = []
+    /// Set on every collision, cleared by the view after it fires the
+    /// haptic — same pattern as `lastFeedback`/`tierAnnouncement`.
+    var obstacleHitEvent: ObstacleHitEvent?
+
+    private var seagullSpawnTimer: CGFloat = 0
+    private var droneSpawnTimer: CGFloat = 0
 
     /// The boot's horizontal position, 0...1 — set every frame by the view
     /// from calibrated device tilt (`MotionKickDetector.liveDirection`), not
@@ -127,6 +164,45 @@ final class KeepyUppyGame {
         }
     }
 
+    /// Obstacle side of the same every-20 ladder, continuing past wind's
+    /// top tier — per Andrew: seagulls start at one, slow, and build to
+    /// three, fast; the drone (zig-zag) arrives after that, starting slow
+    /// and getting faster the longer the run continues (scored
+    /// continuously past its intro score rather than in further discrete
+    /// steps, so a very long run keeps getting harder without needing an
+    /// ever-growing tier table).
+    private struct ObstacleTier {
+        let maxSeagulls: Int
+        let seagullSpeed: CGFloat
+        let droneEnabled: Bool
+        let droneSpeed: CGFloat
+    }
+
+    private static let droneIntroScore = 120
+    private static let droneMaxSpeed: CGFloat = 0.42
+
+    private static func obstacleTier(for score: Int) -> ObstacleTier {
+        let maxSeagulls: Int
+        let seagullSpeed: CGFloat
+        switch score {
+        case ..<60:
+            maxSeagulls = 0; seagullSpeed = 0
+        case 60..<80:
+            maxSeagulls = 1; seagullSpeed = 0.14
+        case 80..<100:
+            maxSeagulls = 2; seagullSpeed = 0.20
+        default:
+            maxSeagulls = 3; seagullSpeed = 0.28
+        }
+
+        let droneEnabled = score >= droneIntroScore
+        let droneSpeed: CGFloat = droneEnabled
+            ? min(droneMaxSpeed, 0.16 + CGFloat(score - droneIntroScore) * 0.0015)
+            : 0
+
+        return ObstacleTier(maxSeagulls: maxSeagulls, seagullSpeed: seagullSpeed, droneEnabled: droneEnabled, droneSpeed: droneSpeed)
+    }
+
     func start() {
         ball = BallState()
         score = 0
@@ -139,6 +215,10 @@ final class KeepyUppyGame {
         windGustTimer = 0
         lastAnnouncedTier = 0
         tierAnnouncement = nil
+        obstacles = []
+        obstacleHitEvent = nil
+        seagullSpawnTimer = 0
+        droneSpawnTimer = 0
     }
 
     func pause() { isPaused = true }
@@ -157,6 +237,8 @@ final class KeepyUppyGame {
         ball.velocityX += windSpeed * windAcceleration * deltaTime
         ball.x += ball.velocityX * deltaTime
         ball.y += ball.velocityY * deltaTime
+
+        updateObstacles(deltaTime: deltaTime)
 
         // Soft side-wall rebounds keep the POC playable.
         if ball.x < wallMargin {
@@ -253,6 +335,99 @@ final class KeepyUppyGame {
         guard tier != lastAnnouncedTier else { return }
         lastAnnouncedTier = tier
         tierAnnouncement = Self.windTier(for: score).announcement
+    }
+
+    /// The obstacle's actual render/collision height — a seagull flies a
+    /// straight line at its spawn height; a drone's height rides a sine
+    /// wave on top of that (the "zig-zag"), driven by simulation time
+    /// elapsed since it spawned, not wall-clock time.
+    func obstacleY(_ obstacle: Obstacle) -> CGFloat {
+        switch obstacle.kind {
+        case .seagull:
+            return obstacle.baseY
+        case .drone:
+            let amplitude: CGFloat = 0.12
+            let frequency: CGFloat = 3.2
+            return obstacle.baseY + amplitude * sin(obstacle.elapsed * frequency)
+        }
+    }
+
+    /// Spawns due obstacles, advances everything in flight, and knocks the
+    /// ball on any contact. Runs every tick regardless of tier — the tier
+    /// tables above are what actually gate whether anything spawns.
+    private func updateObstacles(deltaTime: CGFloat) {
+        let tier = Self.obstacleTier(for: score)
+
+        if tier.maxSeagulls > 0 {
+            seagullSpawnTimer -= deltaTime
+            let activeSeagulls = obstacles.filter { $0.kind == .seagull }.count
+            if seagullSpawnTimer <= 0, activeSeagulls < tier.maxSeagulls {
+                spawnSeagull(speed: tier.seagullSpeed)
+                seagullSpawnTimer = CGFloat.random(in: 2.5...4.5)
+            }
+        }
+
+        if tier.droneEnabled {
+            droneSpawnTimer -= deltaTime
+            let droneActive = obstacles.contains { $0.kind == .drone }
+            if droneSpawnTimer <= 0, !droneActive {
+                spawnDrone(speed: tier.droneSpeed)
+                droneSpawnTimer = CGFloat.random(in: 5...8)
+            }
+        }
+
+        for i in obstacles.indices {
+            obstacles[i].elapsed += deltaTime
+            obstacles[i].x += obstacles[i].velocityX * deltaTime
+        }
+
+        let hitRadius: CGFloat = 0.07
+        var hitIndices: [Int] = []
+        for (i, obstacle) in obstacles.enumerated() {
+            let dx = ball.x - obstacle.x
+            let dy = ball.y - obstacleY(obstacle)
+            if dx * dx + dy * dy <= hitRadius * hitRadius {
+                hitIndices.append(i)
+            }
+        }
+        for i in hitIndices.reversed() {
+            applyKnock(from: obstacles[i])
+            obstacles.remove(at: i)
+        }
+
+        // Off-screen in either direction — despawn.
+        obstacles.removeAll { $0.x < -0.15 || $0.x > 1.15 }
+    }
+
+    /// A hit is a shove, not an instant fail — it changes the ball's
+    /// trajectory (in the direction the obstacle was travelling, plus a
+    /// downward push that makes the next touch harder) and lets physics
+    /// carry the consequence, rather than ending the game on contact.
+    private func applyKnock(from obstacle: Obstacle) {
+        let knockStrength: CGFloat = 0.9
+        ball.velocityX += (obstacle.velocityX >= 0 ? 1 : -1) * knockStrength
+        ball.velocityY += 0.4
+        obstacleHitEvent = ObstacleHitEvent(kind: obstacle.kind)
+    }
+
+    private func spawnSeagull(speed: CGFloat) {
+        let fromLeft = Bool.random()
+        obstacles.append(Obstacle(
+            kind: .seagull,
+            x: fromLeft ? -0.08 : 1.08,
+            baseY: CGFloat.random(in: 0.18...0.55),
+            velocityX: fromLeft ? speed : -speed
+        ))
+    }
+
+    private func spawnDrone(speed: CGFloat) {
+        let fromLeft = Bool.random()
+        obstacles.append(Obstacle(
+            kind: .drone,
+            x: fromLeft ? -0.08 : 1.08,
+            baseY: CGFloat.random(in: 0.20...0.5),
+            velocityX: fromLeft ? speed : -speed
+        ))
     }
 
     /// Tap-to-kick fallback — same `applyKick` path as motion input, so

@@ -29,6 +29,7 @@ struct KeepyUppyViewV2: View {
     @State private var calibrationSecondsLeft = 3
     @State private var flashFeedback: KickFeedback?
     @State private var tierBannerText: String?
+    @State private var obstacleFlashActive = false
 
     private let calibrationTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -38,9 +39,11 @@ struct KeepyUppyViewV2: View {
                 Color(.systemBackground).ignoresSafeArea()
                 tickDriver
                 windsock(in: geo.size)
+                obstaclesView(in: geo.size)
                 foot(in: geo.size)
                 ball(in: geo.size)
                 feedbackFlash
+                obstacleFlash
                 VStack(spacing: 16) {
                     hud
                     if let tierBannerText {
@@ -96,6 +99,16 @@ struct KeepyUppyViewV2: View {
             Task {
                 try? await Task.sleep(nanoseconds: 1_600_000_000)
                 if tierBannerText == message { tierBannerText = nil }
+            }
+        }
+        .onChange(of: game.obstacleHitEvent) { _, event in
+            guard let event else { return }
+            fireObstacleHaptic(for: event.kind)
+            obstacleFlashActive = true
+            game.obstacleHitEvent = nil
+            Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                obstacleFlashActive = false
             }
         }
         .sheet(isPresented: $showSafetyMessage) { safetySheet }
@@ -156,6 +169,30 @@ struct KeepyUppyViewV2: View {
         let mph = Int(abs(game.windSpeed) * 40)
         guard mph > 0 else { return "Calm" }
         return "\(mph) mph \(game.windSpeed >= 0 ? "→" : "←")"
+    }
+
+    /// Seagulls (🐦, straight line) and drones (🚁, zig-zag —
+    /// `KeepyUppyGame.obstacleY` rides a sine wave on top of the straight
+    /// travel) — both fly in from off-screen and knock the ball on contact.
+    private func obstaclesView(in size: CGSize) -> some View {
+        ForEach(game.obstacles) { obstacle in
+            Text(obstacle.kind == .seagull ? "🐦" : "🚁")
+                .font(.system(size: 30))
+                .scaleEffect(x: obstacle.velocityX >= 0 ? 1 : -1, y: 1)
+                .position(x: obstacle.x * size.width, y: game.obstacleY(obstacle) * size.height)
+        }
+    }
+
+    /// Brief tint on any obstacle collision — distinct from `feedbackFlash`
+    /// (which is about kick *timing*, not an environmental hazard) so a hit
+    /// reads as "something external happened," not a missed touch.
+    @ViewBuilder
+    private var obstacleFlash: some View {
+        if obstacleFlashActive {
+            Color.purple.opacity(reduceMotion ? 0.15 : 0.25)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
     }
 
     private func tierBanner(_ text: String) -> some View {
@@ -376,5 +413,13 @@ struct KeepyUppyViewV2: View {
             // vibration/error buzz, just a soft nudge.
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.4)
         }
+    }
+
+    /// Distinct from `fireHaptic` — an obstacle strike is an external event,
+    /// not a kick-quality judgement, so it gets its own warning-style buzz
+    /// regardless of which obstacle it was.
+    private func fireObstacleHaptic(for _: ObstacleKind) {
+        guard hapticsEnabled else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 }
