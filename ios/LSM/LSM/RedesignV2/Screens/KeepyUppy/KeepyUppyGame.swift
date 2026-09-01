@@ -114,8 +114,7 @@ final class KeepyUppyGame {
     /// arrive at the boot before it's considered too late.
     private let kickRequestWindow: CGFloat = 0.35
 
-    // Tunables — POC defaults per the design doc; expect to retune on a
-    // physical device alongside `MotionKickDetector`'s own thresholds.
+    // Tunables — POC defaults; expect to retune on a physical device.
     private let gravity: CGFloat = 1.25
     /// The boot's fixed height and how far the ball can be from it (in each
     /// axis) and still count as a touch. Deliberately narrow — a wide,

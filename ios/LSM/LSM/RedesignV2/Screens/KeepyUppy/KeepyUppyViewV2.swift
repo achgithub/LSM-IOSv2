@@ -1,33 +1,27 @@
 import SwiftUI
 import UIKit
 
-/// Standalone POC screen for the keepy-uppy motion-control experiment
-/// (docs/keepy-uppy-poc-scope.md). Reached only from a row in Settings' Help
-/// panel (see `V2PreviewMenuView`'s `HomeHelpPanel`) — builds in Release too,
-/// since motion feel can only be validated via TestFlight on a physical
-/// device, not the Simulator. Deliberately outside the Games/LMS/Predictor/
-/// Killer mode infrastructure,
-/// since this doesn't create a `Game` and isn't a shipping mode. Purpose is
-/// solely to validate whether the motion mechanic feels good before any
-/// artwork/progression/monetisation work is considered.
+/// Standalone POC screen for the keepy-uppy game (docs/keepy-uppy-poc-scope.md).
+/// Reached only from a row in Settings' Help panel (see
+/// `V2PreviewMenuView`'s `HomeHelpPanel`). Deliberately outside the
+/// Games/LMS/Predictor/Killer mode infrastructure, since this doesn't
+/// create a `Game` and isn't a shipping mode.
+///
+/// Originally a Core Motion (phone-tilt/flick) control experiment — dropped
+/// entirely after on-device testing across several rounds found detection
+/// unreliable, tilt-based aiming imprecise, and the whole flick-to-kick
+/// metaphor not a good fit regardless of tuning. Touch (drag to position
+/// the boot, swipe up to kick) replaced it as the sole control scheme; see
+/// git history on this file for the motion-based attempt if it's ever
+/// worth revisiting with a different sensor approach.
 struct KeepyUppyViewV2: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var game = KeepyUppyGame()
-    @State private var motion = MotionKickDetector()
-
-    // Off by default now — touch (drag to position, swipe up to kick) is
-    // the primary, validated control path; motion is an optional add-on a
-    // player can opt into, not something to lead with after two rounds of
-    // on-device feedback that it wasn't working.
-    @State private var motionEnabled = false
     @State private var hapticsEnabled = true
-    @State private var sensitivity: Double = 1
-    @AppStorage("keepyUppy.hasSeenSafetyMessage") private var hasSeenSafetyMessage = false
 
     @State private var lastTickDate: Date?
-    @State private var showSafetyMessage = false
     @State private var flashFeedback: KickFeedback?
     @State private var tierBannerText: String?
     @State private var obstacleFlashActive = false
@@ -46,7 +40,7 @@ struct KeepyUppyViewV2: View {
                 // that same drag is a kick attempt, with power scaled by
                 // how fast the flick was. Positioning alone (a slow drag)
                 // never scores — only an actual flick arms `requestKick`,
-                // same as a phone-motion flick or Tap Kick would. Attached
+                // same as Tap Kick would. Attached
                 // to this background layer, not the whole ZStack, so a
                 // touch that starts on an actual button is claimed by that
                 // button first; only touches on open field space drive this.
@@ -86,23 +80,8 @@ struct KeepyUppyViewV2: View {
         }
         .navigationTitle("Keepy-Uppy (POC)")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            motion.onKick = { [weak game = self.game] input in game?.requestKick(power: input.power) }
-            motion.sensitivity = sensitivity
-            if motionEnabled { motion.start() }
-        }
-        .onDisappear { motion.stop() }
-        .onChange(of: motionEnabled) { _, enabled in
-            if enabled { motion.start() } else { motion.stop() }
-        }
-        .onChange(of: sensitivity) { _, newValue in motion.sensitivity = newValue }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
-                game.pause()
-                motion.stop()
-            } else if motionEnabled {
-                motion.start()
-            }
+            if phase != .active { game.pause() }
         }
         .onChange(of: game.lastFeedback) { _, feedback in
             guard let feedback else { return }
@@ -134,7 +113,6 @@ struct KeepyUppyViewV2: View {
                 obstacleFlashActive = false
             }
         }
-        .sheet(isPresented: $showSafetyMessage) { safetySheet }
     }
 
     // MARK: - Touch control
@@ -146,8 +124,7 @@ struct KeepyUppyViewV2: View {
     /// scaled linearly below that.
     private let swipeMaxPowerSpeed: CGFloat = 1800
     /// Speed the finger has to drop back below before another flick can
-    /// arm — mirrors `MotionKickDetector`'s trigger/reset pair, same reason:
-    /// one continuous fast motion shouldn't fire more than one kick.
+    /// arm, so one continuous fast motion can't fire more than one kick.
     private let swipeResetSpeed: CGFloat = 150
 
     private func handleDragChanged(_ value: DragGesture.Value, fieldSize: CGSize) {
@@ -314,23 +291,10 @@ struct KeepyUppyViewV2: View {
                 Text("\(game.score)").font(.title2.bold())
             }
             Spacer()
-            if motionEnabled {
-                powerMeter
-                    .frame(width: 120)
-            }
-            Spacer()
             VStack(alignment: .trailing) {
                 Text("Best").font(.caption).foregroundStyle(.secondary)
                 Text("\(game.bestScore)").font(.title2.bold())
             }
-        }
-    }
-
-    private var powerMeter: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Power").font(.caption2).foregroundStyle(.secondary)
-            ProgressView(value: motion.livePower)
-                .tint(V2Theme.accent)
         }
     }
 
@@ -371,61 +335,16 @@ struct KeepyUppyViewV2: View {
                 .controlSize(.large)
             }
 
-            DisclosureGroup("Motion settings") {
-                VStack(alignment: .leading, spacing: 10) {
-                    // Drag the boot always works — this only toggles
-                    // whether a phone flick can *also* trigger a kick, on
-                    // top of Tap Kick.
-                    Toggle("Motion flick-to-kick", isOn: $motionEnabled)
-                    Toggle("Haptics", isOn: $hapticsEnabled)
-                    VStack(alignment: .leading) {
-                        Text("Sensitivity: \(sensitivity, specifier: "%.1f")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Slider(value: $sensitivity, in: 0.5...2.0, step: 0.1)
-                    }
-                    .disabled(!motionEnabled)
-                }
-                .padding(.top, 6)
-            }
+            Toggle("Haptics", isOn: $hapticsEnabled)
         }
     }
 
     private var startRestartButton: some View {
         Button(game.isGameOver ? "Restart" : "Start") {
-            handleStartTapped()
+            game.start()
         }
         .buttonStyle(.borderedProminent)
         .disabled(game.isRunning && !game.isGameOver)
-    }
-
-    private func handleStartTapped() {
-        if motionEnabled, !hasSeenSafetyMessage {
-            showSafetyMessage = true
-        } else {
-            game.start()
-        }
-    }
-
-    // MARK: - Safety sheet
-
-    private var safetySheet: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "hand.raised.fill").font(.largeTitle).foregroundStyle(V2Theme.accent)
-            Text("Before you start")
-                .font(.title3.bold())
-            Text("Hold your phone securely and use a short upward wrist movement. Make sure there is space around you.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Button("Got it — Start") {
-                hasSeenSafetyMessage = true
-                showSafetyMessage = false
-                game.start()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding(32)
-        .presentationDetents([.medium])
     }
 
     // MARK: - Haptics
