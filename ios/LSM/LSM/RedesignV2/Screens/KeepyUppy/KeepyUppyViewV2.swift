@@ -17,7 +17,11 @@ struct KeepyUppyViewV2: View {
     @State private var game = KeepyUppyGame()
     @State private var motion = MotionKickDetector()
 
-    @State private var motionEnabled = true
+    // Off by default now — touch (drag to position, swipe up to kick) is
+    // the primary, validated control path; motion is an optional add-on a
+    // player can opt into, not something to lead with after two rounds of
+    // on-device feedback that it wasn't working.
+    @State private var motionEnabled = false
     @State private var hapticsEnabled = true
     @State private var sensitivity: Double = 1
     @AppStorage("keepyUppy.hasSeenSafetyMessage") private var hasSeenSafetyMessage = false
@@ -28,23 +32,34 @@ struct KeepyUppyViewV2: View {
     @State private var tierBannerText: String?
     @State private var obstacleFlashActive = false
 
+    // Tracks the drag to detect an upward flick as a kick attempt — see
+    // the drag gesture below. Reset whenever the finger lifts.
+    @State private var lastDragLocation: CGPoint?
+    @State private var lastDragTime: Date?
+    @State private var swipeArmed = true
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // The boot follows a drag directly — where your thumb is is
-                // where the boot is. Attached to this background layer (not
-                // the whole ZStack) so it sits behind the HUD/control
-                // buttons in hit-testing order: a touch that starts on an
-                // actual button is claimed by that button first, and only
-                // touches on open field space drive the boot.
+                // One continuous gesture does both jobs: the boot follows
+                // your thumb (positioning), and a fast upward flick within
+                // that same drag is a kick attempt, with power scaled by
+                // how fast the flick was. Positioning alone (a slow drag)
+                // never scores — only an actual flick arms `requestKick`,
+                // same as a phone-motion flick or Tap Kick would. Attached
+                // to this background layer, not the whole ZStack, so a
+                // touch that starts on an actual button is claimed by that
+                // button first; only touches on open field space drive this.
                 Color(.systemBackground)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                let clampedX = min(max(value.location.x, 0), geo.size.width)
-                                game.footX = clampedX / geo.size.width
+                            .onChanged { value in handleDragChanged(value, fieldSize: geo.size) }
+                            .onEnded { _ in
+                                lastDragLocation = nil
+                                lastDragTime = nil
+                                swipeArmed = true
                             }
                     )
                 tickDriver
@@ -120,6 +135,46 @@ struct KeepyUppyViewV2: View {
             }
         }
         .sheet(isPresented: $showSafetyMessage) { safetySheet }
+    }
+
+    // MARK: - Touch control
+
+    /// Points/sec of upward finger speed needed to count as a kick flick,
+    /// vs. just repositioning the boot.
+    private let swipeTriggerSpeed: CGFloat = 500
+    /// Upward speed at which a swipe is treated as full (1.0) power —
+    /// scaled linearly below that.
+    private let swipeMaxPowerSpeed: CGFloat = 1800
+    /// Speed the finger has to drop back below before another flick can
+    /// arm — mirrors `MotionKickDetector`'s trigger/reset pair, same reason:
+    /// one continuous fast motion shouldn't fire more than one kick.
+    private let swipeResetSpeed: CGFloat = 150
+
+    private func handleDragChanged(_ value: DragGesture.Value, fieldSize: CGSize) {
+        let clampedX = min(max(value.location.x, 0), fieldSize.width)
+        game.footX = clampedX / fieldSize.width
+
+        defer {
+            lastDragLocation = value.location
+            lastDragTime = Date()
+        }
+
+        guard let lastLocation = lastDragLocation, let lastTime = lastDragTime else { return }
+        let dt = Date().timeIntervalSince(lastTime)
+        guard dt > 0 else { return }
+
+        // Screen y grows downward, so a finger moving up is a *decrease*
+        // in y — this is positive exactly when the finger is moving up.
+        let upwardSpeed = (lastLocation.y - value.location.y) / CGFloat(dt)
+
+        if upwardSpeed > swipeTriggerSpeed, swipeArmed {
+            swipeArmed = false
+            let power = min(max((upwardSpeed - swipeTriggerSpeed) / (swipeMaxPowerSpeed - swipeTriggerSpeed), 0), 1)
+            game.requestKick(power: Double(power))
+        }
+        if upwardSpeed < swipeResetSpeed {
+            swipeArmed = true
+        }
     }
 
     // MARK: - Physics tick
