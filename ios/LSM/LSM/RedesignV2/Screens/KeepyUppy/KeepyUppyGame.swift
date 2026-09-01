@@ -39,18 +39,30 @@ final class KeepyUppyGame {
     /// `KeepyUppyViewV2`'s `.onChange(of: game.lastFeedback)`.
     var lastFeedback: KickFeedback?
 
+    /// The boot's horizontal position, 0...1 — set every frame by the view
+    /// from calibrated device tilt (`MotionKickDetector.liveDirection`), not
+    /// owned/animated by this engine. Vertical position is fixed (`footY`);
+    /// only left/right is player-controlled.
+    var footX: CGFloat = 0.5
+    /// While `false` (motion controls off), a kick is always in reach
+    /// regardless of `footX`/`footReach` — the Tap Kick fallback must stay
+    /// a complete, always-works path per the design doc, not one gated on a
+    /// foot the player has no way to steer.
+    var motionActive = true
+
     // Tunables — POC defaults per the design doc; expect to retune on a
     // physical device alongside `MotionKickDetector`'s own thresholds.
     private let gravity: CGFloat = 1.25
-    private let contactZoneStart: CGFloat = 0.55
-    private let contactZoneEnd: CGFloat = 0.90
-    private let perfectContactY: CGFloat = 0.76
+    /// The boot's fixed height and how far the ball can be from it (in each
+    /// axis) and still count as a touch. Deliberately narrow — a wide,
+    /// full-width "contact zone" made every horizontal position equally
+    /// valid, which didn't feel like actually having to reach the ball.
+    let footY: CGFloat = 0.80
+    let footReach: CGFloat = 0.11
+    private let verticalTolerance: CGFloat = 0.07
     private let groundY: CGFloat = 0.94
     private let wallMargin: CGFloat = 0.06
     private let maxDeltaTime: CGFloat = 1.0 / 30.0
-
-    var contactZoneRange: ClosedRange<CGFloat> { contactZoneStart...contactZoneEnd }
-    var perfectContactPoint: CGFloat { perfectContactY }
 
     func start() {
         ball = BallState()
@@ -89,17 +101,26 @@ final class KeepyUppyGame {
         }
     }
 
-    /// Valid only while the ball is descending through the contact zone —
-    /// see docs/keepy-uppy-poc-scope.md "Applying a kick".
+    /// Valid only while the ball is descending, near the boot's height, and
+    /// close enough horizontally to actually be reachable — the boot's own
+    /// position (`footX`), not the swipe/tilt direction, is what has to
+    /// line up with the ball. Where on the boot it lands (`contactOffset`
+    /// below) determines the outgoing direction, the way an off-centre
+    /// real kick would glance sideways rather than travel dead straight.
     func applyKick(_ kick: KickInput) {
         guard isRunning, !isPaused, !isGameOver else { return }
         guard ball.velocityY > 0 else { return }
-        guard contactZoneRange.contains(ball.y) else {
+
+        let verticalDistance = abs(ball.y - footY)
+        let horizontalDistance = abs(ball.x - footX)
+        let effectiveReach = motionActive ? footReach : 1.0
+
+        guard verticalDistance <= verticalTolerance, horizontalDistance <= effectiveReach else {
             lastFeedback = .miss
             return
         }
 
-        let timing = timingQuality(for: ball.y)
+        let timing = timingQuality(verticalDistance: verticalDistance, horizontalDistance: horizontalDistance, reach: effectiveReach)
         guard timing > 0 else {
             lastFeedback = .miss
             return
@@ -111,10 +132,14 @@ final class KeepyUppyGame {
         let effectivePower = minimumUsefulPower + (kick.power * 0.38)
 
         let verticalKickStrength: CGFloat = 1.05
-        let horizontalKickStrength: CGFloat = 0.42
+        let horizontalKickStrength: CGFloat = 0.55
+
+        // -1 (hit the left edge of the boot) ... 1 (right edge) — a dead
+        // centre hit (0) goes straight up.
+        let contactOffset = effectiveReach == 0 ? 0 : max(-1, min(1, (ball.x - footX) / effectiveReach))
 
         ball.velocityY = -verticalKickStrength * CGFloat(effectivePower) * timing
-        ball.velocityX += CGFloat(kick.direction) * horizontalKickStrength
+        ball.velocityX += contactOffset * horizontalKickStrength
 
         score += 1
         lastFeedback = timing >= 1.0 ? .perfect : (timing >= 0.84 ? .good : .earlyOrLate)
@@ -122,19 +147,21 @@ final class KeepyUppyGame {
 
     /// Tap-to-kick fallback — same `applyKick` path as motion input, so
     /// accessibility controls and motion controls stay mechanically
-    /// consistent. Fixed at a straight, moderately powerful kick; a later
-    /// version could let the player drag/press different sides of the
-    /// button to choose direction.
+    /// consistent. Direction comes entirely from contact geometry now
+    /// (`applyKick`'s `contactOffset`), so there's nothing left for the tap
+    /// gesture itself to aim.
     func performTapKick() {
         applyKick(KickInput(power: 0.72, direction: 0, timestamp: Date()))
     }
 
-    private func timingQuality(for ballY: CGFloat) -> CGFloat {
-        let distance = abs(ballY - perfectContactY)
-        switch distance {
-        case 0..<0.04: return 1.0       // Perfect
-        case 0..<0.09: return 0.84      // Good
-        case 0..<0.15: return 0.62      // Early or late
+    private func timingQuality(verticalDistance: CGFloat, horizontalDistance: CGFloat, reach: CGFloat) -> CGFloat {
+        // How centred the contact was, on whichever axis is tighter —
+        // dead-centre-of-the-boot at exactly boot height is the sweet spot.
+        let normalized = max(verticalDistance / verticalTolerance, reach == 0 ? 0 : horizontalDistance / reach)
+        switch normalized {
+        case 0..<0.3: return 1.0        // Perfect
+        case 0..<0.6: return 0.84       // Good
+        case 0..<1.0: return 0.62       // Early or late / off-centre
         default: return 0               // Miss
         }
     }

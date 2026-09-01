@@ -36,7 +36,7 @@ struct KeepyUppyViewV2: View {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
                 tickDriver
-                contactZone(in: geo.size)
+                foot(in: geo.size)
                 ball(in: geo.size)
                 feedbackFlash
                 VStack(spacing: 16) {
@@ -55,10 +55,12 @@ struct KeepyUppyViewV2: View {
         .onAppear {
             motion.onKick = { [weak game = self.game] input in game?.applyKick(input) }
             motion.sensitivity = sensitivity
+            game.motionActive = motionEnabled
             if motionEnabled { motion.start() }
         }
         .onDisappear { motion.stop() }
         .onChange(of: motionEnabled) { _, enabled in
+            game.motionActive = enabled
             if enabled { motion.start() } else { motion.stop() }
         }
         .onChange(of: sensitivity) { _, newValue in motion.sensitivity = newValue }
@@ -96,26 +98,44 @@ struct KeepyUppyViewV2: View {
                 .onChange(of: timeline.date) { _, newDate in
                     let delta = lastTickDate.map { newDate.timeIntervalSince($0) } ?? 0
                     lastTickDate = newDate
+                    if motionEnabled { game.footX = mappedFootX(from: motion.liveDirection) }
                     game.tick(deltaTime: CGFloat(delta))
                 }
         }
     }
 
+    /// Maps calibrated tilt (-1...1) to the boot's on-screen x — clamped
+    /// short of the true edges so the boot sprite never renders half
+    /// off-screen at full tilt.
+    private func mappedFootX(from direction: Double) -> CGFloat {
+        let clamped = max(-1, min(1, direction))
+        return 0.5 + CGFloat(clamped) * 0.4
+    }
+
     // MARK: - Field
 
-    private func contactZone(in size: CGSize) -> some View {
-        let start = game.contactZoneRange.lowerBound * size.height
-        let end = game.contactZoneRange.upperBound * size.height
-        let perfect = game.perfectContactPoint * size.height
-        return ZStack(alignment: .top) {
-            Rectangle()
-                .fill(V2Theme.accent.opacity(0.12))
-                .frame(height: end - start)
-                .position(x: size.width / 2, y: (start + end) / 2)
-            Rectangle()
-                .fill(V2Theme.accent.opacity(0.6))
-                .frame(height: 2)
-                .position(x: size.width / 2, y: perfect)
+    /// The boot only renders while motion controls are on — with them off,
+    /// `KeepyUppyGame.motionActive` makes every contact reachable
+    /// regardless of position, so there's no meaningful boot position to
+    /// show (see `applyKick`'s `motionActive` handling).
+    @ViewBuilder
+    private func foot(in size: CGSize) -> some View {
+        if motionEnabled {
+            let x = game.footX * size.width
+            let y = game.footY * size.height
+            let reachRadius = game.footReach * size.width
+            ZStack {
+                // Reach ring — a tuning/feedback aid showing how close the
+                // ball needs to be, same spirit as the power/direction
+                // meters (docs/keepy-uppy-poc-scope.md "development aids").
+                Circle()
+                    .stroke(V2Theme.accent.opacity(0.35), lineWidth: 1.5)
+                    .frame(width: reachRadius * 2, height: reachRadius * 2)
+                    .position(x: x, y: y)
+                Text("🥾")
+                    .font(.system(size: 40))
+                    .position(x: x, y: y)
+            }
         }
     }
 
@@ -154,11 +174,8 @@ struct KeepyUppyViewV2: View {
             }
             Spacer()
             if motionEnabled {
-                VStack(spacing: 4) {
-                    powerMeter
-                    directionIndicator
-                }
-                .frame(width: 120)
+                powerMeter
+                    .frame(width: 120)
             }
             Spacer()
             VStack(alignment: .trailing) {
@@ -173,22 +190,6 @@ struct KeepyUppyViewV2: View {
             Text("Power").font(.caption2).foregroundStyle(.secondary)
             ProgressView(value: motion.livePower)
                 .tint(V2Theme.accent)
-        }
-    }
-
-    private var directionIndicator: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Direction").font(.caption2).foregroundStyle(.secondary)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.secondary.opacity(0.2)).frame(height: 6)
-                    Circle()
-                        .fill(V2Theme.accent)
-                        .frame(width: 10, height: 10)
-                        .offset(x: (geo.size.width - 10) * CGFloat((motion.liveDirection + 1) / 2))
-                }
-            }
-            .frame(height: 10)
         }
     }
 
