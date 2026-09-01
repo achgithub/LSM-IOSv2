@@ -39,6 +39,23 @@ final class KeepyUppyGame {
     /// `KeepyUppyViewV2`'s `.onChange(of: game.lastFeedback)`.
     var lastFeedback: KickFeedback?
 
+    /// Signed lateral wind force currently applied to the ball, roughly
+    /// -1 (strong left) ... 1 (strong right) — see `updateWind`. Smoothed
+    /// toward `windTarget` rather than snapping, so the windsock visibly
+    /// swings before the ball actually feels the new gust (telegraphing,
+    /// not a surprise shove).
+    private(set) var windSpeed: CGFloat = 0
+    /// True once score has crossed into a wind tier — the windsock only
+    /// renders while this is true (docs: "starts easy, no wind").
+    var isWindActive: Bool { Self.windTier(for: score).maxStrength > 0 }
+    /// Set once per tier crossing, cleared by the view after it shows the
+    /// banner/haptic — same pattern as `lastFeedback`.
+    var tierAnnouncement: String?
+
+    private var windTarget: CGFloat = 0
+    private var windGustTimer: CGFloat = 0
+    private var lastAnnouncedTier = 0
+
     /// The boot's horizontal position, 0...1 — set every frame by the view
     /// from calibrated device tilt (`MotionKickDetector.liveDirection`), not
     /// owned/animated by this engine. Vertical position is fixed (`footY`);
@@ -63,6 +80,52 @@ final class KeepyUppyGame {
     private let groundY: CGFloat = 0.94
     private let wallMargin: CGFloat = 0.06
     private let maxDeltaTime: CGFloat = 1.0 / 30.0
+    /// How strongly `windSpeed` actually pushes the ball each tick — a
+    /// separate scale from `windSpeed`'s own -1...1 range so the two can be
+    /// tuned independently (visual vane swing vs. felt physics effect).
+    private let windAcceleration: CGFloat = 1.6
+    /// How quickly `windSpeed` chases `windTarget` — lower reads as more
+    /// "gust arriving," higher as "instant shove." Not proportional to
+    /// deltaTime directly since this is a per-second chase rate, not a
+    /// fixed-per-frame step.
+    private let windSmoothingRate: CGFloat = 0.5
+
+    /// One entry of the score-based difficulty ladder (every 20 points, per
+    /// Andrew) — kept as plain data so `updateWind`/`isWindActive` don't
+    /// duplicate the score thresholds. `isGusty` false means "steady": one
+    /// constant-strength push rather than a randomised gust cycle.
+    private struct WindTier {
+        let maxStrength: CGFloat
+        let isGusty: Bool
+        let announcement: String?
+    }
+
+    private static func windTier(for score: Int) -> WindTier {
+        switch score {
+        case ..<20:
+            return WindTier(maxStrength: 0, isGusty: false, announcement: nil)
+        case 20..<40:
+            return WindTier(maxStrength: 0.18, isGusty: false, announcement: "Wind picking up")
+        case 40..<60:
+            return WindTier(maxStrength: 0.30, isGusty: true, announcement: "Gusts incoming")
+        case 60..<80:
+            return WindTier(maxStrength: 0.45, isGusty: true, announcement: "Strong gusts")
+        default:
+            return WindTier(maxStrength: 0.60, isGusty: true, announcement: "Full storm")
+        }
+    }
+
+    /// Index of the tier `score` falls in — only used to detect a
+    /// *crossing* (see `checkTierMilestone`), not for any wind math itself.
+    private static func windTierIndex(for score: Int) -> Int {
+        switch score {
+        case ..<20: return 0
+        case 20..<40: return 1
+        case 40..<60: return 2
+        case 60..<80: return 3
+        default: return 4
+        }
+    }
 
     func start() {
         ball = BallState()
@@ -71,6 +134,11 @@ final class KeepyUppyGame {
         isPaused = false
         isRunning = true
         lastFeedback = nil
+        windSpeed = 0
+        windTarget = 0
+        windGustTimer = 0
+        lastAnnouncedTier = 0
+        tierAnnouncement = nil
     }
 
     func pause() { isPaused = true }
@@ -83,7 +151,10 @@ final class KeepyUppyGame {
         guard isRunning, !isPaused, !isGameOver else { return }
         let deltaTime = min(rawDeltaTime, maxDeltaTime)
 
+        updateWind(deltaTime: deltaTime)
+
         ball.velocityY += gravity * deltaTime
+        ball.velocityX += windSpeed * windAcceleration * deltaTime
         ball.x += ball.velocityX * deltaTime
         ball.y += ball.velocityY * deltaTime
 
@@ -143,6 +214,45 @@ final class KeepyUppyGame {
 
         score += 1
         lastFeedback = timing >= 1.0 ? .perfect : (timing >= 0.84 ? .good : .earlyOrLate)
+        checkTierMilestone()
+    }
+
+    /// Steps `windSpeed` toward whatever this score's tier calls for.
+    /// "Steady" tiers pick one strength+direction and hold it; "gusty"
+    /// tiers re-roll a new target every few seconds. Either way `windSpeed`
+    /// eases toward `windTarget` rather than jumping — see
+    /// `windSmoothingRate`.
+    private func updateWind(deltaTime: CGFloat) {
+        let tier = Self.windTier(for: score)
+
+        guard tier.maxStrength > 0 else {
+            windTarget = 0
+            windSpeed = 0
+            windGustTimer = 0
+            return
+        }
+
+        if tier.isGusty {
+            windGustTimer -= deltaTime
+            if windGustTimer <= 0 {
+                windGustTimer = CGFloat.random(in: 3...6)
+                windTarget = CGFloat.random(in: -tier.maxStrength...tier.maxStrength)
+            }
+        } else if windTarget == 0 {
+            // Steady tier, not yet rolled — pick one direction and hold it
+            // for the rest of the tier.
+            windTarget = Bool.random() ? tier.maxStrength : -tier.maxStrength
+        }
+
+        let chase = min(1, windSmoothingRate * deltaTime)
+        windSpeed += (windTarget - windSpeed) * chase
+    }
+
+    private func checkTierMilestone() {
+        let tier = Self.windTierIndex(for: score)
+        guard tier != lastAnnouncedTier else { return }
+        lastAnnouncedTier = tier
+        tierAnnouncement = Self.windTier(for: score).announcement
     }
 
     /// Tap-to-kick fallback — same `applyKick` path as motion input, so

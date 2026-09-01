@@ -28,6 +28,7 @@ struct KeepyUppyViewV2: View {
     @State private var isCalibrating = false
     @State private var calibrationSecondsLeft = 3
     @State private var flashFeedback: KickFeedback?
+    @State private var tierBannerText: String?
 
     private let calibrationTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -36,17 +37,22 @@ struct KeepyUppyViewV2: View {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
                 tickDriver
+                windsock(in: geo.size)
                 foot(in: geo.size)
                 ball(in: geo.size)
                 feedbackFlash
                 VStack(spacing: 16) {
                     hud
+                    if let tierBannerText {
+                        tierBanner(tierBannerText)
+                    }
                     Spacer()
                     if game.isGameOver {
                         gameOverPanel
                     }
                     controls
                 }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: tierBannerText)
                 .padding()
             }
         }
@@ -82,6 +88,16 @@ struct KeepyUppyViewV2: View {
                 if flashFeedback == feedback { flashFeedback = nil }
             }
         }
+        .onChange(of: game.tierAnnouncement) { _, message in
+            guard let message else { return }
+            tierBannerText = message
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            game.tierAnnouncement = nil
+            Task {
+                try? await Task.sleep(nanoseconds: 1_600_000_000)
+                if tierBannerText == message { tierBannerText = nil }
+            }
+        }
         .sheet(isPresented: $showSafetyMessage) { safetySheet }
     }
 
@@ -113,6 +129,44 @@ struct KeepyUppyViewV2: View {
     }
 
     // MARK: - Field
+
+    /// Corner-flag-style windsock — a football-native stand-in for an
+    /// abstract compass, since a real corner flag already tells players
+    /// wind direction. Only appears once score crosses into a wind tier
+    /// (docs: "starts easy, no wind"); rotation/flutter speed reflect
+    /// `windSpeed`, giving the same dev-aid-turned-player-feedback role as
+    /// the power meter.
+    @ViewBuilder
+    private func windsock(in size: CGSize) -> some View {
+        if game.isWindActive {
+            VStack(spacing: 2) {
+                Text("🚩")
+                    .font(.system(size: 30))
+                    .rotationEffect(.degrees(Double(game.windSpeed) * 50))
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: game.windSpeed)
+                Text(windSpeedLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .position(x: size.width - 40, y: 70)
+        }
+    }
+
+    private var windSpeedLabel: String {
+        let mph = Int(abs(game.windSpeed) * 40)
+        guard mph > 0 else { return "Calm" }
+        return "\(mph) mph \(game.windSpeed >= 0 ? "→" : "←")"
+    }
+
+    private func tierBanner(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.subheadline.bold())
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: Capsule())
+            .frame(maxWidth: .infinity)
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+    }
 
     /// The boot only renders while motion controls are on — with them off,
     /// `KeepyUppyGame.motionActive` makes every contact reachable
