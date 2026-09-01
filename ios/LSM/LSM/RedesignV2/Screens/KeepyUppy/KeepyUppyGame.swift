@@ -93,16 +93,26 @@ final class KeepyUppyGame {
     private var seagullSpawnTimer: CGFloat = 0
     private var droneSpawnTimer: CGFloat = 0
 
-    /// The boot's horizontal position, 0...1 — set every frame by the view
-    /// from calibrated device tilt (`MotionKickDetector.liveDirection`), not
-    /// owned/animated by this engine. Vertical position is fixed (`footY`);
-    /// only left/right is player-controlled.
+    /// The boot's horizontal position, 0...1 — set by the view from a touch
+    /// drag on the field, not owned/animated by this engine. Vertical
+    /// position is fixed (`footY`); only left/right is player-controlled.
+    /// Was tilt-driven; moved to touch after on-device testing found
+    /// roll-based aiming imprecise, and touch is simply the more direct
+    /// mapping — where your thumb is is where the boot is.
     var footX: CGFloat = 0.5
-    /// While `false` (motion controls off), a kick is always in reach
-    /// regardless of `footX`/`footReach` — the Tap Kick fallback must stay
-    /// a complete, always-works path per the design doc, not one gated on a
-    /// foot the player has no way to steer.
-    var motionActive = true
+
+    /// A flick (or Tap Kick) doesn't move the ball by itself any more — it
+    /// only arms a short-lived request that `updateBootContact` consults
+    /// the moment the ball actually touches the boot. This lets contact
+    /// with the boot always do *something* physical (see
+    /// `updateBootContact`'s passive-bounce path) instead of the ball
+    /// silently falling through whenever a kick attempt and the ball's
+    /// arrival don't land in the exact same instant.
+    private var pendingKickPower: Double?
+    private var pendingKickAge: CGFloat = 0
+    /// How long a flick/tap stays "armed" waiting for the ball to actually
+    /// arrive at the boot before it's considered too late.
+    private let kickRequestWindow: CGFloat = 0.35
 
     // Tunables — POC defaults per the design doc; expect to retune on a
     // physical device alongside `MotionKickDetector`'s own thresholds.
@@ -126,6 +136,13 @@ final class KeepyUppyGame {
     /// deltaTime directly since this is a per-second chase rate, not a
     /// fixed-per-frame step.
     private let windSmoothingRate: CGFloat = 0.5
+    /// A touch/no-kick-request bounce off the boot — weaker than any scored
+    /// kick, so it's clearly the "the boot is just solid" case, not a
+    /// substitute for actually timing a flick.
+    private let passiveBounceStrength: CGFloat = 0.5
+    private let passiveHorizontalStrength: CGFloat = 0.25
+    private let verticalKickStrength: CGFloat = 1.05
+    private let horizontalKickStrength: CGFloat = 0.55
 
     /// One entry of the score-based difficulty ladder (every 20 points, per
     /// Andrew) — kept as plain data so `updateWind`/`isWindActive` don't
@@ -219,6 +236,8 @@ final class KeepyUppyGame {
         obstacleHitEvent = nil
         seagullSpawnTimer = 0
         droneSpawnTimer = 0
+        pendingKickPower = nil
+        pendingKickAge = 0
     }
 
     func pause() { isPaused = true }
@@ -232,12 +251,14 @@ final class KeepyUppyGame {
         let deltaTime = min(rawDeltaTime, maxDeltaTime)
 
         updateWind(deltaTime: deltaTime)
+        ageKickRequest(deltaTime: deltaTime)
 
         ball.velocityY += gravity * deltaTime
         ball.velocityX += windSpeed * windAcceleration * deltaTime
         ball.x += ball.velocityX * deltaTime
         ball.y += ball.velocityY * deltaTime
 
+        updateBootContact()
         updateObstacles(deltaTime: deltaTime)
 
         // Soft side-wall rebounds keep the POC playable.
@@ -254,27 +275,58 @@ final class KeepyUppyGame {
         }
     }
 
-    /// Valid only while the ball is descending, near the boot's height, and
-    /// close enough horizontally to actually be reachable — the boot's own
-    /// position (`footX`), not the swipe/tilt direction, is what has to
-    /// line up with the ball. Where on the boot it lands (`contactOffset`
-    /// below) determines the outgoing direction, the way an off-centre
-    /// real kick would glance sideways rather than travel dead straight.
-    func applyKick(_ kick: KickInput) {
+    /// Arms a kick attempt (from a flick or Tap Kick) without touching the
+    /// ball directly — `updateBootContact` is the only place that actually
+    /// moves the ball on contact, so there's exactly one code path to
+    /// reason about instead of two systems racing to decide what happens
+    /// when the ball reaches the boot.
+    func requestKick(power: Double) {
         guard isRunning, !isPaused, !isGameOver else { return }
+        pendingKickPower = power
+        pendingKickAge = 0
+    }
+
+    private func ageKickRequest(deltaTime: CGFloat) {
+        guard pendingKickPower != nil else { return }
+        pendingKickAge += deltaTime
+        if pendingKickAge > kickRequestWindow {
+            pendingKickPower = nil
+        }
+    }
+
+    /// The boot is a solid object: any time the descending ball is close
+    /// enough (see `footReach`/`verticalTolerance`), *something* happens —
+    /// either a real, scored kick if a flick/tap was armed recently enough
+    /// (`pendingKickPower`), or a weaker passive bounce if not. Either way
+    /// the outgoing velocity always goes negative, which is what keeps this
+    /// from re-firing every frame of continued overlap — the `velocityY > 0`
+    /// guard below naturally won't pass again until the ball has looped
+    /// back down for a new touch.
+    private func updateBootContact() {
         guard ball.velocityY > 0 else { return }
 
         let verticalDistance = abs(ball.y - footY)
         let horizontalDistance = abs(ball.x - footX)
-        let effectiveReach = motionActive ? footReach : 1.0
+        guard verticalDistance <= verticalTolerance, horizontalDistance <= footReach else { return }
 
-        guard verticalDistance <= verticalTolerance, horizontalDistance <= effectiveReach else {
-            lastFeedback = .miss
+        // -1 (touched the left edge of the boot) ... 1 (right edge) — a
+        // dead-centre touch goes straight up, off-centre glances sideways,
+        // the way a real touch would.
+        let contactOffset = footReach == 0 ? 0 : max(-1, min(1, (ball.x - footX) / footReach))
+
+        guard let power = pendingKickPower else {
+            ball.velocityY = -passiveBounceStrength
+            ball.velocityX += contactOffset * passiveHorizontalStrength
             return
         }
+        pendingKickPower = nil
 
-        let timing = timingQuality(verticalDistance: verticalDistance, horizontalDistance: horizontalDistance, reach: effectiveReach)
+        let timing = timingQuality(verticalDistance: verticalDistance, horizontalDistance: horizontalDistance, reach: footReach)
         guard timing > 0 else {
+            // Attempted, but badly mistimed — still just a passive bounce,
+            // not a wasted touch that lets the ball fall straight through.
+            ball.velocityY = -passiveBounceStrength
+            ball.velocityX += contactOffset * passiveHorizontalStrength
             lastFeedback = .miss
             return
         }
@@ -282,14 +334,7 @@ final class KeepyUppyGame {
         // Every valid gesture gets a minimum useful power so a gentle
         // movement never feels like the game ignored the player.
         let minimumUsefulPower = 0.62
-        let effectivePower = minimumUsefulPower + (kick.power * 0.38)
-
-        let verticalKickStrength: CGFloat = 1.05
-        let horizontalKickStrength: CGFloat = 0.55
-
-        // -1 (hit the left edge of the boot) ... 1 (right edge) — a dead
-        // centre hit (0) goes straight up.
-        let contactOffset = effectiveReach == 0 ? 0 : max(-1, min(1, (ball.x - footX) / effectiveReach))
+        let effectivePower = minimumUsefulPower + (power * 0.38)
 
         ball.velocityY = -verticalKickStrength * CGFloat(effectivePower) * timing
         ball.velocityX += contactOffset * horizontalKickStrength
@@ -430,13 +475,13 @@ final class KeepyUppyGame {
         ))
     }
 
-    /// Tap-to-kick fallback — same `applyKick` path as motion input, so
-    /// accessibility controls and motion controls stay mechanically
-    /// consistent. Direction comes entirely from contact geometry now
-    /// (`applyKick`'s `contactOffset`), so there's nothing left for the tap
-    /// gesture itself to aim.
+    /// Tap-to-kick fallback — same `requestKick`/`updateBootContact` path
+    /// as motion input, so accessibility controls and motion controls stay
+    /// mechanically consistent. Direction comes entirely from contact
+    /// geometry (`updateBootContact`'s `contactOffset`), so there's nothing
+    /// left for the tap gesture itself to aim.
     func performTapKick() {
-        applyKick(KickInput(power: 0.72, direction: 0, timestamp: Date()))
+        requestKick(power: 0.72)
     }
 
     private func timingQuality(verticalDistance: CGFloat, horizontalDistance: CGFloat, reach: CGFloat) -> CGFloat {

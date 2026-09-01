@@ -1,4 +1,3 @@
-import Combine
 import SwiftUI
 import UIKit
 
@@ -25,18 +24,29 @@ struct KeepyUppyViewV2: View {
 
     @State private var lastTickDate: Date?
     @State private var showSafetyMessage = false
-    @State private var isCalibrating = false
-    @State private var calibrationSecondsLeft = 3
     @State private var flashFeedback: KickFeedback?
     @State private var tierBannerText: String?
     @State private var obstacleFlashActive = false
 
-    private let calibrationTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                // The boot follows a drag directly — where your thumb is is
+                // where the boot is. Attached to this background layer (not
+                // the whole ZStack) so it sits behind the HUD/control
+                // buttons in hit-testing order: a touch that starts on an
+                // actual button is claimed by that button first, and only
+                // touches on open field space drive the boot.
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let clampedX = min(max(value.location.x, 0), geo.size.width)
+                                game.footX = clampedX / geo.size.width
+                            }
+                    )
                 tickDriver
                 windsock(in: geo.size)
                 obstaclesView(in: geo.size)
@@ -62,14 +72,12 @@ struct KeepyUppyViewV2: View {
         .navigationTitle("Keepy-Uppy (POC)")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            motion.onKick = { [weak game = self.game] input in game?.applyKick(input) }
+            motion.onKick = { [weak game = self.game] input in game?.requestKick(power: input.power) }
             motion.sensitivity = sensitivity
-            game.motionActive = motionEnabled
             if motionEnabled { motion.start() }
         }
         .onDisappear { motion.stop() }
         .onChange(of: motionEnabled) { _, enabled in
-            game.motionActive = enabled
             if enabled { motion.start() } else { motion.stop() }
         }
         .onChange(of: sensitivity) { _, newValue in motion.sensitivity = newValue }
@@ -127,18 +135,9 @@ struct KeepyUppyViewV2: View {
                 .onChange(of: timeline.date) { _, newDate in
                     let delta = lastTickDate.map { newDate.timeIntervalSince($0) } ?? 0
                     lastTickDate = newDate
-                    if motionEnabled { game.footX = mappedFootX(from: motion.liveDirection) }
                     game.tick(deltaTime: CGFloat(delta))
                 }
         }
-    }
-
-    /// Maps calibrated tilt (-1...1) to the boot's on-screen x — clamped
-    /// short of the true edges so the boot sprite never renders half
-    /// off-screen at full tilt.
-    private func mappedFootX(from direction: Double) -> CGFloat {
-        let clamped = max(-1, min(1, direction))
-        return 0.5 + CGFloat(clamped) * 0.4
     }
 
     // MARK: - Field
@@ -205,28 +204,24 @@ struct KeepyUppyViewV2: View {
             .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
     }
 
-    /// The boot only renders while motion controls are on — with them off,
-    /// `KeepyUppyGame.motionActive` makes every contact reachable
-    /// regardless of position, so there's no meaningful boot position to
-    /// show (see `applyKick`'s `motionActive` handling).
-    @ViewBuilder
+    /// Always rendered — the boot is now the primary control (drag to
+    /// position it) regardless of whether motion controls are on, not
+    /// something that only exists when motion is active.
     private func foot(in size: CGSize) -> some View {
-        if motionEnabled {
-            let x = game.footX * size.width
-            let y = game.footY * size.height
-            let reachRadius = game.footReach * size.width
-            ZStack {
-                // Reach ring — a tuning/feedback aid showing how close the
-                // ball needs to be, same spirit as the power/direction
-                // meters (docs/keepy-uppy-poc-scope.md "development aids").
-                Circle()
-                    .stroke(V2Theme.accent.opacity(0.35), lineWidth: 1.5)
-                    .frame(width: reachRadius * 2, height: reachRadius * 2)
-                    .position(x: x, y: y)
-                Text("🥾")
-                    .font(.system(size: 40))
-                    .position(x: x, y: y)
-            }
+        let x = game.footX * size.width
+        let y = game.footY * size.height
+        let reachRadius = game.footReach * size.width
+        return ZStack {
+            // Reach ring — a tuning/feedback aid showing how close the
+            // ball needs to be, same spirit as the power meter
+            // (docs/keepy-uppy-poc-scope.md "development aids").
+            Circle()
+                .stroke(V2Theme.accent.opacity(0.35), lineWidth: 1.5)
+                .frame(width: reachRadius * 2, height: reachRadius * 2)
+                .position(x: x, y: y)
+            Text("🥾")
+                .font(.system(size: 40))
+                .position(x: x, y: y)
         }
     }
 
@@ -323,7 +318,10 @@ struct KeepyUppyViewV2: View {
 
             DisclosureGroup("Motion settings") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Toggle("Motion controls", isOn: $motionEnabled)
+                    // Drag the boot always works — this only toggles
+                    // whether a phone flick can *also* trigger a kick, on
+                    // top of Tap Kick.
+                    Toggle("Motion flick-to-kick", isOn: $motionEnabled)
                     Toggle("Haptics", isOn: $hapticsEnabled)
                     VStack(alignment: .leading) {
                         Text("Sensitivity: \(sensitivity, specifier: "%.1f")")
@@ -331,26 +329,9 @@ struct KeepyUppyViewV2: View {
                             .foregroundStyle(.secondary)
                         Slider(value: $sensitivity, in: 0.5...2.0, step: 0.1)
                     }
-                    Button {
-                        startCalibration()
-                    } label: {
-                        Label(
-                            isCalibrating ? "Hold still… \(calibrationSecondsLeft)" : "Calibrate neutral position",
-                            systemImage: "location.north.line"
-                        )
-                    }
-                    .disabled(!motionEnabled || isCalibrating)
+                    .disabled(!motionEnabled)
                 }
                 .padding(.top, 6)
-            }
-        }
-        .onReceive(calibrationTimer) { _ in
-            guard isCalibrating else { return }
-            if calibrationSecondsLeft > 1 {
-                calibrationSecondsLeft -= 1
-            } else {
-                motion.calibrate()
-                isCalibrating = false
             }
         }
     }
@@ -369,11 +350,6 @@ struct KeepyUppyViewV2: View {
         } else {
             game.start()
         }
-    }
-
-    private func startCalibration() {
-        calibrationSecondsLeft = 3
-        isCalibrating = true
     }
 
     // MARK: - Safety sheet
