@@ -168,6 +168,17 @@ private struct HomeHelpPanel: View {
                     } label: {
                         row("Report a Bug", icon: "ladybug.fill", tint: V2Theme.Mode.killer)
                     }
+                    #if DEBUG
+                    // POC only — see docs/keepy-uppy-poc-scope.md. Not a
+                    // shipping mode, deliberately kept out of the Games
+                    // picker; dev-only entry point until motion-control
+                    // feel is validated on a physical device.
+                    NavigationLink {
+                        KeepyUppyViewV2()
+                    } label: {
+                        row("Keepy-Uppy (POC)", icon: "figure.soccer", tint: V2Theme.Mode.predictor)
+                    }
+                    #endif
                 }
                 Text(DataDisclaimer.text)
                     .font(.caption2)
