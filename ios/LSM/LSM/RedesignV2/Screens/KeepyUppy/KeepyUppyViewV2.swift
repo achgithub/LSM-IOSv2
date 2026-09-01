@@ -3,9 +3,11 @@ import SwiftUI
 import UIKit
 
 /// Standalone POC screen for the keepy-uppy motion-control experiment
-/// (docs/keepy-uppy-poc-scope.md). Reached only from Settings' Help panel
-/// behind a `#if DEBUG` row (see `V2PreviewMenuView`'s `HomeHelpPanel`) —
-/// deliberately outside the Games/LMS/Predictor/Killer mode infrastructure,
+/// (docs/keepy-uppy-poc-scope.md). Reached only from a row in Settings' Help
+/// panel (see `V2PreviewMenuView`'s `HomeHelpPanel`) — builds in Release too,
+/// since motion feel can only be validated via TestFlight on a physical
+/// device, not the Simulator. Deliberately outside the Games/LMS/Predictor/
+/// Killer mode infrastructure,
 /// since this doesn't create a `Game` and isn't a shipping mode. Purpose is
 /// solely to validate whether the motion mechanic feels good before any
 /// artwork/progression/monetisation work is considered.
