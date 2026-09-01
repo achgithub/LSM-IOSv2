@@ -72,9 +72,16 @@ final class SyncScheduler {
         await withTaskGroup(of: Void.self) { group in
             for league in leagues {
                 group.addTask { @MainActor in
+                    // Matches only auto-refresh while a fixture is actually
+                    // in its active window — never on the shared 120s
+                    // `matches` clock unconditionally. That clock stays
+                    // reserved for the manual refresh tap (Fixtures tab /
+                    // Results entry); this ladder polls at the much slower
+                    // `matchesLiveWindow` cadence, and not at all otherwise.
+                    guard liveWindowActive else { return }
                     let key = LeagueDataCache.matchesKey(league.id)
                     let cached = LeagueDataCache.load(LeagueDataCache.Matches.self, key: key)
-                    guard cached == nil || !LeagueDataCache.isFresh(cached!.date, ttl: CacheTTL.matches) else { return }
+                    guard cached == nil || !LeagueDataCache.isFresh(cached!.date, ttl: CacheTTL.matchesLiveWindow) else { return }
                     _ = try? await LeagueData.pullLiveMatches(for: league)
                 }
                 group.addTask { @MainActor in

@@ -2,6 +2,21 @@
 
 Status: **draft design, not yet implemented** (2026-08-27, extended 2026-08-30).
 
+**Correction (2026-09-01):** the "Relaxed window" rule below — matches
+auto-refreshing unconditionally on the shared 120s `CacheTTL.matches` clock —
+was wrong and has been reversed in `SyncScheduler.swift`. That let matches
+silently re-pull on almost every foreground/appear (any gap over 2 minutes),
+which is far too aggressive for background polling and was the cause of the
+Fixtures panel's footer looking like it had "just synced" without the user
+touching anything. Per Andrew: **matches only auto-refresh while a fixture is
+in its active window** (same gate as the standings tightened-TTL rule below),
+at a new `CacheTTL.matchesLiveWindow` (10 min) cadence — never on a bare 120s
+timer regardless of live state. The 120s `CacheTTL.matches` clock stays
+reserved for the manual refresh tap (Fixtures tab / Results entry), which is
+supposed to be that responsive. Every "Relaxed window: matches" reference
+below is superseded by this — read `SyncScheduler.refreshIfDue` as the source
+of truth for matches' actual cadence, not this doc's original table.
+
 ## Scope: V2 screens only (2026-08-30)
 
 All screen-triggered wiring in this doc targets **V2 screens only**

@@ -37,10 +37,16 @@ enum CacheTTL {
     /// docs/sync-refresh-policy.md): standings TTL used instead of the 30-min
     /// `standings` value above while a round has a fixture in its active
     /// window (kickoff-adjacent, not yet finished — see
-    /// `SyncScheduler.isFixtureActive`). Matches keeps its normal `matches`
-    /// TTL even then — 120s is already tight enough that a separate live
-    /// value would never bite.
+    /// `SyncScheduler.isFixtureActive`).
     static let standingsLiveWindow: TimeInterval = 10 * 60
+    /// V2-only auto-refresh (`SyncScheduler`): matches only auto-refresh at
+    /// all while a fixture is in its active window (see
+    /// `standingsLiveWindow` above for the same gate on standings) — per
+    /// Andrew, background polling must never run off the shared `matches`
+    /// (120s) TTL unconditionally; that clock stays reserved for the manual
+    /// refresh tap (Fixtures tab / Results entry), which explicitly wants
+    /// to be that responsive. 10 min matches `standingsLiveWindow`'s cadence.
+    static let matchesLiveWindow: TimeInterval = 10 * 60
     /// V2-only (`SyncScheduler`): a fixture becomes an active-window
     /// candidate this long before its kickoff — catches pre-match delays so
     /// polling is already running the moment a match actually starts. There

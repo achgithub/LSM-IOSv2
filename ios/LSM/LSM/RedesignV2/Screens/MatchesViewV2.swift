@@ -126,15 +126,11 @@ struct MatchesViewV2: View {
                 .background(.ultraThinMaterial)
             }
         }
-        .safeAreaInset(edge: .bottom) { footer }
         .task(id: enabled.leagues.map(\.id)) {
             let validIds = Set(enabled.leagues.map(\.id))
             selectedLeagueIds.formIntersection(validIds)
             if selectedLeagueIds.isEmpty { selectedLeagueIds = validIds }
             await store.load(leagues: enabled.leagues)
-        }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { tick in
-            if store.isThrottled { store.now = tick }
         }
         .onChange(of: filterKey) { recomputeFiltered() }
         .task { recomputeFiltered() }
@@ -163,24 +159,6 @@ struct MatchesViewV2: View {
                 }
             }
         }
-    }
-
-    private var footer: some View {
-        VStack(spacing: 4) {
-            if let lastRefreshed = store.lastRefreshed {
-                Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            }
-            if store.isThrottled, let freshUntil = store.freshUntil {
-                let remaining = Duration.seconds(max(0, freshUntil.timeIntervalSince(store.now)))
-                Text("Refresh available in \(remaining.formatted(.time(pattern: .minuteSecond)))")
-                    .font(.caption2)
-                    .foregroundStyle(V2Theme.textSecondary)
-            }
-        }
-        .padding(.bottom, 6)
-        .background(.ultraThinMaterial)
     }
 
     // MARK: - Filter sheet
