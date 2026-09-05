@@ -1,14 +1,15 @@
 import SwiftUI
 import SwiftData
 
-/// Card restyle of `ProfileSettingsView` — same merge (name, optional
-/// recovery email, cloud games list) in one screen instead of three
-/// separate rows. See that file's header comment for why the merge and why
-/// email is free for every tier.
+/// Card restyle of `ProfileSettingsView` — same merge (name, recovery email,
+/// cloud games list) in one screen instead of three separate rows. See that
+/// file's header comment for why the merge and why registering is gated to
+/// cloud tiers.
 struct ProfileSettingsViewV2: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
     @Environment(\.modelContext) private var context
+    @State private var entitlements = Entitlements.shared
     @State private var syncModel = GameSyncListModel()
 
     @State private var emailDraft = ""
@@ -77,14 +78,24 @@ struct ProfileSettingsViewV2: View {
                             .foregroundStyle(V2Theme.textSecondary)
                     }
                 }
-                Button("Use a Different Email", role: .destructive) {
-                    linkedEmail = ""
-                    emailStage = .enterEmail
-                    emailDraft = ""
-                    otpDraft = ""
+                // Read-only below the cloud tiers: registering was ungated
+                // before, so managers on Free/No Ads may already have an
+                // email on file. Recovery keeps working for them (link-device
+                // is never gated) — they just can't re-point it until they're
+                // back on a cloud tier. Taking a safety net away from someone
+                // who already has it is worse than not offering a new one.
+                if entitlements.canUseCloud {
+                    Button("Use a Different Email", role: .destructive) {
+                        linkedEmail = ""
+                        emailStage = .enterEmail
+                        emailDraft = ""
+                        otpDraft = ""
+                    }
+                    .font(.subheadline.weight(.semibold))
                 }
-                .font(.subheadline.weight(.semibold))
             }
+        } else if !entitlements.canUseCloud {
+            cloudUpsellCard
         } else {
             switch emailStage {
             case .enterEmail:
@@ -135,6 +146,23 @@ struct ProfileSettingsViewV2: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(V2Theme.accent)
                 }
+            }
+        }
+    }
+
+    /// What Free/No Ads sees in place of the registration form. Names the
+    /// alternative that actually exists today rather than only advertising
+    /// the upgrade — export is a real backup route, not a consolation prize.
+    private var cloudUpsellCard: some View {
+        Card(floating: true) {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader(title: "Recover On A New Phone")
+                Text("Registering an email so you can recover your games on a new phone is part of the 3 Leagues plan and above.")
+                    .font(.caption)
+                    .foregroundStyle(V2Theme.textSecondary)
+                Text("On your current plan, back up a game with Export for Transfer from its menu, then import it on the new phone.")
+                    .font(.caption)
+                    .foregroundStyle(V2Theme.textSecondary)
             }
         }
     }

@@ -1,19 +1,28 @@
 import SwiftUI
 import SwiftData
 
-/// The manager's own identity: display name, optional recovery email, and
-/// the list of this account's cloud games available to pull onto this
-/// device. Combines what used to be three separate rows (Profile, Account,
-/// Sync Games) into one screen — the split never explained itself well
-/// ("why is there a whole separate 'Account' screen, and what does 'Sync
-/// Games' even mean here?"). Free for every tier: the email is a safety net
-/// that costs nothing until it's actually needed, gating it behind a
-/// subscription only reaches the people who won't need it and misses the
-/// free-tier user who loses their phone before ever upgrading.
+/// The manager's own identity: display name, recovery email, and the list of
+/// this account's cloud games available to pull onto this device. Combines
+/// what used to be three separate rows (Profile, Account, Sync Games) into
+/// one screen — the split never explained itself well ("why is there a whole
+/// separate 'Account' screen, and what does 'Sync Games' even mean here?").
+///
+/// Registering an email is gated to cloud tiers (`leagues_3` and above, see
+/// `Entitlements.canUseCloud`). It was open to every tier until 2026-09-05 on
+/// the reasoning that a safety net costs nothing until it's needed; that's
+/// reversed now, because the net is cloud-side recovery infrastructure and
+/// it's priced with the rest of the cloud bundle. Free/No Ads back up with
+/// Export for Transfer instead.
+///
+/// Only *registering* is gated. Recovery itself (`LinkDeviceView`,
+/// `ReauthorizeDeviceView`) is open at every tier and must stay that way —
+/// see `ManagerOnboardingView`'s header for why gating it would strand
+/// exactly the paying managers it's meant to serve.
 struct ProfileSettingsView: View {
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
     @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
     @Environment(\.modelContext) private var context
+    @State private var entitlements = Entitlements.shared
     @State private var syncModel = GameSyncListModel()
 
     @State private var emailDraft = ""
@@ -64,13 +73,25 @@ struct ProfileSettingsView: View {
             } footer: {
                 Text("If you get a new phone, enter this email during setup to recover your games.")
             }
-            Section {
-                Button("Use a Different Email", role: .destructive) {
-                    linkedEmail = ""
-                    emailStage = .enterEmail
-                    emailDraft = ""
-                    otpDraft = ""
+            // Read-only below the cloud tiers — see this file's header for
+            // why an already-registered email is never taken away.
+            if entitlements.canUseCloud {
+                Section {
+                    Button("Use a Different Email", role: .destructive) {
+                        linkedEmail = ""
+                        emailStage = .enterEmail
+                        emailDraft = ""
+                        otpDraft = ""
+                    }
                 }
+            }
+        } else if !entitlements.canUseCloud {
+            Section {
+                Text("Registering an email so you can recover your games on a new phone is part of the 3 Leagues plan and above.")
+            } header: {
+                Text("Recover on a new phone")
+            } footer: {
+                Text("On your current plan, back up a game with Export for Transfer from its menu, then import it on the new phone.")
             }
         } else {
             switch emailStage {

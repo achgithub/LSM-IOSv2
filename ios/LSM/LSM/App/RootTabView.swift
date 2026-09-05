@@ -17,8 +17,10 @@ struct RootTabView: View {
     /// Owned by `AppRootView` so it persists across the language re-key.
     @Binding var selection: RootTab
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
+    @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
     @State private var entitlements = Entitlements.shared
     @State private var lockoutState = DeviceLockoutState.shared
+    @State private var recoveryPrompt = RecoveryEmailPrompt.shared
     @State private var submissionBadgeStore = SubmissionBadgeStore.shared
     @State private var pushCoordinator = PushCoordinator.shared
     @Environment(EnabledLeagues.self) private var enabled
@@ -93,6 +95,20 @@ struct RootTabView: View {
         .sheet(isPresented: $showLeagueManager) {
             LeagueDowngradeView(forced: false).environment(entitlements)
         }
+        // Guarded against every other sheet/cover this root can raise — an
+        // optional nudge must never be the thing that stops onboarding, a
+        // device reauth, or a forced downgrade from being dealt with.
+        // `evaluate` only flips this on when it's genuinely due, so the
+        // binding is a presentation guard, not the decision.
+        .sheet(isPresented: Binding(
+            get: {
+                !splashActive && !managerName.isEmpty && !lockoutState.isLockedOut
+                    && !enabled.mustBlock(entitlements) && recoveryPrompt.isPresented
+            },
+            set: { if !$0 { recoveryPrompt.isPresented = false } }
+        )) {
+            RecoveryEmailPromptView()
+        }
         // Forced only once the 14-day grace period has fully elapsed while
         // still over allowance — during the grace period the banner above
         // is the only nudge, nothing is blocked (see EnabledLeagues.mustBlock).
@@ -101,6 +117,9 @@ struct RootTabView: View {
         }
         .task {
             await AppBootstrap.run(context: context, entitlements: entitlements, enabled: enabled, pushCoordinator: pushCoordinator)
+            // After bootstrap, not before — the tier has to be resolved for
+            // `evaluate` to tell a cloud manager from a Free one.
+            recoveryPrompt.evaluate(entitlements: entitlements, linkedEmail: linkedEmail)
         }
         // Interstitial dropped (2026-06-15) — foreground trigger disabled.
         // .onChange(of: scenePhase) { _, phase in

@@ -31,157 +31,114 @@ enum AccountSettings {
     static let linkedEmailKey = "linkedAccountEmail"
 }
 
-/// First-launch prompt for the manager's name, plus an optional email —
-/// email is free for every tier (see `AccountClient`) and captured here,
-/// not gated behind Settings, because Settings is only reachable *after*
-/// you already have a working phone. The whole point of registering is
-/// recovering from the phone you're using right now no longer being an
-/// option — asking later, only to people who've already subscribed, misses
-/// exactly the people who'll actually need it.
+/// First-launch prompt for the manager's name, and — for a returning
+/// subscriber — the way back to their games.
+///
+/// No email *registration* here any more: registering is what creates the
+/// account link, and it's a cloud feature (`leagues_3` and above, see
+/// `Entitlements.canUseCloud`), so it belongs at the moment that's actually
+/// true — Settings → Profile, or `RecoveryEmailPrompt`. At first launch you
+/// are in one of two situations and neither of them is "register": either an
+/// account already exists (recover it — link-device) or you haven't
+/// subscribed yet (nothing to secure).
+///
+/// The branch is possible because a subscription lives on the Apple ID, not
+/// the phone: on a fresh install RevenueCat picks the active one up on its
+/// own, and `AppBootstrap` awaits that behind the 2.5s splash — so by the
+/// time this draws, `Entitlements` usually already knows. When it doesn't
+/// (offline, a slow or failed refresh) this falls back to the plain
+/// name-only form, which is why "I Already Have an Account" stays visible
+/// there too: it's the escape hatch for a subscriber we failed to recognise.
+///
+/// Linking is never gated, at any tier. You can only link to an account that
+/// already exists, and accounts are only ever created by someone entitled at
+/// the time — so it gates itself, and a paying manager can never be locked
+/// out of their own games by a tier that hasn't resolved yet.
 struct ManagerOnboardingView: View {
     @Binding var managerName: String
-    @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
+    /// Read directly off the singleton rather than `@Environment` — this is
+    /// presented as a sheet from two different roots, and depending on each
+    /// one's environment plumbing to reach it is a silent-failure risk for
+    /// the branch below.
+    @State private var entitlements = Entitlements.shared
 
     @State private var nameDraft = ""
-    @State private var emailDraft = ""
-    @State private var otpDraft = ""
-    @State private var stage: Stage = .nameAndEmail
     @State private var showLinkDevice = false
-    @State private var isBusy = false
-    @State private var errorMessage: String?
-
-    private enum Stage {
-        case nameAndEmail
-        case enterCode(email: String)
-    }
 
     private var trimmedName: String { nameDraft.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedEmail: String { emailDraft.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-    private var emailIsPlausible: Bool { trimmedEmail.contains("@") && trimmedEmail.contains(".") && trimmedEmail.count > 4 }
-    private var canContinue: Bool { !trimmedName.isEmpty && (trimmedEmail.isEmpty || emailIsPlausible) }
+    private var canContinue: Bool { !trimmedName.isEmpty }
+
+    /// A live cloud subscription on this Apple ID with no games on this
+    /// device yet — almost always a new/replacement phone. `verified` is
+    /// required because an unresolved tier reads as `.free`.
+    private var isReturningSubscriber: Bool {
+        entitlements.verified && entitlements.canUseCloud
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch stage {
-                case .nameAndEmail: nameAndEmailForm
-                case .enterCode(let email): codeForm(email: email)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(V2Theme.background.ignoresSafeArea())
-            .navigationTitle("Welcome")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(V2Theme.background, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            form
+                .scrollContentBackground(.hidden)
+                .background(V2Theme.background.ignoresSafeArea())
+                .navigationTitle(isReturningSubscriber ? "Welcome Back" : "Welcome")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(V2Theme.background, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
         }
         .interactiveDismissDisabled()
         .sheet(isPresented: $showLinkDevice) {
             LinkDeviceView()
         }
-        .alert("Couldn't Send Code", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "")
-        }
     }
 
     @ViewBuilder
-    private var nameAndEmailForm: some View {
+    private var form: some View {
         Form {
+            if isReturningSubscriber {
+                // Promoted above the name field, unlike the free path: for
+                // someone who just replaced a phone, recovering their games
+                // *is* the task, and the name they're about to type is one
+                // link-device will overwrite anyway.
+                Section {
+                    Text("Your \(entitlements.tier.label) subscription is active on this Apple ID. If you had games on another phone, bring them over here.")
+                        .font(.subheadline)
+                    Button("Get My Games Back") { showLinkDevice = true }
+                        .fontWeight(.semibold)
+                } header: {
+                    Text("Recover your games")
+                }
+            }
+
             Section {
                 // Single localized string key — can't wrap without changing the key.
                 // swiftlint:disable:next line_length
                 Text("What's your name? You'll be added to games you create, and your pick is always shown on shared summary cards — even in anonymous mode — so it's fair on the other players.")
                     .font(.subheadline)
+            } header: {
+                Text(isReturningSubscriber ? "Or start fresh" : "")
             }
             Section("Your name") {
                 TextField("e.g. Andy", text: $nameDraft)
                     .textInputAutocapitalization(.words)
             }
-            Section {
-                TextField("Email", text: $emailDraft)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.emailAddress)
-            } header: {
-                Text("Email (optional)")
-            } footer: {
-                Text("So you can get your games back if you ever lose this phone. Not needed otherwise.")
-            }
-            Section {
-                // Deliberately below the name/email fields, not above — this
-                // is the exception case (new/lost phone), not the default
-                // first-launch path. Presented before anything here touches
-                // ManagerToken.current — see LinkDeviceView's header comment
-                // for why that ordering matters.
-                Button("I Already Have an Account") { showLinkDevice = true }
-            }
-            Section {
-                Button {
-                    Task { await proceed() }
-                } label: {
-                    if isBusy { ProgressView() } else { Text("Continue") }
+
+            if !isReturningSubscriber {
+                Section {
+                    // Deliberately below the name field, not above — this is
+                    // the exception case (new/lost phone), not the default
+                    // first-launch path. Presented before anything here
+                    // touches ManagerToken.current — see LinkDeviceView's
+                    // header comment for why that ordering matters.
+                    Button("I Already Have an Account") { showLinkDevice = true }
+                } footer: {
+                    Text("Recovering games from a phone you no longer have? Start here.")
                 }
-                .disabled(!canContinue || isBusy)
             }
-        }
-    }
 
-    @ViewBuilder
-    private func codeForm(email: String) -> some View {
-        Form {
             Section {
-                LabeledContent("Email", value: email)
-                TextField("6-digit code", text: $otpDraft)
-                    .keyboardType(.numberPad)
-            } footer: {
-                Text("Enter the code we just sent to \(email).")
+                Button("Continue") { managerName = trimmedName }
+                    .disabled(!canContinue)
             }
-            Section {
-                Button {
-                    Task { await verifyAndFinish(email: email) }
-                } label: {
-                    if isBusy { ProgressView() } else { Text("Verify") }
-                }
-                .disabled(isBusy || otpDraft.count != 6)
-
-                Button("Skip for Now") { managerName = trimmedName }
-            }
-        }
-    }
-
-    /// Saves the name immediately either way. Only moves to the code step if
-    /// an email was actually entered — leaving it blank finishes onboarding
-    /// right here, since email is genuinely optional.
-    private func proceed() async {
-        guard canContinue else { return }
-        guard !trimmedEmail.isEmpty else {
-            managerName = trimmedName
-            return
-        }
-        isBusy = true
-        defer { isBusy = false }
-        do {
-            try await AccountClient.shared.registerRequest(email: trimmedEmail)
-            stage = .enterCode(email: trimmedEmail)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func verifyAndFinish(email: String) async {
-        isBusy = true
-        defer { isBusy = false }
-        do {
-            try await AccountClient.shared.registerVerify(email: email, otp: otpDraft)
-            linkedEmail = email
-            managerName = trimmedName
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

@@ -14,8 +14,10 @@ import SwiftData
 struct V2RootView: View {
     var splashActive: Bool = false
     @AppStorage(ManagerSettings.nameKey) private var managerName = ""
+    @AppStorage(AccountSettings.linkedEmailKey) private var linkedEmail = ""
     @State private var entitlements = Entitlements.shared
     @State private var lockoutState = DeviceLockoutState.shared
+    @State private var recoveryPrompt = RecoveryEmailPrompt.shared
     @State private var submissionBadgeStore = SubmissionBadgeStore.shared
     @State private var pushCoordinator = PushCoordinator.shared
     @Environment(EnabledLeagues.self) private var enabled
@@ -43,11 +45,28 @@ struct V2RootView: View {
             .sheet(isPresented: $showLeagueManager) {
                 LeagueDowngradeView(forced: false).environment(entitlements)
             }
+            // Guarded against every other sheet/cover this root can raise —
+            // an optional nudge must never be the thing that stops onboarding,
+            // a device reauth, or a forced downgrade from being dealt with.
+            // `evaluate` only flips this on when it's genuinely due, so the
+            // binding is a presentation guard, not the decision.
+            .sheet(isPresented: Binding(
+                get: {
+                    !splashActive && !managerName.isEmpty && !lockoutState.isLockedOut
+                        && !enabled.mustBlock(entitlements) && recoveryPrompt.isPresented
+                },
+                set: { if !$0 { recoveryPrompt.isPresented = false } }
+            )) {
+                RecoveryEmailPromptView()
+            }
             .fullScreenCover(isPresented: .constant(!splashActive && enabled.mustBlock(entitlements))) {
                 LeagueDowngradeView(forced: true).environment(entitlements)
             }
             .task {
                 await AppBootstrap.run(context: context, entitlements: entitlements, enabled: enabled, pushCoordinator: pushCoordinator)
+                // After bootstrap, not before — the tier has to be resolved
+                // for `evaluate` to tell a cloud manager from a Free one.
+                recoveryPrompt.evaluate(entitlements: entitlements, linkedEmail: linkedEmail)
             }
             // V2-only auto-refresh foreground trigger — see
             // docs/sync-refresh-policy.md. RootTabView (v1) intentionally
