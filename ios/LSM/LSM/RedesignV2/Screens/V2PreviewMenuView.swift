@@ -168,16 +168,6 @@ private struct HomeHelpPanel: View {
                     } label: {
                         row("Report a Bug", icon: "ladybug.fill", tint: V2Theme.Mode.killer)
                     }
-                    // POC only — see docs/keepy-uppy-poc-scope.md. Not a
-                    // shipping mode, deliberately kept out of the Games
-                    // picker. Needs to build in Release (not just DEBUG)
-                    // since motion feel can only be validated via TestFlight
-                    // on a physical device, not the Simulator.
-                    NavigationLink {
-                        KeepyUppyViewV2()
-                    } label: {
-                        row("Keepy-Uppy (POC)", icon: "figure.soccer", tint: V2Theme.Mode.predictor)
-                    }
                 }
                 Text(DataDisclaimer.text)
                     .font(.caption2)
