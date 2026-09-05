@@ -26,7 +26,7 @@ struct V2Tile: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
             }
-            MicroLabel(text: label)
+            MicroLabel(verbatim: label)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)

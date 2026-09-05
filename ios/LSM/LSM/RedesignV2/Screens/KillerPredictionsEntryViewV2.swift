@@ -174,7 +174,7 @@ private struct KillerFixturePredictionRowV2: View {
     }
 
     private func outcomePill(_ outcome: FixtureOutcome, title: String) -> some View {
-        SelectablePill(title: title, isSelected: existing?.predictedOutcome == outcome, tint: V2Theme.Mode.killer) {
+        SelectablePill(verbatim: title, isSelected: existing?.predictedOutcome == outcome, tint: V2Theme.Mode.killer) {
             KillerScoringService.setPrediction(player: player, round: round, fixtureId: fixture.id, outcome: outcome, context: context)
         }
     }
@@ -222,7 +222,7 @@ private struct KillerHitTargetPickerViewV2: View {
                         HStack(spacing: 8) {
                             ForEach(availableTargets) { opponent in
                                 SelectablePill(
-                                    title: opponent.name,
+                                    verbatim: opponent.name,
                                     isSelected: existing?.hitTargetPlayerId == opponent.id,
                                     tint: V2Theme.danger
                                 ) { setTarget(opponent.id) }

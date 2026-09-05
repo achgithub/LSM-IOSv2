@@ -313,7 +313,7 @@ struct GameWizardViewV2: View {
 
     // MARK: Cards
 
-    private struct Action { let label: String; let sheet: WizardSheetV2 }
+    private struct Action { let label: LocalizedStringKey; let sheet: WizardSheetV2 }
     private struct PhaseCard {
         let icon: String
         let title: String

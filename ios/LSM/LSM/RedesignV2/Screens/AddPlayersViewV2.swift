@@ -68,7 +68,7 @@ struct AddPlayersViewV2: View {
                 HStack(spacing: 8) {
                     SelectablePill(title: "All players", isSelected: filterGroupId == nil) { filterGroupId = nil }
                     ForEach(groups) { group in
-                        SelectablePill(title: group.name, isSelected: filterGroupId == group.id) {
+                        SelectablePill(verbatim: group.name, isSelected: filterGroupId == group.id) {
                             filterGroupId = group.id
                         }
                     }

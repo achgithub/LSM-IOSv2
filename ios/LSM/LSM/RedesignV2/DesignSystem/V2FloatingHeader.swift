@@ -10,7 +10,8 @@ import SwiftUI
 /// under the status bar. Factored out after that header was hand-rolled
 /// separately on Home and Players — don't hand-roll a third copy.
 struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
-    let title: String
+    /// Pre-built so callers choose localized vs. verbatim explicitly.
+    let title: Text
     var showBack: Bool = true
     /// Taller when `tiles` is non-empty (the scrim needs to cover the tile
     /// grid too, not just the title row) — set by the `Tiles == EmptyView`
@@ -57,7 +58,7 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
                 // absolutely here, with back/trailing floating over it in
                 // their natural corners instead of sharing its layout.
                 ZStack {
-                    Text(title)
+                    title
                         .font(V2Theme.Typography.pageTitle)
                         .foregroundStyle(V2Theme.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -114,7 +115,7 @@ struct V2HeaderIconLabel: View {
 }
 
 extension V2FloatingHeader where Trailing == EmptyView, Tiles == EmptyView {
-    init(title: String, showBack: Bool = true) {
+    init(title: Text, showBack: Bool = true) {
         self.title = title
         self.showBack = showBack
         // No tile grid to cover — the struct's 160/260 defaults are sized
@@ -129,7 +130,7 @@ extension V2FloatingHeader where Trailing == EmptyView, Tiles == EmptyView {
 }
 
 extension V2FloatingHeader where Tiles == EmptyView {
-    init(title: String, showBack: Bool = true, @ViewBuilder trailing: @escaping () -> Trailing) {
+    init(title: Text, showBack: Bool = true, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title
         self.showBack = showBack
         // See the no-trailing initializer above for why this is smaller
@@ -141,7 +142,7 @@ extension V2FloatingHeader where Tiles == EmptyView {
 }
 
 extension V2FloatingHeader where Trailing == EmptyView {
-    init(title: String, showBack: Bool = true, scrimHeight: CGFloat = 260, @ViewBuilder tiles: @escaping () -> Tiles) {
+    init(title: Text, showBack: Bool = true, scrimHeight: CGFloat = 260, @ViewBuilder tiles: @escaping () -> Tiles) {
         self.title = title
         self.showBack = showBack
         self.scrimHeight = scrimHeight
@@ -154,20 +155,45 @@ extension View {
     /// Applies `.toolbar(.hidden, for: .navigationBar)` and reserves the
     /// header's space via `.safeAreaInset(edge: .top)` — pair with a
     /// `.v2*Scene()` background modifier, not `.v2Header`.
+    /// Titles are `LocalizedStringKey`, so a literal goes through
+    /// `Localizable.xcstrings` automatically. Screen titles that are user
+    /// data — a game or player name — take the `verbatim:` overload, which
+    /// the compiler forces you to choose since a `String` won't bind here.
     func v2FloatingHeader<Trailing: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         showBack: Bool = true,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        v2FloatingHeader(text: Text(title), showBack: showBack, trailing: trailing)
+    }
+
+    /// For a title built from user-supplied text, never looked up in the catalog.
+    func v2FloatingHeader<Trailing: View>(
+        verbatim title: String,
+        showBack: Bool = true,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        v2FloatingHeader(text: Text(verbatim: title), showBack: showBack, trailing: trailing)
+    }
+
+    func v2FloatingHeader(_ title: LocalizedStringKey, showBack: Bool = true) -> some View {
+        v2FloatingHeader(title, showBack: showBack) { EmptyView() }
+    }
+
+    func v2FloatingHeader(verbatim title: String, showBack: Bool = true) -> some View {
+        v2FloatingHeader(verbatim: title, showBack: showBack) { EmptyView() }
+    }
+
+    fileprivate func v2FloatingHeader<Trailing: View>(
+        text: Text,
+        showBack: Bool,
         @ViewBuilder trailing: @escaping () -> Trailing
     ) -> some View {
         self
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top) {
-                V2FloatingHeader(title: title, showBack: showBack, trailing: trailing)
+                V2FloatingHeader(title: text, showBack: showBack, trailing: trailing)
             }
-    }
-
-    func v2FloatingHeader(_ title: String, showBack: Bool = true) -> some View {
-        v2FloatingHeader(title, showBack: showBack) { EmptyView() }
     }
 
     /// Header + a `V2TileGrid` (see that type) appended below the title
@@ -192,7 +218,7 @@ extension View {
     /// stays fully visible the whole way down while only the content in
     /// front of it fades.
     func v2FloatingHeaderWithTiles<Tiles: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         showBack: Bool = false,
         headerHeight: CGFloat = V2FloatingHeaderFade.headerHeight,
         @ViewBuilder tiles: @escaping () -> Tiles
@@ -210,7 +236,7 @@ extension View {
                         Color.black
                     }
                 }
-            V2FloatingHeader(title: title, showBack: showBack, scrimHeight: headerHeight, tiles: tiles)
+            V2FloatingHeader(title: Text(title), showBack: showBack, scrimHeight: headerHeight, tiles: tiles)
         }
         .toolbar(.hidden, for: .navigationBar)
     }

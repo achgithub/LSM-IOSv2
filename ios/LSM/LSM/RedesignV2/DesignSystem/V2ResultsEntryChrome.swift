@@ -15,7 +15,7 @@ import SwiftUI
 /// tutorial banner — which Predictor/Killer's results screens don't carry
 /// — stay with each caller, applied after this modifier.
 private struct V2ResultsEntryChromeModifier: ViewModifier {
-    let title: String
+    let title: LocalizedStringKey
     let tint: Color
     let isLoading: Bool
     let leagues: [LeagueOption]
@@ -49,7 +49,7 @@ extension View {
     /// (a reference type, so this modifier mutating it is visible back to
     /// the caller without a binding).
     func v2ResultsEntryChrome(
-        title: String,
+        title: LocalizedStringKey,
         tint: Color,
         isLoading: Bool,
         leagues: [LeagueOption],

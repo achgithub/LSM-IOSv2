@@ -72,7 +72,7 @@ struct PredictorGameDetailViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TrophyRoomScene()
-        .v2FloatingHeader(game.name) {
+        .v2FloatingHeader(verbatim: game.name) {
             V2GameHeaderActions(game: game, model: headerActions)
         }
         .v2GameHeaderActions(game: game, model: headerActions)
@@ -174,7 +174,7 @@ struct PredictorGameDetailViewV2: View {
                             .font(V2Theme.Typography.rowTitle)
                             .foregroundStyle(V2Theme.textPrimary)
                         Spacer()
-                        V2StatusBadge(label: round.status.label, tint: V2Theme.Mode.predictor)
+                        V2StatusBadge(verbatim: round.status.label, tint: V2Theme.Mode.predictor)
                     }
                     PrimaryButton(title: "Enter Predictions", tint: V2Theme.Mode.predictor) { sheet = .predictions }
                         .tutorialAnchor(id: "pred.enterPredictions")

@@ -108,7 +108,7 @@ struct LeaguesPortalViewV2: View {
         }
     }
 
-    private func panel<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+    private func panel<Content: View>(title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content) -> some View {
         Card(floating: true) {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(title: title)

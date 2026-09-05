@@ -168,7 +168,7 @@ struct NewGameViewV2: View {
                         FlowPills {
                             ForEach(enabled.leagues) { league in
                                 SelectablePill(
-                                    title: league.name,
+                                    verbatim: league.name,
                                     isSelected: selectedLeagueIds.contains(league.id),
                                     tint: V2Theme.Mode.predictor
                                 ) {
@@ -369,7 +369,7 @@ extension NewGameViewV2 {
                         FlowPills {
                             ForEach(enabled.leagues) { league in
                                 SelectablePill(
-                                    title: league.name,
+                                    verbatim: league.name,
                                     isSelected: selectedLeagueIds.contains(league.id),
                                     tint: V2Theme.Mode.lms
                                 ) {
@@ -423,7 +423,7 @@ extension NewGameViewV2 {
                         MicroLabel(text: "Summaries")
                         HStack(spacing: 8) {
                             ForEach(AnonymityMode.allCases) { option in
-                                SelectablePill(title: option.label, isSelected: anonymity == option, tint: V2Theme.Mode.lms) {
+                                SelectablePill(verbatim: option.label, isSelected: anonymity == option, tint: V2Theme.Mode.lms) {
                                     anonymity = option
                                 }
                             }
@@ -470,7 +470,7 @@ extension NewGameViewV2 {
                         FlowPills {
                             ForEach(enabled.leagues) { league in
                                 SelectablePill(
-                                    title: league.name,
+                                    verbatim: league.name,
                                     isSelected: selectedLeagueIds.contains(league.id),
                                     tint: V2Theme.Mode.killer
                                 ) {

@@ -193,7 +193,7 @@ struct MatchesViewV2: View {
                 pillRow(title: "League") {
                     ForEach(enabled.leagues) { league in
                         let on = selectedLeagueIds.isEmpty || selectedLeagueIds.contains(league.id)
-                        SelectablePill(title: league.displayName, isSelected: on) { toggleLeague(league.id) }
+                        SelectablePill(verbatim: league.displayName, isSelected: on) { toggleLeague(league.id) }
                     }
                 }
             }
@@ -249,7 +249,7 @@ struct MatchesViewV2: View {
     private func pillRow<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if let title {
-                MicroLabel(text: title.uppercased())
+                MicroLabel(verbatim: title.uppercased())
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) { content() }

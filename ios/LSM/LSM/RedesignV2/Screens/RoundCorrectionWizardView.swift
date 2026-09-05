@@ -39,7 +39,10 @@ struct RoundCorrectionWizardView: View {
                     playerPicker
                 }
             }
-            .v2FloatingHeader(selectedPlayer == nil ? "Fix a Player's History" : selectedPlayer!.name, showBack: selectedPlayer != nil) {
+            // `verbatim:` because the selected branch is a player's name —
+            // the fallback is localized eagerly so the literal still goes
+            // through the catalog.
+            .v2FloatingHeader(verbatim: selectedPlayer?.name ?? AppString("Fix a Player's History"), showBack: selectedPlayer != nil) {
                 Button("Cancel") { dismiss() }
                     .foregroundStyle(V2Theme.textSecondary)
             }
@@ -105,7 +108,7 @@ struct RoundCorrectionWizardView: View {
 /// through a confirmation reflexively.
 struct TypeToConfirmButton: View {
     let playerName: String
-    let actionTitle: String
+    let actionTitle: LocalizedStringKey
     var tint: Color = V2Theme.accent
     let action: () -> Void
     @State private var typed = ""

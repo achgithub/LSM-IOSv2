@@ -102,7 +102,7 @@ struct FavouriteGameCard: View {
                 .frame(width: 34, height: 34)
                 .background(modeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: V2Theme.Radius.pill, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
+                MicroLabel(verbatim: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
                 Text(game.name)
                     .font(.system(.headline, design: V2Theme.Mode.fontDesign(for: game.mode)).weight(.bold))
                     .foregroundStyle(V2Theme.textPrimary)

@@ -6,7 +6,9 @@ import SwiftUI
 /// navigation menus. `isEnabled: false` dims and disables the row so
 /// callers stop having to hand-manage tint/opacity together.
 struct ActionRow: View {
-    let title: String
+    /// `LocalizedStringKey` so literals go through the catalog — as `String`
+    /// this rendered English in every language (see CLAUDE.md).
+    let title: LocalizedStringKey
     let icon: String
     var tint: Color = V2Theme.accent
     var isEnabled: Bool = true

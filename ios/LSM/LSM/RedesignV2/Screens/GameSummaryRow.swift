@@ -47,7 +47,7 @@ struct GameSummaryRow: View {
                 } label: {
                     HStack(spacing: 4) {
                         VStack(alignment: .leading, spacing: 2) {
-                            MicroLabel(text: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
+                            MicroLabel(verbatim: V2Theme.Mode.displayName(for: game.mode), tint: modeColor)
                             Text(game.name)
                                 .font(.system(.headline, design: V2Theme.Mode.fontDesign(for: game.mode)).weight(.bold))
                                 .foregroundStyle(V2Theme.textPrimary)
@@ -73,7 +73,7 @@ struct GameSummaryRow: View {
 
             if let managerStatus {
                 HStack(spacing: 8) {
-                    V2StatusBadge(label: managerStatus.label, tint: managerStatus.tint)
+                    V2StatusBadge(verbatim: managerStatus.label, tint: managerStatus.tint)
                     if !managerStatus.detail.isEmpty {
                         Text(managerStatus.detail)
                             .font(.caption)

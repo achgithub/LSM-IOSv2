@@ -144,7 +144,7 @@ struct ResultsEntryViewV2: View {
             HStack(spacing: 8) {
                 ForEach(FixtureOutcome.allCases) { outcome in
                     SelectablePill(
-                        title: outcome.label,
+                        verbatim: outcome.label,
                         isSelected: outcomes[fixture.id] == outcome,
                         tint: V2Theme.Mode.lms
                     ) {

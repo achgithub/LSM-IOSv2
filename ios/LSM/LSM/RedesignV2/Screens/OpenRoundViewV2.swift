@@ -247,7 +247,7 @@ struct OpenRoundViewV2: View {
                         HStack(spacing: 8) {
                             ForEach(gameLeagues) { league in
                                 SelectablePill(
-                                    title: league.name,
+                                    verbatim: league.name,
                                     isSelected: selectedLeagueIds.contains(league.id),
                                     tint: tint
                                 ) { toggleLeague(league.id) }

@@ -71,7 +71,7 @@ struct PlayerDetailViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TeamRoomScene()
-        .v2FloatingHeader(member.name) {
+        .v2FloatingHeader(verbatim: member.name) {
             Button {
                 renameText = member.name
                 renaming = true

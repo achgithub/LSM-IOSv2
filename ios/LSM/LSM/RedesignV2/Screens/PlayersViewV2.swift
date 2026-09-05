@@ -138,7 +138,7 @@ struct PlayersViewV2: View {
                         HStack(spacing: 8) {
                             SelectablePill(title: "All Groups", isSelected: groupFilter == nil) { groupFilter = nil }
                             ForEach(groups) { group in
-                                SelectablePill(title: group.name, isSelected: groupFilter == group.id) {
+                                SelectablePill(verbatim: group.name, isSelected: groupFilter == group.id) {
                                     groupFilter = group.id
                                 }
                             }
@@ -149,7 +149,7 @@ struct PlayersViewV2: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(LinkFilterV2.allCases) { filter in
-                                SelectablePill(title: filter.label, isSelected: linkFilter == filter) {
+                                SelectablePill(verbatim: filter.label, isSelected: linkFilter == filter) {
                                     linkFilter = filter
                                 }
                             }

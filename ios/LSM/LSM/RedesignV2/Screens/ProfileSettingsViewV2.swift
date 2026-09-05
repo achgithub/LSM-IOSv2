@@ -28,7 +28,7 @@ struct ProfileSettingsViewV2: View {
             LazyVStack(spacing: V2Theme.Spacing.section) {
                 Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
-                        SectionHeader(title: AppString("Your Name"))
+                        SectionHeader(title: "Your Name")
                         TextField("Your name", text: $managerName)
                             .textInputAutocapitalization(.words)
                             .padding(12)
@@ -49,7 +49,7 @@ struct ProfileSettingsViewV2: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TacticsOfficeScene()
         .v2LoadingOverlay(syncModel.isLoading, label: "Loading games…")
-        .v2FloatingHeader(AppString("Profile"))
+        .v2FloatingHeader("Profile")
         .task { await syncModel.load(context: context) }
         .alert("Couldn't Complete That", isPresented: Binding(
             get: { errorMessage != nil },
@@ -69,7 +69,7 @@ struct ProfileSettingsViewV2: View {
             VStack(spacing: V2Theme.Spacing.section) {
                 Card(floating: true) {
                     VStack(alignment: .leading, spacing: 10) {
-                        SectionHeader(title: AppString("Registered Email"))
+                        SectionHeader(title: "Registered Email")
                         Text(linkedEmail)
                             .font(V2Theme.Typography.rowTitle)
                             .foregroundStyle(V2Theme.textPrimary)
@@ -102,7 +102,7 @@ struct ProfileSettingsViewV2: View {
                 VStack(spacing: V2Theme.Spacing.section) {
                     Card(floating: true) {
                         VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader(title: AppString("Email (Optional)"))
+                            SectionHeader(title: "Email (Optional)")
                             TextField("Email", text: $emailDraft)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
@@ -114,7 +114,7 @@ struct ProfileSettingsViewV2: View {
                                 .foregroundStyle(V2Theme.textSecondary)
                         }
                     }
-                    PrimaryButton(title: isBusy ? AppString("Sending…") : AppString("Send Code"), isEnabled: !isBusy && isPlausibleEmail(emailDraft)) {
+                    PrimaryButton(title: isBusy ? "Sending…" : "Send Code", isEnabled: !isBusy && isPlausibleEmail(emailDraft)) {
                         Task { await sendCode() }
                     }
                 }
@@ -123,7 +123,7 @@ struct ProfileSettingsViewV2: View {
                 VStack(spacing: V2Theme.Spacing.section) {
                     Card(floating: true) {
                         VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader(title: AppString("Enter Code"))
+                            SectionHeader(title: "Enter Code")
                             Text(email)
                                 .font(.subheadline)
                                 .foregroundStyle(V2Theme.textSecondary)
@@ -136,7 +136,7 @@ struct ProfileSettingsViewV2: View {
                                 .foregroundStyle(V2Theme.textSecondary)
                         }
                     }
-                    PrimaryButton(title: isBusy ? AppString("Verifying…") : AppString("Verify"), isEnabled: !isBusy && otpDraft.count == 6) {
+                    PrimaryButton(title: isBusy ? "Verifying…" : "Verify", isEnabled: !isBusy && otpDraft.count == 6) {
                         Task { await verifyCode(email: email) }
                     }
                     Button("Use a Different Email") {
@@ -156,7 +156,7 @@ struct ProfileSettingsViewV2: View {
     private var cloudUpsellCard: some View {
         Card(floating: true) {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: AppString("Recover On A New Phone"))
+                SectionHeader(title: "Recover On A New Phone")
                 Text("Registering an email so you can recover your games on a new phone is part of the 3 Leagues plan and above.")
                     .font(.caption)
                     .foregroundStyle(V2Theme.textSecondary)
@@ -205,7 +205,7 @@ struct ProfileSettingsViewV2: View {
         if let loadError = syncModel.loadError {
             Card(floating: true) {
                 VStack(alignment: .leading, spacing: 10) {
-                    SectionHeader(title: AppString("Your Games"))
+                    SectionHeader(title: "Your Games")
                     Text(loadError).foregroundStyle(V2Theme.textSecondary)
                     Button("Try Again") { Task { await syncModel.load(context: context) } }
                         .foregroundStyle(V2Theme.accent)
@@ -216,7 +216,7 @@ struct ProfileSettingsViewV2: View {
         } else if !syncModel.games.isEmpty {
             Card(floating: true) {
                 VStack(alignment: .leading, spacing: 10) {
-                    SectionHeader(title: AppString("Your Games"))
+                    SectionHeader(title: "Your Games")
                     ForEach(syncModel.games) { game in
                         gameRow(game)
                     }

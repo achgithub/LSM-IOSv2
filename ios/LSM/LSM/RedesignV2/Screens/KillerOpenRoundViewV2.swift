@@ -93,7 +93,7 @@ struct KillerOpenRoundViewV2: View {
                                 HStack(spacing: 8) {
                                     ForEach(gameLeagues) { league in
                                         SelectablePill(
-                                            title: league.name,
+                                            verbatim: league.name,
                                             isSelected: selectedLeagueIds.contains(league.id),
                                             tint: V2Theme.Mode.killer
                                         ) { toggleLeague(league.id) }

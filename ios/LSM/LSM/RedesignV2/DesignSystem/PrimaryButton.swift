@@ -3,8 +3,14 @@ import SwiftUI
 /// Full-width rounded button, filled `V2Theme.accent` by default — the V2
 /// replacement for the default bordered/plain Button styles on primary
 /// actions ("Save", "Add"). Pass `tint:` for a mode-specific fill.
+///
+/// `title` is `LocalizedStringKey` so a literal goes through
+/// `Localizable.xcstrings` automatically — as `String` it hit `Text`'s
+/// verbatim initializer and rendered English in every language. A button
+/// label is always UI copy, never user data, so there's deliberately no
+/// verbatim escape here.
 struct PrimaryButton: View {
-    let title: String
+    let title: LocalizedStringKey
     var isEnabled = true
     /// Fill color — defaults to the shared accent; pass a mode's own color
     /// (`V2Theme.Mode.color(for:)`) on a mode-specific screen (e.g. a
@@ -29,7 +35,7 @@ struct PrimaryButton: View {
 /// Compact pill toggle used for exclusive-choice rows ("Who? Ellie Reyes /
 /// Ryan Blackwood") — filled gold when selected, outlined otherwise.
 struct SelectablePill: View {
-    let title: String
+    private let title: Text
     let isSelected: Bool
     /// Fill color when selected — defaults to the shared accent; pass a
     /// mode's own color on a mode-specific screen to match that mode's
@@ -37,9 +43,26 @@ struct SelectablePill: View {
     var tint: Color = V2Theme.accent
     let action: () -> Void
 
+    /// UI copy — goes through `Localizable.xcstrings`.
+    init(title: LocalizedStringKey, isSelected: Bool, tint: Color = V2Theme.accent, action: @escaping () -> Void) {
+        self.title = Text(title)
+        self.isSelected = isSelected
+        self.tint = tint
+        self.action = action
+    }
+
+    /// For a player/league/group name, or a string already localized by its
+    /// own `label`/`displayName` (see `Enums.swift`) — never re-looked-up.
+    init(verbatim title: String, isSelected: Bool, tint: Color = V2Theme.accent, action: @escaping () -> Void) {
+        self.title = Text(verbatim: title)
+        self.isSelected = isSelected
+        self.tint = tint
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
-            Text(title)
+            title
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)

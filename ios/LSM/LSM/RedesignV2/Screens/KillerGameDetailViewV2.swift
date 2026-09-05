@@ -75,7 +75,7 @@ struct KillerGameDetailViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TrophyRoomScene()
-        .v2FloatingHeader(game.name) {
+        .v2FloatingHeader(verbatim: game.name) {
             V2GameHeaderActions(game: game, model: headerActions)
         }
         .v2GameHeaderActions(game: game, model: headerActions)
@@ -161,7 +161,7 @@ struct KillerGameDetailViewV2: View {
                             .font(V2Theme.Typography.rowTitle)
                             .foregroundStyle(V2Theme.textPrimary)
                         Spacer()
-                        V2StatusBadge(label: round.status.label, tint: V2Theme.Mode.killer)
+                        V2StatusBadge(verbatim: round.status.label, tint: V2Theme.Mode.killer)
                     }
                     PrimaryButton(title: "Enter Predictions", tint: V2Theme.Mode.killer) { sheet = .predictions }
                     ActionRow(title: "Enter Results / Close", icon: "flag.checkered") { sheet = .results }

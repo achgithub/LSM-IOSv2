@@ -19,7 +19,7 @@ struct StandingsViewV2: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(enabled.leagues) { option in
-                                SelectablePill(title: option.displayName, isSelected: option.id == league.id) {
+                                SelectablePill(verbatim: option.displayName, isSelected: option.id == league.id) {
                                     selectedLeague = option
                                 }
                             }

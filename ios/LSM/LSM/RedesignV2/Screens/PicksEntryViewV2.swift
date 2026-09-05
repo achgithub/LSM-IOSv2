@@ -357,7 +357,7 @@ private struct TeamPickSheetV2: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .v2LMSFormScene()
-            .v2FloatingHeader(playerName, showBack: false) {
+            .v2FloatingHeader(verbatim: playerName, showBack: false) {
                 Button("Cancel") { dismiss() }
                     .foregroundStyle(V2Theme.textSecondary)
             }

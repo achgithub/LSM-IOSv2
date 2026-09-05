@@ -99,7 +99,7 @@ struct GameDetailViewV2: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .v2TrophyRoomScene()
-        .v2FloatingHeader(game.name) {
+        .v2FloatingHeader(verbatim: game.name) {
             V2GameHeaderActions(game: game, model: headerActions)
         }
         .v2GameHeaderActions(game: game, model: headerActions)
@@ -227,7 +227,7 @@ struct GameDetailViewV2: View {
                         Text("Round \(round.roundNumber)")
                             .font(V2Theme.Typography.rowTitle).foregroundStyle(V2Theme.textPrimary)
                         Spacer()
-                        V2StatusBadge(label: round.status.label, tint: V2Theme.Mode.lms)
+                        V2StatusBadge(verbatim: round.status.label, tint: V2Theme.Mode.lms)
                     }
                     if round.roundType != .normal, let ending = game.lastOutcome {
                         ActionRow(title: "Share \(ending.headline) Card", icon: "square.and.arrow.up") { AdGate.run { sheet = .summaryOutcome } }

@@ -735,6 +735,140 @@ add("Couldn't Complete That", "No se ha podido completar", "Das hat nicht geklap
 add("Couldn't Link Device", "No se ha podido vincular el dispositivo", "Gerät konnte nicht verknüpft werden", "Impossible de lier l’appareil", "Koppelen van toestel mislukt", "Impossibile collegare il dispositivo")
 add("Couldn't Reconnect", "No se ha podido reconectar", "Neu verbinden fehlgeschlagen", "Impossible de reconnecter", "Opnieuw koppelen mislukt", "Impossibile riconnettersi")
 
+# ---- V2 screens: tiles, wizard, rounds, submissions, share actions ----
+# Surfaced when the V2 design-system components moved from `String` to
+# `LocalizedStringKey` — until then these rendered English in every
+# language regardless of the catalog. See CLAUDE.md.
+add("%lld/%lld submitted", "%lld/%lld enviadas", "%lld/%lld abgegeben", "%lld/%lld envoyés", "%lld/%lld ingestuurd", "%lld/%lld inviate")
+add("ACTIVE", "ACTIVA", "AKTIV", "ACTIVE", "ACTIEF", "ATTIVA")
+add("ADD", "AÑADIR", "HINZUFÜGEN", "AJOUTER", "TOEVOEGEN", "AGGIUNGI")
+add("All Groups", "Todos los grupos", "Alle Gruppen", "Tous les groupes", "Alle groepen", "Tutti i gruppi")
+add("All submitted", "Todas enviadas", "Alle abgegeben", "Tous envoyés", "Alles ingestuurd", "Tutte inviate")
+add("Apply Correction", "Aplicar corrección", "Korrektur anwenden", "Appliquer la correction", "Correctie toepassen", "Applica correzione")
+add("Approve", "Aprobar", "Genehmigen", "Approuver", "Goedkeuren", "Approva")
+add("Assign Players", "Asignar jugadores", "Spieler zuweisen", "Attribuer les joueurs", "Spelers toewijzen", "Assegna giocatori")
+add("Assign players to the game",
+    "Asigna jugadores a la partida",
+    "Spieler dem Spiel zuweisen",
+    "Attribue les joueurs à la partie",
+    "Wijs spelers toe aan het spel",
+    "Assegna i giocatori alla partita")
+add("Check Submissions", "Ver envíos", "Einsendungen prüfen", "Voir les envois", "Inzendingen bekijken", "Controlla invii")
+add("Choose Player", "Elegir jugador", "Spieler wählen", "Choisir un joueur", "Speler kiezen", "Scegli giocatore")
+add("Collect predictions", "Recoger pronósticos", "Tipps einsammeln", "Recueillir les pronostics", "Voorspellingen verzamelen", "Raccogli i pronostici")
+add("Create Game", "Crear partida", "Spiel erstellen", "Créer la partie", "Spel maken", "Crea partita")
+add("DUE", "PENDIENTE", "FÄLLIG", "ATTENDU", "OPEN", "IN SCADENZA")
+add("Dates", "Fechas", "Termine", "Dates", "Data", "Date")
+add("Edit Fixtures", "Editar partidos", "Spiele bearbeiten", "Modifier les matchs", "Wedstrijden bewerken", "Modifica partite")
+add("Enter Predictions", "Introducir pronósticos", "Tipps eingeben", "Saisir les pronostics", "Voorspellingen invoeren", "Inserisci pronostici")
+add("Enter scores & close", "Introducir marcadores y cerrar", "Ergebnisse eingeben & schließen", "Saisir les scores et clôturer", "Uitslagen invoeren & sluiten", "Inserisci punteggi e chiudi")
+add("Enter your prediction", "Introduce tu pronóstico", "Gib deinen Tipp ein", "Saisis ton pronostic", "Voer je voorspelling in", "Inserisci il tuo pronostico")
+add("Export CSV", "Exportar CSV", "CSV exportieren", "Exporter en CSV", "CSV exporteren", "Esporta CSV")
+add("Favourites", "Favoritos", "Favoriten", "Favoris", "Favorieten", "Preferiti")
+add("Fixtures", "Partidos", "Spiele", "Matchs", "Wedstrijden", "Partite")
+add("GAMES", "PARTIDAS", "SPIELE", "PARTIES", "SPELLEN", "PARTITE")
+add("Get Submission Link", "Obtener enlace de envío", "Einsende-Link holen", "Obtenir le lien d’envoi", "Inzendlink ophalen", "Ottieni link di invio")
+add("HELP", "AYUDA", "HILFE", "AIDE", "HULP", "AIUTO")
+add("HOME", "INICIO", "START", "ACCUEIL", "START", "HOME")
+add("Help", "Ayuda", "Hilfe", "Aide", "Hulp", "Aiuto")
+add("Hit target", "Objetivo alcanzado", "Ziel getroffen", "Objectif atteint", "Doel gehaald", "Obiettivo centrato")
+add("Import / Export Players",
+    "Importar / exportar jugadores",
+    "Spieler importieren / exportieren",
+    "Importer / exporter les joueurs",
+    "Spelers importeren / exporteren",
+    "Importa / esporta giocatori")
+add("Import Game", "Importar partida", "Spiel importieren", "Importer une partie", "Spel importeren", "Importa partita")
+add("Joker", "Comodín", "Joker", "Joker", "Joker", "Jolly")
+add("Kicks off soon", "Empieza pronto", "Beginnt bald", "Coup d’envoi bientôt", "Begint binnenkort", "Inizia a breve")
+add("Killer settings", "Ajustes de Killer", "Killer-Einstellungen", "Réglages Killer", "Killer-instellingen", "Impostazioni Killer")
+add("LEAGUES", "LIGAS", "LIGEN", "LIGUES", "COMPETITIES", "CAMPIONATI")
+add("Live", "En directo", "Live", "En direct", "Live", "In diretta")
+add("Lives", "Vidas", "Leben", "Vies", "Levens", "Vite")
+add("Loading submissions…", "Cargando envíos…", "Einsendungen werden geladen…", "Chargement des envois…", "Inzendingen laden…", "Caricamento invii…")
+add("Make it count", "Que cuente", "Mach was draus", "Fais-en bon usage", "Maak het waar", "Falla contare")
+add("Manage Leagues", "Gestionar ligas", "Ligen verwalten", "Gérer les ligues", "Competities beheren", "Gestisci campionati")
+add("Manager Picked Games (%lld/%lld selected)",
+    "Partidos elegidos por el organizador (%lld/%lld seleccionados)",
+    "Vom Manager gewählte Spiele (%lld/%lld ausgewählt)",
+    "Matchs choisis par l’organisateur (%lld/%lld sélectionnés)",
+    "Door de manager gekozen wedstrijden (%lld/%lld geselecteerd)",
+    "Partite scelte dal manager (%lld/%lld selezionate)")
+add("Matches playing", "Partidos en juego", "Laufende Spiele", "Matchs en cours", "Wedstrijden bezig", "Partite in corso")
+add("New Killer Game", "Nueva partida Killer", "Neues Killer-Spiel", "Nouvelle partie Killer", "Nieuw Killer-spel", "Nuova partita Killer")
+add("New LMS Game", "Nueva partida LMS", "Neues LMS-Spiel", "Nouvelle partie LMS", "Nieuw LMS-spel", "Nuova partita LMS")
+add("New Predictor Game", "Nueva partida Predictor", "Neues Predictor-Spiel", "Nouvelle partie Predictor", "Nieuw Predictor-spel", "Nuova partita Predictor")
+add("New design", "Nuevo diseño", "Neues Design", "Nouveau design", "Nieuw ontwerp", "Nuovo design")
+add("No clear winner", "Sin ganador claro", "Kein klarer Sieger", "Pas de vainqueur net", "Geen duidelijke winnaar", "Nessun vincitore chiaro")
+add("No team left to pick", "No quedan equipos por elegir", "Keine Mannschaft mehr übrig", "Plus aucune équipe à choisir", "Geen team meer over", "Nessuna squadra rimasta")
+add("Not started", "Sin empezar", "Nicht begonnen", "Pas commencé", "Niet gestart", "Non iniziato")
+add("Not started (%lld)", "Sin empezar (%lld)", "Nicht begonnen (%lld)", "Pas commencé (%lld)", "Niet gestart (%lld)", "Non iniziato (%lld)")
+add("Open Matchday", "Abrir jornada", "Spieltag öffnen", "Ouvrir la journée", "Speeldag openen", "Apri giornata")
+add("Open Round %lld", "Abrir ronda %lld", "Runde %lld öffnen", "Ouvrir la manche %lld", "Ronde %lld openen", "Apri turno %lld")
+add("Open the next matchday", "Abre la siguiente jornada", "Nächsten Spieltag öffnen", "Ouvre la journée suivante", "Open de volgende speeldag", "Apri la giornata successiva")
+add("Open the next round", "Abre la siguiente ronda", "Nächste Runde öffnen", "Ouvre la manche suivante", "Open de volgende ronde", "Apri il turno successivo")
+add("PLAYERS", "JUGADORES", "SPIELER", "JOUEURS", "SPELERS", "GIOCATORI")
+add("PWA Submissions", "Envíos PWA", "PWA-Einsendungen", "Envois PWA", "PWA-inzendingen", "Invii PWA")
+add("Player", "Jugador", "Spieler", "Joueur", "Speler", "Giocatore")
+add("Push to Players", "Enviar a los jugadores", "An Spieler senden", "Envoyer aux joueurs", "Naar spelers sturen", "Invia ai giocatori")
+add("RAPID ENTRY", "ENTRADA RÁPIDA", "SCHNELLEINGABE", "SAISIE RAPIDE", "SNELINVOER", "INSERIMENTO RAPIDO")
+add("ROSTER", "PLANTILLA", "KADER", "EFFECTIF", "SELECTIE", "ROSA")
+add("ROUNDS", "RONDAS", "RUNDEN", "MANCHES", "RONDES", "TURNI")
+add("Recalculate Matchday %lld", "Recalcular jornada %lld", "Spieltag %lld neu berechnen", "Recalculer la journée %lld", "Speeldag %lld herberekenen", "Ricalcola giornata %lld")
+add("Regenerate Link", "Regenerar enlace", "Link neu erzeugen", "Régénérer le lien", "Link opnieuw genereren", "Rigenera link")
+add("Remove Link", "Quitar enlace", "Link entfernen", "Supprimer le lien", "Link verwijderen", "Rimuovi link")
+add("Remove Player", "Quitar jugador", "Spieler entfernen", "Retirer le joueur", "Speler verwijderen", "Rimuovi giocatore")
+add("Report a Bug", "Informar de un fallo", "Fehler melden", "Signaler un bug", "Bug melden", "Segnala un problema")
+add("Resolve the round", "Resolver la ronda", "Runde auflösen", "Résoudre la manche", "Ronde afhandelen", "Risolvi il turno")
+add("Result rules", "Reglas de resultado", "Ergebnisregeln", "Règles de résultat", "Uitslagregels", "Regole del risultato")
+add("Results due", "Resultados pendientes", "Ergebnisse fällig", "Résultats attendus", "Uitslagen open", "Risultati attesi")
+add("Roster", "Plantilla", "Kader", "Effectif", "Selectie", "Rosa")
+add("Round %lld closed", "Ronda %lld cerrada", "Runde %lld geschlossen", "Manche %lld clôturée", "Ronde %lld gesloten", "Turno %lld chiuso")
+add("SEARCH", "BUSCAR", "SUCHE", "RECHERCHE", "ZOEKEN", "CERCA")
+add("STANDINGS", "CLASIFICACIÓN", "TABELLE", "CLASSEMENT", "STAND", "CLASSIFICA")
+add("SUBMISSIONS", "ENVÍOS", "EINSENDUNGEN", "ENVOIS", "INZENDINGEN", "INVII")
+add("SUBSCRIPTION", "SUSCRIPCIÓN", "ABO", "ABONNEMENT", "ABONNEMENT", "ABBONAMENTO")
+add("Scoring", "Puntuación", "Punktevergabe", "Points", "Puntentelling", "Punteggio")
+add("Share Accuracy Table", "Compartir tabla de aciertos", "Trefferquoten-Tabelle teilen", "Partager le tableau de précision", "Nauwkeurigheidstabel delen", "Condividi tabella di precisione")
+add("Share Entry Closed Card",
+    "Compartir tarjeta de cierre",
+    "Karte „Anmeldung geschlossen“ teilen",
+    "Partager la carte de clôture",
+    "Kaart ‘inschrijving gesloten’ delen",
+    "Condividi scheda iscrizioni chiuse")
+add("Share Final Result", "Compartir resultado final", "Endergebnis teilen", "Partager le résultat final", "Eindresultaat delen", "Condividi risultato finale")
+add("Share Final Standings", "Compartir clasificación final", "Endtabelle teilen", "Partager le classement final", "Eindstand delen", "Condividi classifica finale")
+add("Share League Table", "Compartir clasificación", "Tabelle teilen", "Partager le classement", "Stand delen", "Condividi classifica")
+add("Share Link", "Compartir enlace", "Link teilen", "Partager le lien", "Link delen", "Condividi link")
+add("Share Outcome Card", "Compartir tarjeta de desenlace", "Ausgangs-Karte teilen", "Partager la carte d’issue", "Uitkomstkaart delen", "Condividi scheda esito")
+add("Share Player Key Card",
+    "Compartir tarjeta de clave de jugador",
+    "Spieler-Schlüsselkarte teilen",
+    "Partager la carte de clé joueur",
+    "Spelersleutelkaart delen",
+    "Condividi scheda chiave giocatore")
+add("Share Weekly Results", "Compartir resultados semanales", "Wochenergebnisse teilen", "Partager les résultats de la semaine", "Weekresultaten delen", "Condividi risultati settimanali")
+add("Show In Person", "Mostrar en persona", "Vor Ort zeigen", "Montrer en personne", "Ter plekke tonen", "Mostra di persona")
+add("Submission", "Envío", "Einsendung", "Envoi", "Inzending", "Invio")
+add("Submission Link", "Enlace de envío", "Einsende-Link", "Lien d’envoi", "Inzendlink", "Link di invio")
+add("Submissions closed", "Envíos cerrados", "Einsendungen geschlossen", "Envois clôturés", "Inzendingen gesloten", "Invii chiusi")
+add("That's a wrap!", "¡Y hasta aquí!", "Das war’s!", "C’est terminé !", "Dat was het!", "È tutto!")
+add("Tutorial fixtures loaded", "Partidos del tutorial cargados", "Tutorial-Spiele geladen", "Matchs du tutoriel chargés", "Tutorial-wedstrijden geladen", "Partite del tutorial caricate")
+add("Tutorial picks pre-assigned",
+    "Selecciones del tutorial preasignadas",
+    "Tutorial-Tipps vorbelegt",
+    "Choix du tutoriel préremplis",
+    "Tutorial-keuzes vooraf toegewezen",
+    "Scelte del tutorial preassegnate")
+add("Tutorial results loaded", "Resultados del tutorial cargados", "Tutorial-Ergebnisse geladen", "Résultats du tutoriel chargés", "Tutorial-uitslagen geladen", "Risultati del tutorial caricati")
+add("Tutorial scores loaded", "Marcadores del tutorial cargados", "Tutorial-Spielstände geladen", "Scores du tutoriel chargés", "Tutorial-scores geladen", "Punteggi del tutorial caricati")
+add("Unlock Player Submission Links", "Desbloquear enlaces de envío", "Spieler-Einsendelinks freischalten", "Débloquer les liens d’envoi", "Inzendlinks vrijschakelen", "Sblocca i link di invio")
+add("View as %@", "Ver como %@", "Ansicht als %@", "Voir comme %@", "Bekijken als %@", "Vedi come %@")
+add("WINS", "VICTORIAS", "SIEGE", "VICTOIRES", "OVERWINNINGEN", "VITTORIE")
+add("WIZARD", "ASISTENTE", "ASSISTENT", "ASSISTANT", "WIZARD", "PROCEDURA")
+add("What happened?", "¿Qué ha pasado?", "Was ist passiert?", "Que s’est-il passé ?", "Wat is er gebeurd?", "Cosa è successo?")
+add("Your games", "Tus partidas", "Deine Spiele", "Tes parties", "Je spellen", "Le tue partite")
+
 # ---- Tier raw labels already covered (Free/No Ads/Pro/details) ----
 
 with open("LSM/Localizable.xcstrings", "w", encoding="utf-8") as fh:

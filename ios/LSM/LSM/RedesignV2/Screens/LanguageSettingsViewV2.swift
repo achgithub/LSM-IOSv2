@@ -13,7 +13,7 @@ struct LanguageSettingsViewV2: View {
                     VStack(alignment: .leading, spacing: 14) {
                         SectionHeader(title: "Language")
                         FlowPillGrid(items: AppLanguage.allCases) { language in
-                            SelectablePill(title: language.displayName, isSelected: language == localization.language) {
+                            SelectablePill(verbatim: language.displayName, isSelected: language == localization.language) {
                                 localization.select(language)
                             }
                         }
