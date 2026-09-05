@@ -97,8 +97,11 @@ struct ManagerOnboardingView: View {
             if isReturningSubscriber {
                 // Promoted above the name field, unlike the free path: for
                 // someone who just replaced a phone, recovering their games
-                // *is* the task, and the name they're about to type is one
-                // link-device will overwrite anyway.
+                // *is* the task, so it shouldn't sit below the fold as an
+                // afterthought. Linking doesn't set the name (nothing in the
+                // link/sync path writes `ManagerSettings.nameKey`), so they
+                // still land back here to type it — hence "Or start fresh"
+                // below rather than a separate finished state.
                 Section {
                     Text("Your \(entitlements.tier.label) subscription is active on this Apple ID. If you had games on another phone, bring them over here.")
                         .font(.subheadline)
@@ -109,13 +112,16 @@ struct ManagerOnboardingView: View {
                 }
             }
 
+            // Header only on the subscriber path — an empty `Text` header
+            // still renders its padding, which would leave the common
+            // (free) path with a gap it didn't have before.
             Section {
                 // Single localized string key — can't wrap without changing the key.
                 // swiftlint:disable:next line_length
                 Text("What's your name? You'll be added to games you create, and your pick is always shown on shared summary cards — even in anonymous mode — so it's fair on the other players.")
                     .font(.subheadline)
             } header: {
-                Text(isReturningSubscriber ? "Or start fresh" : "")
+                if isReturningSubscriber { Text("Or start fresh") }
             }
             Section("Your name") {
                 TextField("e.g. Andy", text: $nameDraft)

@@ -26,7 +26,9 @@ struct RootTabView: View {
     @Environment(EnabledLeagues.self) private var enabled
     @Environment(\.modelContext) private var context
     @State private var showLeagueManager = false
-    // @Environment(\.scenePhase) private var scenePhase  // interstitial dropped 2026-06-15
+    // Reinstated for the recovery-email nudge only — the interstitial that
+    // originally needed it was dropped 2026-06-15 and is not coming back.
+    @Environment(\.scenePhase) private var scenePhase
 
     private var graceDaysRemaining: Int? { enabled.graceDaysRemaining(entitlements) }
 
@@ -121,9 +123,14 @@ struct RootTabView: View {
             // `evaluate` to tell a cloud manager from a Free one.
             recoveryPrompt.evaluate(entitlements: entitlements, linkedEmail: linkedEmail)
         }
-        // Interstitial dropped (2026-06-15) — foreground trigger disabled.
-        // .onChange(of: scenePhase) { _, phase in
-        //     if phase == .active { InterstitialAdManager.shared.showIfDue() }
-        // }
+        // Interstitial dropped (2026-06-15) — that foreground trigger stays
+        // gone. This one is only the recovery-email nudge: an upgrade bought
+        // mid-session (or a tier that resolved late after an offline launch)
+        // has to be able to raise it without waiting for a cold start.
+        // `evaluate` no-ops when it isn't due.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            recoveryPrompt.evaluate(entitlements: entitlements, linkedEmail: linkedEmail)
+        }
     }
 }

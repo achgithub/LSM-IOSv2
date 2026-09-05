@@ -78,6 +78,12 @@ struct V2RootView: View {
                 Task {
                     await SyncScheduler.shared.refreshIfDue(games: games, leagues: enabled.leagues, entitlements: entitlements)
                 }
+                // Re-checked on every foreground, not just at launch: an
+                // upgrade bought mid-session (or a tier that resolved late
+                // after an offline launch) has to be able to raise the nudge
+                // without waiting for a cold start. `evaluate` no-ops when
+                // it isn't due.
+                recoveryPrompt.evaluate(entitlements: entitlements, linkedEmail: linkedEmail)
             }
     }
 

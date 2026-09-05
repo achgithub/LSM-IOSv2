@@ -34,8 +34,8 @@ final class RecoveryEmailPrompt {
 
     var isSuppressed: Bool { UserDefaults.standard.bool(forKey: Self.suppressedKey) }
 
-    /// Shows the nudge if it's due. Safe to call on every foreground — the
-    /// interval check and `isPresented` guard make repeat calls a no-op.
+    /// Marks the nudge as due if it is. Safe to call on every foreground —
+    /// the interval check and `isPresented` guard make repeat calls a no-op.
     ///
     /// `verified` matters as much as `canUseCloud` here: an unresolved tier
     /// reads as `.free`, and nudging on that would mean pestering free users
@@ -48,15 +48,22 @@ final class RecoveryEmailPrompt {
               !isSuppressed
         else { return }
 
-        let defaults = UserDefaults.standard
-        if let last = defaults.object(forKey: Self.lastPromptedKey) as? Date,
+        if let last = UserDefaults.standard.object(forKey: Self.lastPromptedKey) as? Date,
            Date().timeIntervalSince(last) < Self.reminderInterval {
             return
         }
-        // Stamped when shown, not when dismissed, so closing the sheet by any
-        // route (swipe-down included) still starts the clock.
-        defaults.set(Date(), forKey: Self.lastPromptedKey)
+        // Only marks it due — the clock starts in `markShown`, not here. The
+        // roots can still refuse to present (onboarding, reauth or a forced
+        // downgrade is up), and stamping here would silently burn the nudge
+        // for 30 days on a sheet nobody ever saw.
         isPresented = true
+    }
+
+    /// Called when the sheet actually reaches the screen. Stamped on
+    /// appearance rather than dismissal so closing it by any route
+    /// (swipe-down included) still starts the clock.
+    func markShown() {
+        UserDefaults.standard.set(Date(), forKey: Self.lastPromptedKey)
     }
 
     func suppress() {
@@ -110,6 +117,7 @@ struct RecoveryEmailPromptView: View {
             .background(V2Theme.background.ignoresSafeArea())
             .navigationTitle("Secure Your Games")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { RecoveryEmailPrompt.shared.markShown() }
             .toolbarBackground(V2Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
