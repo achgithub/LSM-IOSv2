@@ -582,6 +582,159 @@ add("Closed", "Cerrada", "Geschlossen", "Clôturée", "Gesloten", "Chiuso")
 add("Player %lld", "Jugador %lld", "Spieler %lld", "Joueur %lld", "Speler %lld", "Giocatore %lld")
 add("Enter Results", "Introducir resultados", "Ergebnisse eingeben", "Saisir les résultats", "Resultaten invoeren", "Inserisci risultati")
 
+# ---- Account / recovery email (onboarding, link-device, reauth, Profile) ----
+# This whole family was English-only until now. Covered together rather than
+# only the new strings, because they share screens — a half-translated
+# recovery flow reads worse than an untranslated one.
+add("Welcome Back", "Bienvenido de nuevo", "Willkommen zurück", "Bon retour", "Welkom terug", "Bentornato")
+add("Recover your games", "Recupera tus partidas", "Hol dir deine Spiele zurück", "Récupère tes parties", "Haal je spellen terug", "Recupera le tue partite")
+add("Get My Games Back", "Recuperar mis partidas", "Meine Spiele zurückholen", "Récupérer mes parties", "Mijn spellen terughalen", "Recupera le mie partite")
+add("Or start fresh", "O empieza de cero", "Oder neu anfangen", "Ou repartir de zéro", "Of begin opnieuw", "Oppure ricomincia")
+add("I Already Have an Account", "Ya tengo una cuenta", "Ich habe bereits ein Konto", "J’ai déjà un compte", "Ik heb al een account", "Ho già un account")
+add("Recovering games from a phone you no longer have? Start here.",
+    "¿Recuperas partidas de un móvil que ya no tienes? Empieza aquí.",
+    "Du holst Spiele von einem Handy zurück, das du nicht mehr hast? Fang hier an.",
+    "Tu récupères des parties d’un téléphone que tu n’as plus ? Commence ici.",
+    "Spellen terughalen van een telefoon die je niet meer hebt? Begin hier.",
+    "Stai recuperando partite da un telefono che non hai più? Inizia qui.")
+add("Your %@ subscription is active on this Apple ID. If you had games on another phone, bring them over here.",
+    "Tu suscripción %@ está activa en este ID de Apple. Si tenías partidas en otro móvil, tráelas aquí.",
+    "Dein %@-Abo ist mit dieser Apple-ID aktiv. Wenn du Spiele auf einem anderen Handy hattest, hol sie hierher.",
+    "Ton abonnement %@ est actif sur cet identifiant Apple. Si tu avais des parties sur un autre téléphone, récupère-les ici.",
+    "Je %@-abonnement is actief op deze Apple ID. Had je spellen op een andere telefoon? Haal ze hierheen.",
+    "Il tuo abbonamento %@ è attivo su questo ID Apple. Se avevi partite su un altro telefono, portale qui.")
+
+# Email / OTP fields shared by every screen in the family
+add("Email", "Correo", "E-Mail", "E-mail", "E-mail", "Email")
+add("Email (optional)", "Correo (opcional)", "E-Mail (optional)", "E-mail (facultatif)", "E-mail (optioneel)", "Email (facoltativa)")
+add("Email (Optional)", "Correo (opcional)", "E-Mail (optional)", "E-mail (facultatif)", "E-mail (optioneel)", "Email (facoltativa)")
+add("Send Code", "Enviar código", "Code senden", "Envoyer le code", "Code versturen", "Invia codice")
+add("Enter Code", "Introducir código", "Code eingeben", "Saisir le code", "Code invoeren", "Inserisci codice")
+add("6-digit code", "Código de 6 dígitos", "6-stelliger Code", "Code à 6 chiffres", "6-cijferige code", "Codice a 6 cifre")
+add("Verify", "Verificar", "Bestätigen", "Vérifier", "Verifiëren", "Verifica")
+add("Sending…", "Enviando…", "Wird gesendet…", "Envoi…", "Versturen…", "Invio…")
+add("Verifying…", "Verificando…", "Wird geprüft…", "Vérification…", "Verifiëren…", "Verifica…")
+add("Use a Different Email", "Usar otro correo", "Andere E-Mail verwenden", "Utiliser un autre e-mail", "Ander e-mailadres gebruiken", "Usa un’altra email")
+add("Enter the code we just sent to %@.",
+    "Introduce el código que acabamos de enviar a %@.",
+    "Gib den Code ein, den wir gerade an %@ geschickt haben.",
+    "Saisis le code que nous venons d’envoyer à %@.",
+    "Voer de code in die we net naar %@ hebben gestuurd.",
+    "Inserisci il codice che abbiamo appena inviato a %@.")
+
+# Profile screen
+add("Profile", "Perfil", "Profil", "Profil", "Profiel", "Profilo")
+add("Your Name", "Tu nombre", "Dein Name", "Ton nom", "Je naam", "Il tuo nome")
+add("Your Games", "Tus partidas", "Deine Spiele", "Tes parties", "Je spellen", "Le tue partite")
+add("Loading games…", "Cargando partidas…", "Spiele werden geladen…", "Chargement des parties…", "Spellen laden…", "Caricamento partite…")
+add("Untitled Game", "Partida sin título", "Unbenanntes Spiel", "Partie sans titre", "Naamloos spel", "Partita senza titolo")
+add("Sync", "Sincronizar", "Sync", "Synchroniser", "Synchroniseren", "Sincronizza")
+add("Try Again", "Reintentar", "Erneut versuchen", "Réessayer", "Opnieuw proberen", "Riprova")
+add("Registered email", "Correo registrado", "Registrierte E-Mail", "E-mail enregistré", "Geregistreerd e-mailadres", "Email registrata")
+add("Registered Email", "Correo registrado", "Registrierte E-Mail", "E-mail enregistré", "Geregistreerd e-mailadres", "Email registrata")
+add("You're added to games you create, and your pick is always shown on shared summary cards.",
+    "Te añadimos a las partidas que creas y tu selección siempre aparece en las tarjetas de resumen compartidas.",
+    "Du wirst zu den von dir erstellten Spielen hinzugefügt, und dein Tipp wird auf geteilten Übersichtskarten immer angezeigt.",
+    "Tu es ajouté aux parties que tu crées, et ton choix apparaît toujours sur les cartes récapitulatives partagées.",
+    "Je wordt toegevoegd aan spellen die je maakt, en je keuze staat altijd op gedeelde samenvattingskaarten.",
+    "Vieni aggiunto alle partite che crei e la tua scelta è sempre mostrata sulle schede riepilogative condivise.")
+add("If you get a new phone, enter this email during setup to recover your games.",
+    "Si cambias de móvil, introduce este correo durante la configuración para recuperar tus partidas.",
+    "Wenn du ein neues Handy bekommst, gib bei der Einrichtung diese E-Mail-Adresse ein, um deine Spiele wiederherzustellen.",
+    "Si tu changes de téléphone, saisis cet e-mail pendant la configuration pour récupérer tes parties.",
+    "Als je een nieuwe telefoon krijgt, voer je tijdens het instellen dit e-mailadres in om je spellen terug te halen.",
+    "Se cambi telefono, inserisci questa email durante la configurazione per recuperare le tue partite.")
+add("Register your email so you can recover your games on a new device if you ever lose this one.",
+    "Registra tu correo para poder recuperar tus partidas en otro dispositivo si alguna vez pierdes este.",
+    "Registriere deine E-Mail-Adresse, damit du deine Spiele auf einem neuen Gerät wiederherstellen kannst, falls du dieses verlierst.",
+    "Enregistre ton e-mail pour pouvoir récupérer tes parties sur un autre appareil si tu perds celui-ci.",
+    "Registreer je e-mailadres zodat je je spellen op een nieuw toestel kunt terughalen als je dit ooit verliest.",
+    "Registra la tua email per poter recuperare le tue partite su un altro dispositivo se dovessi perdere questo.")
+add("Pick a game to bring it to this device. You can come back later for the rest.",
+    "Elige una partida para traerla a este dispositivo. Puedes volver luego a por el resto.",
+    "Wähle ein Spiel, um es auf dieses Gerät zu holen. Den Rest kannst du später nachholen.",
+    "Choisis une partie pour la récupérer sur cet appareil. Tu pourras revenir plus tard pour le reste.",
+    "Kies een spel om het naar dit toestel te halen. De rest kun je later ophalen.",
+    "Scegli una partita da portare su questo dispositivo. Puoi tornare più tardi per le altre.")
+
+# Tier gate shown to Free / No Ads in place of the registration form
+add("Recover on a new phone", "Recuperar en un móvil nuevo", "Auf einem neuen Handy wiederherstellen", "Récupérer sur un nouveau téléphone", "Herstellen op een nieuwe telefoon", "Recupera su un nuovo telefono")
+add("Recover On A New Phone", "Recuperar en un móvil nuevo", "Auf einem neuen Handy wiederherstellen", "Récupérer sur un nouveau téléphone", "Herstellen op een nieuwe telefoon", "Recupera su un nuovo telefono")
+add("Registering an email so you can recover your games on a new phone is part of the 3 Leagues plan and above.",
+    "Registrar un correo para recuperar tus partidas en un móvil nuevo forma parte del plan de 3 ligas y superiores.",
+    "Eine E-Mail-Adresse zu registrieren, um deine Spiele auf einem neuen Handy wiederherzustellen, gehört zum Tarif „3 Ligen“ und höher.",
+    "Enregistrer un e-mail pour récupérer tes parties sur un nouveau téléphone fait partie de l’offre 3 ligues et au-delà.",
+    "Een e-mailadres registreren om je spellen op een nieuwe telefoon terug te halen hoort bij het 3 competities-abonnement en hoger.",
+    "Registrare un’email per recuperare le tue partite su un nuovo telefono fa parte del piano 3 Campionati e superiori.")
+add("On your current plan, back up a game with Export for Transfer from its menu, then import it on the new phone.",
+    "Con tu plan actual, haz una copia de la partida con Exportar para transferir desde su menú y luego impórtala en el móvil nuevo.",
+    "In deinem aktuellen Tarif sicherst du ein Spiel über „Für Übertragung exportieren“ in seinem Menü und importierst es dann auf dem neuen Handy.",
+    "Avec ton offre actuelle, sauvegarde une partie via Exporter pour transfert dans son menu, puis importe-la sur le nouveau téléphone.",
+    "Met je huidige abonnement maak je een back-up van een spel via Exporteren voor overdracht in het menu en importeer je het op de nieuwe telefoon.",
+    "Con il tuo piano attuale, salva una partita con Esporta per trasferimento dal suo menu e poi importala sul nuovo telefono.")
+
+# Periodic recovery-email nudge (RecoveryEmailPrompt)
+add("Secure Your Games", "Protege tus partidas", "Sichere deine Spiele", "Protège tes parties", "Beveilig je spellen", "Proteggi le tue partite")
+add("Not Now", "Ahora no", "Jetzt nicht", "Pas maintenant", "Niet nu", "Non ora")
+add("Don't Remind Me Again", "No volver a recordármelo", "Nicht mehr erinnern", "Ne plus me le rappeler", "Herinner me niet meer", "Non ricordarmelo più")
+add("Email registered", "Correo registrado", "E-Mail registriert", "E-mail enregistré", "E-mailadres geregistreerd", "Email registrata")
+add("Your plan includes getting your games back on a new phone. Register an email now and you'll be able to recover them if this one is ever lost, stolen or replaced.",
+    "Tu plan incluye recuperar tus partidas en un móvil nuevo. Registra un correo ahora y podrás recuperarlas si este se pierde, te lo roban o lo cambias.",
+    "Dein Tarif enthält das Wiederherstellen deiner Spiele auf einem neuen Handy. Registriere jetzt eine E-Mail-Adresse, damit du sie zurückholen kannst, falls dieses verloren geht, gestohlen oder ersetzt wird.",
+    "Ton offre inclut la récupération de tes parties sur un nouveau téléphone. Enregistre un e-mail maintenant et tu pourras les récupérer si celui-ci est perdu, volé ou remplacé.",
+    "Je abonnement bevat het terughalen van je spellen op een nieuwe telefoon. Registreer nu een e-mailadres, dan kun je ze herstellen als deze verloren gaat, gestolen wordt of vervangen wordt.",
+    "Il tuo piano include il recupero delle partite su un nuovo telefono. Registra un’email ora e potrai recuperarle se questo dovesse essere perso, rubato o sostituito.")
+add("Only used to recover your games. We won't email you about anything else.",
+    "Solo se usa para recuperar tus partidas. No te escribiremos por nada más.",
+    "Wird nur zum Wiederherstellen deiner Spiele verwendet. Wir schreiben dir sonst nichts.",
+    "Utilisé uniquement pour récupérer tes parties. Nous ne t’écrirons pour rien d’autre.",
+    "Alleen gebruikt om je spellen terug te halen. We mailen je verder nergens over.",
+    "Usata solo per recuperare le tue partite. Non ti scriveremo per altro.")
+add("You can still register an email any time from Settings → Profile.",
+    "Puedes registrar un correo cuando quieras desde Ajustes → Perfil.",
+    "Du kannst jederzeit unter Einstellungen → Profil eine E-Mail-Adresse registrieren.",
+    "Tu peux enregistrer un e-mail à tout moment depuis Réglages → Profil.",
+    "Je kunt altijd een e-mailadres registreren via Instellingen → Profiel.",
+    "Puoi registrare un’email quando vuoi da Impostazioni → Profilo.")
+add("If you get a new phone, enter %@ during setup to get your games back.",
+    "Si cambias de móvil, introduce %@ durante la configuración para recuperar tus partidas.",
+    "Wenn du ein neues Handy bekommst, gib bei der Einrichtung %@ ein, um deine Spiele zurückzuholen.",
+    "Si tu changes de téléphone, saisis %@ pendant la configuration pour récupérer tes parties.",
+    "Als je een nieuwe telefoon krijgt, voer je tijdens het instellen %@ in om je spellen terug te halen.",
+    "Se cambi telefono, inserisci %@ durante la configurazione per recuperare le tue partite.")
+
+# Link device / reauthorize
+add("Link Existing Account", "Vincular cuenta existente", "Bestehendes Konto verknüpfen", "Lier un compte existant", "Bestaand account koppelen", "Collega account esistente")
+add("Link This Device", "Vincular este dispositivo", "Dieses Gerät verknüpfen", "Lier cet appareil", "Dit toestel koppelen", "Collega questo dispositivo")
+add("Link Device", "Vincular dispositivo", "Gerät verknüpfen", "Lier l’appareil", "Toestel koppelen", "Collega dispositivo")
+add("Reconnect This Device", "Reconectar este dispositivo", "Dieses Gerät neu verbinden", "Reconnecter cet appareil", "Dit toestel opnieuw koppelen", "Riconnetti questo dispositivo")
+add("Confirm It's You", "Confirma que eres tú", "Bestätige, dass du es bist", "Confirme que c’est toi", "Bevestig dat jij het bent", "Conferma che sei tu")
+add("This phone lost its security key", "Este móvil ha perdido su clave de seguridad", "Dieses Handy hat seinen Sicherheitsschlüssel verloren", "Ce téléphone a perdu sa clé de sécurité", "Deze telefoon is zijn beveiligingssleutel kwijt", "Questo telefono ha perso la sua chiave di sicurezza")
+add("Enter the email you registered on your previous device.",
+    "Introduce el correo que registraste en tu dispositivo anterior.",
+    "Gib die E-Mail-Adresse ein, die du auf deinem vorherigen Gerät registriert hast.",
+    "Saisis l’e-mail enregistré sur ton appareil précédent.",
+    "Voer het e-mailadres in dat je op je vorige toestel hebt geregistreerd.",
+    "Inserisci l’email registrata sul tuo dispositivo precedente.")
+add("Enter the email you registered on this account to reconnect this device.",
+    "Introduce el correo que registraste en esta cuenta para reconectar este dispositivo.",
+    "Gib die E-Mail-Adresse ein, die du für dieses Konto registriert hast, um dieses Gerät wieder zu verbinden.",
+    "Saisis l’e-mail enregistré sur ce compte pour reconnecter cet appareil.",
+    "Voer het e-mailadres in dat je voor dit account hebt geregistreerd om dit toestel opnieuw te koppelen.",
+    "Inserisci l’email registrata su questo account per riconnettere questo dispositivo.")
+add("Make This Your Active Device?", "¿Hacer de este tu dispositivo activo?", "Dieses Gerät zum aktiven Gerät machen?", "Faire de cet appareil ton appareil actif ?", "Dit toestel je actieve toestel maken?", "Rendere questo il tuo dispositivo attivo?")
+add("This phone will become the active device for this account. Your other device will stop working until it's linked again.",
+    "Este móvil pasará a ser el dispositivo activo de esta cuenta. Tu otro dispositivo dejará de funcionar hasta que lo vuelvas a vincular.",
+    "Dieses Handy wird zum aktiven Gerät für dieses Konto. Dein anderes Gerät funktioniert erst wieder, wenn es erneut verknüpft wird.",
+    "Ce téléphone deviendra l’appareil actif de ce compte. Ton autre appareil cessera de fonctionner jusqu’à ce qu’il soit lié à nouveau.",
+    "Deze telefoon wordt het actieve toestel voor dit account. Je andere toestel werkt niet meer totdat het opnieuw is gekoppeld.",
+    "Questo telefono diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi.")
+
+# Failure alert titles for the family
+add("Couldn't Complete That", "No se ha podido completar", "Das hat nicht geklappt", "Impossible de terminer", "Dat is niet gelukt", "Non è stato possibile completare")
+add("Couldn't Link Device", "No se ha podido vincular el dispositivo", "Gerät konnte nicht verknüpft werden", "Impossible de lier l’appareil", "Koppelen van toestel mislukt", "Impossibile collegare il dispositivo")
+add("Couldn't Reconnect", "No se ha podido reconectar", "Neu verbinden fehlgeschlagen", "Impossible de reconnecter", "Opnieuw koppelen mislukt", "Impossibile riconnettersi")
+
 # ---- Tier raw labels already covered (Free/No Ads/Pro/details) ----
 
 with open("LSM/Localizable.xcstrings", "w", encoding="utf-8") as fh:
