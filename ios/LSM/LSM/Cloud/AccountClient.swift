@@ -9,6 +9,10 @@ enum AccountError: LocalizedError {
     case tooManyAttempts
     case cooldown(retryAfterSeconds: Int)
     case emailMismatch
+    /// Server-side counterpart of `Entitlements.canUseCloud` — the app hides
+    /// the registration form below leagues_3, so this only surfaces if the
+    /// tier lapsed mid-flow or the client's view of it is stale.
+    case cloudTierRequired
     case other(APIError)
 
     var errorDescription: String? {
@@ -23,6 +27,8 @@ enum AccountError: LocalizedError {
             return AppString("Please wait \(seconds)s before requesting another code.")
         case .emailMismatch:
             return AppString("That code was issued for a different email address.")
+        case .cloudTierRequired:
+            return AppString("Registering an email for recovery is part of the 3 Leagues plan and above.")
         case .other(let apiError):
             return apiError.errorDescription
         }
@@ -126,6 +132,7 @@ actor AccountClient {
                 case "not_found": throw AccountError.codeExpired
                 case "too_many_attempts": throw AccountError.tooManyAttempts
                 case "email mismatch": throw AccountError.emailMismatch
+                case "cloud_tier_required": throw AccountError.cloudTierRequired
                 default:
                     if http.statusCode == 429, let retry = server.retryAfterSeconds {
                         throw AccountError.cooldown(retryAfterSeconds: retry)

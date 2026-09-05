@@ -731,6 +731,12 @@ add("This phone will become the active device for this account. Your other devic
     "Questo telefono diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi.")
 
 # Failure alert titles for the family
+add("Registering an email for recovery is part of the 3 Leagues plan and above.",
+    "Registrar un correo para recuperar tus partidas forma parte del plan de 3 ligas y superiores.",
+    "Eine E-Mail-Adresse zur Wiederherstellung zu registrieren, gehört zum Tarif „3 Ligen“ und höher.",
+    "Enregistrer un e-mail de récupération fait partie de l’offre 3 ligues et au-delà.",
+    "Een e-mailadres registreren voor herstel hoort bij het 3 competities-abonnement en hoger.",
+    "Registrare un’email per il recupero fa parte del piano 3 Campionati e superiori.")
 add("Couldn't Complete That", "No se ha podido completar", "Das hat nicht geklappt", "Impossible de terminer", "Dat is niet gelukt", "Non è stato possibile completare")
 add("Couldn't Link Device", "No se ha podido vincular el dispositivo", "Gerät konnte nicht verknüpft werden", "Impossible de lier l’appareil", "Koppelen van toestel mislukt", "Impossibile collegare il dispositivo")
 add("Couldn't Reconnect", "No se ha podido reconectar", "Neu verbinden fehlgeschlagen", "Impossible de reconnecter", "Opnieuw koppelen mislukt", "Impossibile riconnettersi")

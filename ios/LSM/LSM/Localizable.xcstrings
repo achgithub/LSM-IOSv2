@@ -12356,6 +12356,41 @@
         }
       }
     },
+    "Registering an email for recovery is part of the 3 Leagues plan and above.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine E-Mail-Adresse zur Wiederherstellung zu registrieren, gehört zum Tarif „3 Ligen“ und höher."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrar un correo para recuperar tus partidas forma parte del plan de 3 ligas y superiores."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer un e-mail de récupération fait partie de l’offre 3 ligues et au-delà."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrare un’email per il recupero fa parte del piano 3 Campionati e superiori."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Een e-mailadres registreren voor herstel hoort bij het 3 competities-abonnement en hoger."
+          }
+        }
+      }
+    },
     "Couldn't Complete That": {
       "extractionState": "manual",
       "localizations": {

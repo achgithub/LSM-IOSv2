@@ -7,6 +7,7 @@ import {
 } from "../account-store";
 import { issueOtp, verifyOtp, registerOtpKey, linkDeviceOtpKey, writePendingBind } from "../otp";
 import { sendOtpEmail, EmailSendError } from "../email";
+import { resolveManagerDB } from "../shardRouter";
 
 // ── Email registration for device recovery ───────────────────────────────────
 //
@@ -23,8 +24,11 @@ import { sendOtpEmail, EmailSendError } from "../email";
 //   pending-bind window that the device's *next* /attest/register call must
 //   consume to become the active device — see the guard in routes/attest.ts.
 //
-// Not shard-routed — queried via c.env.DB directly, same as the admin
-// device-management routes. See schema.sql's comment on accounts for why.
+// The `accounts` table itself is not shard-routed — queried via c.env.DB
+// directly, same as the admin device-management routes. See schema.sql's
+// comment on accounts for why. The one exception is the cloud-entitlement
+// check on register/verify below, which reads `manager_lifecycle` and so
+// does have to resolve the manager's shard.
 
 export const account = new Hono<{ Bindings: Env }>();
 
@@ -34,6 +38,51 @@ function managerTokenHeader(c: { req: { header: (name: string) => string | undef
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function shardHeader(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  return c.req.header("X-Shard-Id") ?? null;
+}
+
+// Registering an email is a cloud feature — leagues_3 and above (see
+// Entitlements.canUseCloud in the iOS app). The app hides the registration
+// form below that tier, but a client-side rule is a UI convention, not a
+// gate, so it's enforced here too.
+//
+// `max_pwa_links` is the server's only view of tier: reported by the client
+// on every launch (POST /manager/entitlements) and non-null exactly for the
+// cloud tiers. That makes it a soft signal rather than proof — tier is a
+// StoreKit concept the server can't verify, so a hand-crafted request could
+// claim anything. This closes the casual path, not a determined one.
+//
+// Fails OPEN in both uncertain cases — no row, or a lookup error. A manager
+// the server has never heard of is mid-first-launch, not a free-rider, and
+// rejecting them would break registration for a paying customer whose
+// entitlement report hasn't landed yet (it's fire-and-forget). Only a row
+// that positively says "no cloud tier" is refused.
+//
+// Deliberately NOT applied to the link-device routes below: those are
+// recovery, they run on a device with no attested identity or resolved tier
+// by definition, and they gate themselves — you can only link to an account
+// that already exists, and accounts are only created by an entitled manager.
+async function hasCloudEntitlement(
+  c: { env: Env; req: { header: (name: string) => string | undefined } },
+  managerToken: string
+): Promise<boolean> {
+  try {
+    const { db } = await resolveManagerDB(c.env, shardHeader(c), managerToken);
+    const row = await db
+      .prepare(`SELECT max_pwa_links FROM manager_lifecycle WHERE manager_token = ?`)
+      .bind(managerToken)
+      .first<{ max_pwa_links: number | null }>();
+    if (!row) return true;
+    return row.max_pwa_links != null;
+  } catch (err) {
+    console.error(JSON.stringify({
+      msg: "cloud entitlement lookup failed, allowing", route: "account", error: String(err),
+    }));
+    return true;
+  }
 }
 
 // ─── Register (already-live device) ─────────────────────────────────────────
@@ -50,6 +99,10 @@ account.post("/register", async (c) => {
   }
   const email = body.email ? normalizeEmail(body.email) : null;
   if (!email) return c.json({ error: "email is required" }, 400);
+
+  if (!(await hasCloudEntitlement(c, managerToken))) {
+    return c.json({ error: "cloud_tier_required" }, 403);
+  }
 
   const result = await issueOtp(c.env.FLAGS, registerOtpKey(managerToken), { email });
   if ("error" in result) {
@@ -81,6 +134,10 @@ account.post("/verify", async (c) => {
   const otp = body.otp?.trim();
   const keyId = body.keyId;
   if (!email || !otp || !keyId) return c.json({ error: "email, otp and keyId are required" }, 400);
+
+  if (!(await hasCloudEntitlement(c, managerToken))) {
+    return c.json({ error: "cloud_tier_required" }, 403);
+  }
 
   const result = await verifyOtp<{ email: string }>(c.env.FLAGS, registerOtpKey(managerToken), otp);
   if (!result.ok) return c.json({ error: result.error }, 401);
