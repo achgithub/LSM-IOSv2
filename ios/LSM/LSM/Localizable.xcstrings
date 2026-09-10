@@ -14736,6 +14736,41 @@
         }
       }
     },
+    "No ads · 1 league · 9 games": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werbefrei · 1 Liga · 9 Spiele"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin anuncios · 1 liga · 9 partidas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans pub · 1 ligue · 9 parties"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senza pubblicità · 1 lega · 9 partite"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geen advertenties · 1 competitie · 9 spellen"
+          }
+        }
+      }
+    },
     "This Predictor game has reached its %lld-week cap and can't open another matchday.": {
       "extractionState": "manual",
       "localizations": {

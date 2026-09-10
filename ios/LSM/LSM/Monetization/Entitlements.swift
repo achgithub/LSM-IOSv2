@@ -42,7 +42,7 @@ enum Tier: String, CaseIterable, Identifiable {
         case .free:
             return AppString("Ad-supported · 1 league · 2 games")
         case .noAds:
-            return AppString("No ads · 1 league · 3 games")
+            return AppString("No ads · 1 league · 9 games")
         case .leagues3:
             return AppString("No ads · 3 leagues · 9 games · PWA player links (60)")
         case .leagues5:
@@ -52,12 +52,14 @@ enum Tier: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Maximum simultaneous non-completed games (1:3 ratio per league).
+    /// Maximum simultaneous non-completed games (1:3 ratio per league above
+    /// `.noAds`, which is deliberately raised to match `.leagues3`'s game
+    /// count as an entry-tier value bump rather than following the ratio).
     /// Games with `.complete` status do not count against this limit.
     var maxActiveGames: Int {
         switch self {
         case .free:     return 2
-        case .noAds:    return 3
+        case .noAds:    return 9
         case .leagues3: return 9
         case .leagues5: return 15
         case .leagues7: return 21
