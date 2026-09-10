@@ -14771,6 +14771,146 @@
         }
       }
     },
+    "Ad-supported · 1 league · 2 games": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit Werbung · 1 Liga · 2 Spiele"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con anuncios · 1 liga · 2 partidas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec pub · 1 ligue · 2 parties"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con pubblicità · 1 lega · 2 partite"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Met advertenties · 1 competitie · 2 spellen"
+          }
+        }
+      }
+    },
+    "No ads · 3 leagues · 9 games · PWA player links (60)": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werbefrei · 3 Ligen · 9 Spiele · PWA-Spieler-Links (60)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin anuncios · 3 ligas · 9 partidas · enlaces de jugador PWA (60)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans pub · 3 ligues · 9 parties · liens joueur PWA (60)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senza pubblicità · 3 leghe · 9 partite · link giocatore PWA (60)"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geen advertenties · 3 competities · 9 spellen · PWA-spelerlinks (60)"
+          }
+        }
+      }
+    },
+    "No ads · 5 leagues · 15 games · PWA player links (100)": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werbefrei · 5 Ligen · 15 Spiele · PWA-Spieler-Links (100)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin anuncios · 5 ligas · 15 partidas · enlaces de jugador PWA (100)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans pub · 5 ligues · 15 parties · liens joueur PWA (100)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senza pubblicità · 5 leghe · 15 partite · link giocatore PWA (100)"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geen advertenties · 5 competities · 15 spellen · PWA-spelerlinks (100)"
+          }
+        }
+      }
+    },
+    "No ads · 7 leagues · 21 games · PWA player links (140)": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werbefrei · 7 Ligen · 21 Spiele · PWA-Spieler-Links (140)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin anuncios · 7 ligas · 21 partidas · enlaces de jugador PWA (140)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans pub · 7 ligues · 21 parties · liens joueur PWA (140)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senza pubblicità · 7 leghe · 21 partite · link giocatore PWA (140)"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geen advertenties · 7 competities · 21 spellen · PWA-spelerlinks (140)"
+          }
+        }
+      }
+    },
     "This Predictor game has reached its %lld-week cap and can't open another matchday.": {
       "extractionState": "manual",
       "localizations": {
