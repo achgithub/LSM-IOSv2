@@ -338,7 +338,10 @@ struct NewGameView: View {
             } header: {
                 Text("Scoring")
             } footer: {
-                Text("Each prediction earns the single highest rung it qualifies for. A correct non-exact draw lands on Goal difference, not Result.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Each prediction earns the single highest rung it qualifies for. A correct non-exact draw lands on Goal difference, not Result.")
+                    Text("Runs for up to \(Game.defaultPredictorMaxWeeks) matchdays, then ends automatically.")
+                }
             }
         }
         .navigationTitle("New Game")

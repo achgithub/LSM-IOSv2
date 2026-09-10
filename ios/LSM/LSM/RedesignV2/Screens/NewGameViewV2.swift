@@ -201,6 +201,8 @@ struct NewGameViewV2: View {
                 Card(floating: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         MicroLabel(text: "Scoring")
+                        Text("Runs for up to \(Game.defaultPredictorMaxWeeks) matchdays, then ends automatically.")
+                            .font(.caption).foregroundStyle(V2Theme.textTertiary)
                         Stepper("Exact score: \(predictorExactPoints) pts", value: $predictorExactPoints, in: 1...10)
                         Divider().background(V2Theme.cardBorder)
                         Toggle("Goal difference", isOn: $predictorGDEnabled).tint(V2Theme.Mode.predictor)

@@ -14701,6 +14701,41 @@
         }
       }
     },
+    "Runs for up to %lld matchdays, then ends automatically.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Läuft über bis zu %lld Spieltage und endet dann automatisch."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dura hasta %lld jornadas y luego termina automáticamente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dure jusqu'à %lld journées, puis se termine automatiquement."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dura fino a %lld giornate, poi termina automaticamente."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loopt tot %lld speeldagen en stopt dan automatisch."
+          }
+        }
+      }
+    },
     "This Predictor game has reached its %lld-week cap and can't open another matchday.": {
       "extractionState": "manual",
       "localizations": {

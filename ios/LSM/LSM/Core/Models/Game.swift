@@ -55,6 +55,10 @@ final class Game {
     /// manager can be raised past it later without a migration. Unused by
     /// LMS/Killer games.
     var predictorMaxWeeks: Int = 10
+    /// The default `predictorMaxWeeks` new Predictor games are created with —
+    /// single source of truth for the creation screens' "runs for N
+    /// matchdays" notice, so it can't drift from the field's own default.
+    static let defaultPredictorMaxWeeks = 10
 
     // Killer settings — set once at creation, prefilled from the manager's
     // last-used settings. Unused by LMS/Predictor games. See the Killer
