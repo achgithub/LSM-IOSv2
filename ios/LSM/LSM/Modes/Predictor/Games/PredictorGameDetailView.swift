@@ -186,7 +186,7 @@ struct PredictorGameDetailView: View {
     private var infoSection: some View {
         Section {
             LabeledContent("Status", value: game.status.label)
-            LabeledContent("Matchday", value: "\(currentRound?.roundNumber ?? 0)")
+            LabeledContent("Matchday", value: "\(currentRound?.roundNumber ?? 0) / \(game.predictorMaxWeeks)")
             Button { sheet = .standings } label: {
                 Label("Standings", systemImage: "list.number")
             }
@@ -244,6 +244,11 @@ struct PredictorGameDetailView: View {
                 }
                 shareCardButton("Share Fixtures Card", .shareFixtures, enabled: true)
                 shareCardButton("Share Entry Closed Card", .shareEntryClosed, enabled: round.deadline < Date())
+            } else if game.predictorAtWeekCap {
+                Label("Week cap reached", systemImage: "flag.checkered")
+                    .foregroundStyle(.secondary)
+                Text("This Predictor game has reached its \(game.predictorMaxWeeks)-week cap and can't open another matchday.")
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
                 Button { sheet = .open } label: { Label("Open Matchday", systemImage: "calendar.badge.plus") }
                     .disabled(game.players.count < 2)

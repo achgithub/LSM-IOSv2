@@ -116,6 +116,13 @@ enum GameLogicService {
     /// fixture's real purpose (correcting a postponed real fixture, filling a
     /// provider gap) — only a fixture dated implausibly far in the future is
     /// rejected.
+    /// Predictor has no elimination or fixture-exhaustion end condition (see
+    /// `Game.predictorMaxWeeks`), so this is the one enforcement point every
+    /// mode's round-opening UI funnels through — nothing can bypass it.
+    enum OpenRoundError: Error {
+        case predictorWeekCapReached
+    }
+
     @discardableResult
     static func openRound(
         in game: Game,
@@ -124,7 +131,11 @@ enum GameLogicService {
         deadline: Date,
         roundType: RoundType = .normal,
         context: ModelContext
-    ) -> Round {
+    ) throws -> Round {
+        if game.mode == .predictor, nextRoundNumber(for: game) > game.predictorMaxWeeks {
+            game.status = .complete
+            throw OpenRoundError.predictorWeekCapReached
+        }
         let manualLeagueId = ManualFixtureService.leagueId(for: game)
         let realFixtures = fixtures.filter { $0.leagueId != manualLeagueId }
         let manualFixturesById = Dictionary(

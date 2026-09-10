@@ -209,13 +209,13 @@ struct KillerOpenRoundViewV2: View {
             .filter { selectedFixtureIds.contains($0.id) }
             .sorted { $0.kickoff < $1.kickoff }
             .map(\.id)
-        let round = GameLogicService.openRound(
+        guard let round = try? GameLogicService.openRound(
             in: game,
             fixtureIds: orderedIds,
             fixtures: allFixtures,
             deadline: deadline,
             context: context
-        )
+        ) else { return }
         try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             let name = managerName

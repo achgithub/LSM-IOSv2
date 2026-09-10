@@ -223,7 +223,7 @@ struct TutorialContainerView: View {
         guard let game else { return }
         switch TutorialManager.shared.currentStep {
         case .lmsOpenRound1:
-            TutorialDataService.openLMSRound1(in: game, context: context)
+            try? TutorialDataService.openLMSRound1(in: game, context: context)
             try? context.save()
 
         case .lmsEnterPicks1:
@@ -239,7 +239,7 @@ struct TutorialContainerView: View {
             }
 
         case .lmsOpenRound2:
-            TutorialDataService.openLMSRound2(in: game, context: context)
+            try? TutorialDataService.openLMSRound2(in: game, context: context)
             try? context.save()
 
         case .lmsEnterPicks2:
@@ -255,7 +255,7 @@ struct TutorialContainerView: View {
             }
 
         case .predictorOpenRound:
-            TutorialDataService.openPredictorRound(in: game, context: context)
+            try? TutorialDataService.openPredictorRound(in: game, context: context)
             try? context.save()
 
         case .predictorEnterPredictions:

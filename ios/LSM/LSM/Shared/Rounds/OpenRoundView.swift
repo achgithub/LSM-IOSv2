@@ -164,7 +164,7 @@ struct OpenRoundView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Open") { create() }
-                        .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty)
+                        .disabled(selectedFixtureIds.isEmpty || !enoughPlayers || !strandedPlayers.isEmpty || game.predictorAtWeekCap)
                 }
             }
             .task { await load() }
@@ -174,6 +174,23 @@ struct OpenRoundView: View {
                         title: "Tutorial fixtures loaded",
                         detail: "All fixtures are pre-selected. Tap Open ↑ to continue."
                     )
+                } else if game.predictorAtWeekCap {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Week cap reached")
+                                .font(.subheadline.bold())
+                            Text("This Predictor game has reached its \(game.predictorMaxWeeks)-week cap and can't open another matchday.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } icon: {
+                        Image(systemName: "flag.checkered")
+                            .foregroundStyle(.tint)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.accentColor.opacity(0.1))
                 }
             }
             .sheet(isPresented: $showAddManualFixture) {
@@ -461,14 +478,18 @@ struct OpenRoundView: View {
     }
 
     private func create() {
-        let round = GameLogicService.openRound(
+        guard let round = try? GameLogicService.openRound(
             in: game,
             fixtureIds: Array(selectedFixtureIds),
             fixtures: allFixtures,
             deadline: deadline,
             roundType: roundType,
             context: context
-        )
+        ) else {
+            try? context.save()
+            dismiss()
+            return
+        }
         try? context.save()
         if entitlements.canUseCloud && pwaSubmissionsEnabled {
             let name = managerName

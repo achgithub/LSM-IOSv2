@@ -65,9 +65,9 @@ enum TutorialDataService {
     }
 
     @discardableResult
-    static func openLMSRound1(in game: Game, context: ModelContext) -> Round {
+    static func openLMSRound1(in game: Game, context: ModelContext) throws -> Round {
         let ids = TutorialDataGenerator.lmsRound1Fixtures.map(\.matchId)
-        return GameLogicService.openRound(
+        return try GameLogicService.openRound(
             in: game, fixtureIds: ids,
             deadline: Date().addingTimeInterval(-4 * 24 * 3600),
             roundType: .normal, context: context
@@ -84,9 +84,9 @@ enum TutorialDataService {
     }
 
     @discardableResult
-    static func openLMSRound2(in game: Game, context: ModelContext) -> Round {
+    static func openLMSRound2(in game: Game, context: ModelContext) throws -> Round {
         let ids = TutorialDataGenerator.lmsRound2Fixtures.map(\.matchId)
-        return GameLogicService.openRound(
+        return try GameLogicService.openRound(
             in: game, fixtureIds: ids,
             deadline: Date().addingTimeInterval(-2 * 24 * 3600),
             roundType: .normal, context: context
@@ -138,9 +138,9 @@ enum TutorialDataService {
     }
 
     @discardableResult
-    static func openPredictorRound(in game: Game, context: ModelContext) -> Round {
+    static func openPredictorRound(in game: Game, context: ModelContext) throws -> Round {
         let ids = TutorialDataGenerator.predictorFixtures.map(\.matchId)
-        return GameLogicService.openRound(
+        return try GameLogicService.openRound(
             in: game, fixtureIds: ids,
             deadline: Date().addingTimeInterval(-1 * 24 * 3600),
             roundType: .normal, context: context

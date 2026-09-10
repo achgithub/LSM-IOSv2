@@ -49,6 +49,12 @@ final class Game {
     var predictorResultPoints: Int = 2
     /// One double-points fixture per matchday per player, off by default.
     var predictorJokerEnabled: Bool = false
+    /// Predictor has no elimination or fixture-exhaustion end condition, so
+    /// without a cap it runs forever (see `GameLogicService.openRound`,
+    /// which enforces this). Per-game rather than a global constant so a
+    /// manager can be raised past it later without a migration. Unused by
+    /// LMS/Killer games.
+    var predictorMaxWeeks: Int = 10
 
     // Killer settings — set once at creation, prefilled from the manager's
     // last-used settings. Unused by LMS/Predictor games. See the Killer
@@ -122,6 +128,7 @@ final class Game {
         predictorResultEnabled: Bool = true,
         predictorResultPoints: Int = 2,
         predictorJokerEnabled: Bool = false,
+        predictorMaxWeeks: Int = 10,
         killerBuildPhaseRounds: Int = 2,
         killerMaxAdditionalLives: Int = 10,
         killerMaxMPG: Int = 5
@@ -144,6 +151,7 @@ final class Game {
         self.predictorResultEnabled = predictorResultEnabled
         self.predictorResultPoints = predictorResultPoints
         self.predictorJokerEnabled = predictorJokerEnabled
+        self.predictorMaxWeeks = predictorMaxWeeks
         self.killerBuildPhaseRounds = killerBuildPhaseRounds
         self.killerMaxAdditionalLives = killerMaxAdditionalLives
         self.killerMaxMPG = killerMaxMPG
@@ -183,6 +191,12 @@ final class Game {
     }
     var activePlayers: [Player] { players.filter { $0.status == .active } }
     var currentRound: Round? { rounds.max(by: { $0.roundNumber < $1.roundNumber }) }
+
+    /// True once Predictor has reached its week cap (`predictorMaxWeeks`) and
+    /// no further round can be opened. Always false for other modes.
+    var predictorAtWeekCap: Bool {
+        mode == .predictor && (rounds.map(\.roundNumber).max() ?? 0) >= predictorMaxWeeks
+    }
 
     /// Next sequential entry number for a player added to this game.
     var nextEntryNumber: Int { (players.map(\.entryNumber).max() ?? 0) + 1 }

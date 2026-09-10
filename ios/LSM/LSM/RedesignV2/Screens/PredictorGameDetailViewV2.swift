@@ -145,7 +145,7 @@ struct PredictorGameDetailViewV2: View {
                 HStack {
                     V2StatusBadge(gameStatus: game.status)
                     Spacer()
-                    Text("Round \(currentRound?.roundNumber ?? 0)")
+                    Text("Round \(currentRound?.roundNumber ?? 0) / \(game.predictorMaxWeeks)")
                         .font(V2Theme.Typography.metadata)
                         .foregroundStyle(V2Theme.textSecondary)
                 }
@@ -190,6 +190,11 @@ struct PredictorGameDetailViewV2: View {
                     ActionRow(title: "Share Entry Closed Card", icon: "square.and.arrow.up", isEnabled: round.deadline < Date()) {
                         AdGate.run { sheet = .shareEntryClosed }
                     }
+                } else if game.predictorAtWeekCap {
+                    Label("Week cap reached", systemImage: "flag.checkered")
+                        .foregroundStyle(V2Theme.textSecondary)
+                    Text("This Predictor game has reached its \(game.predictorMaxWeeks)-week cap and can't open another matchday.")
+                        .font(.caption).foregroundStyle(V2Theme.textTertiary)
                 } else {
                     PrimaryButton(title: "Open Round", isEnabled: game.players.count >= 2, tint: V2Theme.Mode.predictor) { sheet = .open }
                         .tutorialAnchor(id: "pred.openRound")
