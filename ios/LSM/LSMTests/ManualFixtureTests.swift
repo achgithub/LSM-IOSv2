@@ -156,7 +156,7 @@ struct ManualFixtureTests {
             leagueId: "REAL"
         )
 
-        let round = GameLogicService.openRound(
+        let round = try GameLogicService.openRound(
             in: g,
             fixtureIds: [999, 1000, 1001],
             fixtures: [manualFixture, anchorFixture, outlierFixture],
@@ -194,7 +194,7 @@ struct ManualFixtureTests {
             leagueId: "REAL"
         )
 
-        let round = GameLogicService.openRound(
+        let round = try GameLogicService.openRound(
             in: g,
             fixtureIds: [999, 1000],
             fixtures: [manualFixture, anchorFixture],
@@ -228,7 +228,7 @@ struct ManualFixtureTests {
             leagueId: "REAL"
         )
 
-        let round = GameLogicService.openRound(
+        let round = try GameLogicService.openRound(
             in: g,
             fixtureIds: [999, 1000],
             fixtures: [manualFixture, anchorFixture],

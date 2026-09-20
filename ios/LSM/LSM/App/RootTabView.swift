@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// The five tabs. Tagged so the selection survives the language re-key (see
 /// `AppRootView`): changing language recreates this view, so the selection lives
