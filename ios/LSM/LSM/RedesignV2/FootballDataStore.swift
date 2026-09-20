@@ -19,15 +19,28 @@ import Foundation
 /// action behind its own cooldown, not the per-screen Standings refresh.
 @Observable
 final class FootballDataStore {
+    /// Persists `freshUntil` across store instances — the store itself is
+    /// `@State` on `LeaguesPortalViewV2`, so it's recreated from scratch
+    /// every time that screen is pushed to again, which used to silently
+    /// reset the cooldown (leave, come back, SYNC looks available again
+    /// even mid-throttle).
+    private static let freshUntilKey = "footballDataStore.freshUntil"
+
     var isLoading = false
     var errorMessage: String?
     var lastRefreshed: Date?
-    var freshUntil: Date?
+    var freshUntil: Date? {
+        didSet { UserDefaults.standard.set(freshUntil, forKey: Self.freshUntilKey) }
+    }
     /// Ticked every second by the view's `Timer.publish` while throttled —
     /// see `FootballDataCard`'s `.onReceive`. Settable (not `private(set)`)
     /// for exactly that; a one-shot sleep-then-set-once left the countdown
     /// frozen on screen between arm and expiry.
     var now = Date()
+
+    init() {
+        freshUntil = UserDefaults.standard.object(forKey: Self.freshUntilKey) as? Date
+    }
 
     var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
 
@@ -43,8 +56,12 @@ final class FootballDataStore {
     /// Ad-gated for free users (skipped entirely for subscribers via
     /// `AdGate`); the 2-minute cooldown applies to everyone regardless of
     /// tier, so it can't be hammered by repeatedly dismissing/re-watching ads.
+    /// Also guards `isLoading` directly (not just relying on the caller's
+    /// button being disabled) — the SYNC tile no longer marks itself
+    /// `.disabled` while loading, since SwiftUI auto-dims disabled content
+    /// in a way that made the throttle countdown unreadable.
     func refresh(leagues: [LeagueOption]) {
-        guard !isThrottled else { return }
+        guard !isThrottled, !isLoading else { return }
         AdGate.run { [weak self] in Task { await self?.load(leagues: leagues) } }
     }
 

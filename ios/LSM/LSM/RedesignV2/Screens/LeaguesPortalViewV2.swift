@@ -70,10 +70,12 @@ struct LeaguesPortalViewV2: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(store.isLoading || store.isThrottled)
-                // No opacity dimming — the label text itself ("SYNCING…" /
-                // "WAIT Xm") already explains the disabled state, and a
-                // dimmed tile made that text hard to read.
+                // Deliberately not `.disabled(…)` — SwiftUI auto-dims a
+                // disabled control's own content regardless of any
+                // `.opacity()` override, which made the "WAIT Xm" countdown
+                // unreadable. `refresh()` already no-ops while throttled
+                // (and while `isLoading`), so a tap here is inert either
+                // way; the label text alone communicates the state.
                 Button { toggle(.subscription) } label: {
                     V2Tile(icon: "star.fill", label: "SUBSCRIPTION", color: V2Theme.warning, isSelected: expandedPanel == .subscription)
                 }
