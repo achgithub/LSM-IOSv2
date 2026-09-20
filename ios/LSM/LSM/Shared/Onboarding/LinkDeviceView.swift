@@ -56,7 +56,7 @@ struct LinkDeviceView: View {
                 }
             }
         } message: {
-            Text("This phone will become the active device for this account. Your other device will stop working until it's linked again.")
+            Text("This will become the active device for this account. Your other device will stop working until it's linked again.")
         }
     }
 

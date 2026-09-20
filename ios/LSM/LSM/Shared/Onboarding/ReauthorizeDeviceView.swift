@@ -70,7 +70,7 @@ struct ReauthorizeDeviceView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
             } header: {
-                Text("This phone lost its security key")
+                Text("This device lost its security key")
             } footer: {
                 Text("Enter the email you registered on this account to reconnect this device.")
             }

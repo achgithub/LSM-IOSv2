@@ -12216,37 +12216,37 @@
         }
       }
     },
-    "This phone lost its security key": {
+    "This device lost its security key": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dieses Handy hat seinen Sicherheitsschlüssel verloren"
+            "value": "Dieses Gerät hat seinen Sicherheitsschlüssel verloren"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Este móvil ha perdido su clave de seguridad"
+            "value": "Este dispositivo ha perdido su clave de seguridad"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ce téléphone a perdu sa clé de sécurité"
+            "value": "Cet appareil a perdu sa clé de sécurité"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questo telefono ha perso la sua chiave di sicurezza"
+            "value": "Questo dispositivo ha perso la sua chiave di sicurezza"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deze telefoon is zijn beveiligingssleutel kwijt"
+            "value": "Dit toestel is zijn beveiligingssleutel kwijt"
           }
         }
       }
@@ -12356,37 +12356,72 @@
         }
       }
     },
-    "This phone will become the active device for this account. Your other device will stop working until it's linked again.": {
+    "This will become the active device for this account. Your other device will stop working until it's linked again.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dieses Handy wird zum aktiven Gerät für dieses Konto. Dein anderes Gerät funktioniert erst wieder, wenn es erneut verknüpft wird."
+            "value": "Dieses Gerät wird zum aktiven Gerät für dieses Konto. Dein anderes Gerät funktioniert erst wieder, wenn es erneut verknüpft wird."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Este móvil pasará a ser el dispositivo activo de esta cuenta. Tu otro dispositivo dejará de funcionar hasta que lo vuelvas a vincular."
+            "value": "Este pasará a ser el dispositivo activo de esta cuenta. Tu otro dispositivo dejará de funcionar hasta que lo vuelvas a vincular."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ce téléphone deviendra l’appareil actif de ce compte. Ton autre appareil cessera de fonctionner jusqu’à ce qu’il soit lié à nouveau."
+            "value": "Cet appareil deviendra l’appareil actif de ce compte. Ton autre appareil cessera de fonctionner jusqu’à ce qu’il soit lié à nouveau."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questo telefono diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi."
+            "value": "Questo diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deze telefoon wordt het actieve toestel voor dit account. Je andere toestel werkt niet meer totdat het opnieuw is gekoppeld."
+            "value": "Dit wordt het actieve toestel voor dit account. Je andere toestel werkt niet meer totdat het opnieuw is gekoppeld."
+          }
+        }
+      }
+    },
+    "This player was removed from Players. Their results in this game are kept, but there's no submission link or group to manage anymore.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Spieler wurde aus Spieler entfernt. Seine Ergebnisse in diesem Spiel bleiben erhalten, aber es gibt keinen Einsende-Link oder keine Gruppe mehr zu verwalten."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este jugador fue eliminado de Jugadores. Sus resultados en esta partida se conservan, pero ya no hay enlace de envío ni grupo que gestionar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce joueur a été retiré de Joueurs. Ses résultats dans cette partie sont conservés, mais il n’y a plus de lien d’envoi ni de groupe à gérer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo giocatore è stato rimosso da Giocatori. I suoi risultati in questa partita restano, ma non c’è più un link di invio o un gruppo da gestire."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deze speler is verwijderd uit Spelers. Zijn resultaten in dit spel blijven bewaard, maar er is geen inzendlink of groep meer om te beheren."
           }
         }
       }
@@ -15222,6 +15257,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "Selectie"
+          }
+        }
+      }
+    },
+    "Roster entry removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kadereintrag entfernt"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrada de plantilla eliminada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fiche d'effectif supprimée"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce rosa rimossa"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selectie-item verwijderd"
           }
         }
       }

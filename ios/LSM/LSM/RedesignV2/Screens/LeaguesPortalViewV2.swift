@@ -63,7 +63,11 @@ struct LeaguesPortalViewV2: View {
                 Button {
                     store.refresh(leagues: enabled.leagues)
                 } label: {
-                    V2Tile(icon: "arrow.clockwise", label: store.isLoading ? "SYNCING…" : "SYNC", color: V2Theme.warning)
+                    V2Tile(
+                        icon: "arrow.clockwise",
+                        label: store.isLoading ? "SYNCING…" : (store.throttleRemainingLabel.map { "WAIT \($0)" } ?? "SYNC"),
+                        color: V2Theme.warning
+                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(store.isLoading || store.isThrottled)

@@ -192,9 +192,18 @@ extension View {
 /// win/eliminated status label. Tapping a roster-linked player opens
 /// `PlayerDetailViewV2` — same screen `PlayersViewV2` links to — so link
 /// mint/regenerate/remove queries can be handled right from the game
-/// without a trip to the Players tab; a player with no roster member
-/// (manager's own entry, or typed directly with no link possible) renders
-/// inert, no tap.
+/// without a trip to the Players tab; a player with no roster member at all
+/// (the manager's own entry, or one typed directly with no link possible)
+/// renders inert, no tap — that part's by design, unchanged.
+///
+/// A player whose `RosterMember` *used to* exist but was since deleted from
+/// Players is a third case: `player.rosterMemberId` is still set, but it no
+/// longer resolves to anything in `allMembers`. That used to fall into the
+/// same "inert" branch as the two cases above — silently indistinguishable
+/// from "never linked" — which read as a dead row with no explanation. Now
+/// it still navigates, just to `V2OrphanedPlayerDetailView` instead of
+/// `PlayerDetailViewV2`, so it's clear the row isn't broken, the roster
+/// entry is just gone.
 ///
 /// Absorbs the LMS-only `PlayerRowV2` and Predictor/Killer's identical
 /// `playerRowContent` — those differed only in this one optional suffix
@@ -210,10 +219,19 @@ struct V2GamePlayerRow: View {
     let tint: Color
     var showsStatus: Bool = false
 
+    private var isOrphaned: Bool { member == nil && player.rosterMemberId != nil }
+
     var body: some View {
         if let member {
             NavigationLink {
                 PlayerDetailViewV2(member: member, pwaEnabled: pwaEnabled)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else if isOrphaned {
+            NavigationLink {
+                V2OrphanedPlayerDetailView(player: player)
             } label: {
                 content
             }
@@ -245,6 +263,38 @@ struct V2GamePlayerRow: View {
         }
         .padding(10)
         .background(V2Theme.pillBackground, in: RoundedRectangle(cornerRadius: V2Theme.Radius.row, style: .continuous))
+    }
+}
+
+/// Destination for a `V2GamePlayerRow` whose `RosterMember` was deleted from
+/// Players after this player was added to the game (see that type's doc
+/// comment). Just an explainer — none of `PlayerDetailViewV2`'s roster-level
+/// actions (link, groups, rename-cascade) apply with no `RosterMember` to
+/// act on. Removing this player from the game itself is still available
+/// from the Players card row's context menu, same as any other player.
+struct V2OrphanedPlayerDetailView: View {
+    let player: Player
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: V2Theme.Spacing.section) {
+                Card(floating: true) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Roster entry removed")
+                            .font(V2Theme.Typography.rowTitle)
+                            .foregroundStyle(V2Theme.textPrimary)
+                        Text("This player was removed from Players. Their results in this game are kept, but there's no submission link or group to manage anymore.")
+                            .font(.footnote)
+                            .foregroundStyle(V2Theme.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, V2Theme.Spacing.horizontal)
+            .padding(.vertical, V2Theme.Spacing.section)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .v2TeamRoomScene()
+        .v2FloatingHeader(verbatim: player.name)
     }
 }
 

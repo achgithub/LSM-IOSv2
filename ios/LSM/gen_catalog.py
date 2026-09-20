@@ -710,7 +710,7 @@ add("Link This Device", "Vincular este dispositivo", "Dieses Gerät verknüpfen"
 add("Link Device", "Vincular dispositivo", "Gerät verknüpfen", "Lier l’appareil", "Toestel koppelen", "Collega dispositivo")
 add("Reconnect This Device", "Reconectar este dispositivo", "Dieses Gerät neu verbinden", "Reconnecter cet appareil", "Dit toestel opnieuw koppelen", "Riconnetti questo dispositivo")
 add("Confirm It's You", "Confirma que eres tú", "Bestätige, dass du es bist", "Confirme que c’est toi", "Bevestig dat jij het bent", "Conferma che sei tu")
-add("This phone lost its security key", "Este móvil ha perdido su clave de seguridad", "Dieses Handy hat seinen Sicherheitsschlüssel verloren", "Ce téléphone a perdu sa clé de sécurité", "Deze telefoon is zijn beveiligingssleutel kwijt", "Questo telefono ha perso la sua chiave di sicurezza")
+add("This device lost its security key", "Este dispositivo ha perdido su clave de seguridad", "Dieses Gerät hat seinen Sicherheitsschlüssel verloren", "Cet appareil a perdu sa clé de sécurité", "Dit toestel is zijn beveiligingssleutel kwijt", "Questo dispositivo ha perso la sua chiave di sicurezza")
 add("Enter the email you registered on your previous device.",
     "Introduce el correo que registraste en tu dispositivo anterior.",
     "Gib die E-Mail-Adresse ein, die du auf deinem vorherigen Gerät registriert hast.",
@@ -724,12 +724,18 @@ add("Enter the email you registered on this account to reconnect this device.",
     "Voer het e-mailadres in dat je voor dit account hebt geregistreerd om dit toestel opnieuw te koppelen.",
     "Inserisci l’email registrata su questo account per riconnettere questo dispositivo.")
 add("Make This Your Active Device?", "¿Hacer de este tu dispositivo activo?", "Dieses Gerät zum aktiven Gerät machen?", "Faire de cet appareil ton appareil actif ?", "Dit toestel je actieve toestel maken?", "Rendere questo il tuo dispositivo attivo?")
-add("This phone will become the active device for this account. Your other device will stop working until it's linked again.",
-    "Este móvil pasará a ser el dispositivo activo de esta cuenta. Tu otro dispositivo dejará de funcionar hasta que lo vuelvas a vincular.",
-    "Dieses Handy wird zum aktiven Gerät für dieses Konto. Dein anderes Gerät funktioniert erst wieder, wenn es erneut verknüpft wird.",
-    "Ce téléphone deviendra l’appareil actif de ce compte. Ton autre appareil cessera de fonctionner jusqu’à ce qu’il soit lié à nouveau.",
-    "Deze telefoon wordt het actieve toestel voor dit account. Je andere toestel werkt niet meer totdat het opnieuw is gekoppeld.",
-    "Questo telefono diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi.")
+add("This will become the active device for this account. Your other device will stop working until it's linked again.",
+    "Este pasará a ser el dispositivo activo de esta cuenta. Tu otro dispositivo dejará de funcionar hasta que lo vuelvas a vincular.",
+    "Dieses Gerät wird zum aktiven Gerät für dieses Konto. Dein anderes Gerät funktioniert erst wieder, wenn es erneut verknüpft wird.",
+    "Cet appareil deviendra l’appareil actif de ce compte. Ton autre appareil cessera de fonctionner jusqu’à ce qu’il soit lié à nouveau.",
+    "Dit wordt het actieve toestel voor dit account. Je andere toestel werkt niet meer totdat het opnieuw is gekoppeld.",
+    "Questo diventerà il dispositivo attivo per questo account. L’altro dispositivo smetterà di funzionare finché non lo ricolleghi.")
+add("This player was removed from Players. Their results in this game are kept, but there's no submission link or group to manage anymore.",
+    "Este jugador fue eliminado de Jugadores. Sus resultados en esta partida se conservan, pero ya no hay enlace de envío ni grupo que gestionar.",
+    "Dieser Spieler wurde aus Spieler entfernt. Seine Ergebnisse in diesem Spiel bleiben erhalten, aber es gibt keinen Einsende-Link oder keine Gruppe mehr zu verwalten.",
+    "Ce joueur a été retiré de Joueurs. Ses résultats dans cette partie sont conservés, mais il n’y a plus de lien d’envoi ni de groupe à gérer.",
+    "Deze speler is verwijderd uit Spelers. Zijn resultaten in dit spel blijven bewaard, maar er is geen inzendlink of groep meer om te beheren.",
+    "Questo giocatore è stato rimosso da Giocatori. I suoi risultati in questa partita restano, ma non c’è più un link di invio o un gruppo da gestire.")
 
 # Failure alert titles for the family
 add("Registering an email for recovery is part of the 3 Leagues plan and above.",
@@ -838,6 +844,7 @@ add("Resolve the round", "Resolver la ronda", "Runde auflösen", "Résoudre la m
 add("Result rules", "Reglas de resultado", "Ergebnisregeln", "Règles de résultat", "Uitslagregels", "Regole del risultato")
 add("Results due", "Resultados pendientes", "Ergebnisse fällig", "Résultats attendus", "Uitslagen open", "Risultati attesi")
 add("Roster", "Plantilla", "Kader", "Effectif", "Selectie", "Rosa")
+add("Roster entry removed", "Entrada de plantilla eliminada", "Kadereintrag entfernt", "Fiche d'effectif supprimée", "Selectie-item verwijderd", "Voce rosa rimossa")
 add("Round %lld closed", "Ronda %lld cerrada", "Runde %lld geschlossen", "Manche %lld clôturée", "Ronde %lld gesloten", "Turno %lld chiuso")
 add("SEARCH", "BUSCAR", "SUCHE", "RECHERCHE", "ZOEKEN", "CERCA")
 add("STANDINGS", "CLASIFICACIÓN", "TABELLE", "CLASSEMENT", "STAND", "CLASSIFICA")

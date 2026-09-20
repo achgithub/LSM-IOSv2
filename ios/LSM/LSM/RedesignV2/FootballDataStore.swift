@@ -31,6 +31,15 @@ final class FootballDataStore {
 
     var isThrottled: Bool { freshUntil.map { now < $0 } ?? false }
 
+    /// "4M" while throttled, counting down as `now` ticks — `nil` once the
+    /// cooldown lapses. Lets the SYNC tile explain *why* it's greyed out
+    /// instead of just going dim with no feedback.
+    var throttleRemainingLabel: String? {
+        guard let freshUntil, now < freshUntil else { return nil }
+        let minutes = Int((freshUntil.timeIntervalSince(now) / 60).rounded(.up))
+        return "\(max(minutes, 1))M"
+    }
+
     /// Ad-gated for free users (skipped entirely for subscribers via
     /// `AdGate`); the 2-minute cooldown applies to everyone regardless of
     /// tier, so it can't be hammered by repeatedly dismissing/re-watching ads.
