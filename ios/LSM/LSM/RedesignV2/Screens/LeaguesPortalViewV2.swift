@@ -71,12 +71,9 @@ struct LeaguesPortalViewV2: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(store.isLoading || store.isThrottled)
-                // Only dim for the brief "syncing" spinner state — while
-                // throttled, the "WAIT Xm" countdown IS the disabled
-                // indicator, and needs to stay legible to do its job (a
-                // full opacity dim greyed the countdown text itself out
-                // to the point of being unreadable).
-                .opacity(store.isLoading ? 0.4 : 1)
+                // No opacity dimming — the label text itself ("SYNCING…" /
+                // "WAIT Xm") already explains the disabled state, and a
+                // dimmed tile made that text hard to read.
                 Button { toggle(.subscription) } label: {
                     V2Tile(icon: "star.fill", label: "SUBSCRIPTION", color: V2Theme.warning, isSelected: expandedPanel == .subscription)
                 }
