@@ -74,10 +74,12 @@ struct V2PreviewMenuView: View {
         // The submission bell that used to sit in this header was dropped —
         // Games' own SUBMISSIONS tile (see `GamesPortalViewV2`) already
         // covers it, so this was a duplicate entry point.
+        // Always rendered, even with zero games — this grid is Home's only
+        // way out (GAMES/LEAGUES/PLAYERS/HELP/SETTINGS), so hiding it on an
+        // empty `games` left a new user, or a single-league plan right after
+        // a league swap deleted every game, stranded on a bare stadium.
         .v2FloatingHeaderWithTiles("Last Stand Manager") {
-            if !games.isEmpty {
-                GamesOverviewSummary(games: games, expandedPanel: $expandedPanel)
-            }
+            GamesOverviewSummary(games: games, expandedPanel: $expandedPanel)
         }
         // Applied after the header/fade modifier, not before — the fade
         // mask only ever covers the scrollable content, so the stadium
