@@ -20,6 +20,28 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
     @ViewBuilder var trailing: () -> Trailing
     @ViewBuilder var tiles: () -> Tiles
     @Environment(\.dismiss) private var dismiss
+    /// Measured, since trailing content varies per screen (Done, refresh +
+    /// Done, Auto-Assign + Done, export/rename pair) — see `titleInsets`.
+    @State private var trailingWidth: CGFloat = 0
+    @State private var rowWidth: CGFloat = 0
+    @State private var titleWidth: CGFloat = 0
+
+    /// Keeps the title clear of the corner controls floating over it. If it
+    /// fits between them while still centered (both sides inset by the wider
+    /// corner), it stays centered; otherwise it takes the actual free space
+    /// on each side — slightly off-center beats squeezing a long title down
+    /// to "…" just to preserve symmetry against a wide trailing pair.
+    private var titleInsets: (leading: CGFloat, trailing: CGFloat) {
+        let gap: CGFloat = 8
+        // 36pt = `V2HeaderIconLabel`'s back chevron.
+        let leading = showBack ? 36 + gap : 0
+        let trailing = trailingWidth > 0 ? trailingWidth + gap : 0
+        let symmetric = max(leading, trailing)
+        if titleWidth <= rowWidth - 2 * symmetric {
+            return (symmetric, symmetric)
+        }
+        return (leading, trailing)
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -57,10 +79,29 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
                 // two sides carried different widths — title centers
                 // absolutely here, with back/trailing floating over it in
                 // their natural corners instead of sharing its layout.
+                //
+                // Floating over it means the title has to be kept clear of
+                // them explicitly (see `titleInsets`), then shrinks/truncates
+                // to fit what's left. Without this, a results-entry screen's
+                // refresh + Done pair ran straight through "Results · Round N".
                 ZStack {
                     title
                         .font(V2Theme.Typography.pageTitle)
                         .foregroundStyle(V2Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        // Natural (unscaled) width, measured off a hidden
+                        // copy so the shrink-to-fit above can't feed back
+                        // into the centered-vs-offset decision.
+                        .background {
+                            title
+                                .font(V2Theme.Typography.pageTitle)
+                                .fixedSize()
+                                .hidden()
+                                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { titleWidth = $0 }
+                        }
+                        .padding(.leading, titleInsets.leading)
+                        .padding(.trailing, titleInsets.trailing)
                         .frame(maxWidth: .infinity, alignment: .center)
                     HStack {
                         if showBack {
@@ -69,8 +110,10 @@ struct V2FloatingHeader<Trailing: View, Tiles: View>: View {
                         }
                         Spacer()
                         trailing()
+                            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { trailingWidth = $0 }
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
                 tiles()
             }
             .padding(.horizontal, V2Theme.Spacing.horizontal)

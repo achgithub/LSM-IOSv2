@@ -29,7 +29,13 @@ private struct V2ResultsEntryChromeModifier: ViewModifier {
             .v2LoadingOverlay(isLoading, label: "Loading fixtures…")
             .v2FloatingHeader(title, showBack: false) {
                 HStack(spacing: 14) {
+                    // Icon-only: outside a real toolbar a `Label` renders its
+                    // "Refresh matches" text too, which crowded the title.
+                    // The text stays as the accessibility label.
                     LiveMatchRefreshButton(state: refresh) { await onPullFromServer() }
+                        .labelStyle(.iconOnly)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(tint)
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
                         .foregroundStyle(tint)
