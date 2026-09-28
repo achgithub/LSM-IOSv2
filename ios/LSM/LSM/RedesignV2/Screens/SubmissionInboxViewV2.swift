@@ -30,6 +30,7 @@ struct SubmissionInboxViewV2: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selection: SelectedSubmission?
+    @State private var isApprovingAll = false
 
     private var visibleItems: [SubmissionItem] {
         guard let filterGameToken else { return items }
@@ -54,9 +55,25 @@ struct SubmissionInboxViewV2: View {
         games.first { $0.cloudGameToken?.uuidString.lowercased() == token.lowercased() }
     }
 
+    /// Visible submissions that have a local game to apply an approval to —
+    /// orphaned rows (game no longer on this device) are delete-only, so
+    /// they're excluded from bulk approve.
+    private var approvableItems: [(item: SubmissionItem, game: Game)] {
+        visibleItems.compactMap { item in
+            guard let token = item.gameToken, let game = localGame(forTokenString: token) else { return nil }
+            return (item, game)
+        }
+    }
+
     var body: some View {
+        let approvable = approvableItems
         ScrollView {
             LazyVStack(alignment: .leading, spacing: V2Theme.Spacing.section) {
+                if errorMessage == nil, !approvable.isEmpty {
+                    PrimaryButton(title: "Approve All (\(approvable.count))", isEnabled: !isApprovingAll) {
+                        Task { await approveAll(approvable) }
+                    }
+                }
                 if isLoading && items.isEmpty {
                     Color.clear.frame(height: 200)
                 } else if let errorMessage {
@@ -165,6 +182,29 @@ struct SubmissionInboxViewV2: View {
         } catch {
             inboxLog.warning("Approve failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Approves every item in one pass, then reloads once. A failure on one
+    /// item is logged and skipped so the rest still go through — the reload
+    /// leaves any failed ones in the list to retry.
+    private func approveAll(_ approvable: [(item: SubmissionItem, game: Game)]) async {
+        isApprovingAll = true
+        for (item, game) in approvable {
+            guard let tokenString = item.gameToken, let gameToken = UUID(uuidString: tokenString) else { continue }
+            do {
+                let result = try await SubmissionsClient.shared.approve(submissionId: item.id, gameToken: gameToken)
+                if let round = game.currentRound, round.status != .closed {
+                    await MainActor.run {
+                        SubmissionApplyService.apply(result, playerName: item.playerName, game: game, round: round, context: context)
+                    }
+                }
+            } catch {
+                inboxLog.warning("Approve-all partial failure for \(item.id): \(error.localizedDescription)")
+            }
+        }
+        isApprovingAll = false
+        await load()
+        await SubmissionBadgeStore.shared.refresh()
     }
 
     /// Also the delete path for an orphaned submission — the server-side

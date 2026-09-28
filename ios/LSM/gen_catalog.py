@@ -759,6 +759,7 @@ add("All Groups", "Todos los grupos", "Alle Gruppen", "Tous les groupes", "Alle 
 add("All submitted", "Todas enviadas", "Alle abgegeben", "Tous envoyés", "Alles ingestuurd", "Tutte inviate")
 add("Apply Correction", "Aplicar corrección", "Korrektur anwenden", "Appliquer la correction", "Correctie toepassen", "Applica correzione")
 add("Approve", "Aprobar", "Genehmigen", "Approuver", "Goedkeuren", "Approva")
+add("Approve All (%lld)", "Aprobar todo (%lld)", "Alle genehmigen (%lld)", "Tout approuver (%lld)", "Alles goedkeuren (%lld)", "Approva tutto (%lld)")
 add("Assign Players", "Asignar jugadores", "Spieler zuweisen", "Attribuer les joueurs", "Spelers toewijzen", "Assegna giocatori")
 add("Assign players to the game",
     "Asigna jugadores a la partida",
